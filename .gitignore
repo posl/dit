@@ -1,8 +1,2 @@
 .DS_Store
 .vscode/
-__pycache__
-
-.venv/
-Pipfile.lock
-
-check.py
