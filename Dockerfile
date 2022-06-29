@@ -1,0 +1,5 @@
+ARG BASE=ubuntu
+ARG VERSION=latest
+FROM $BASE:$VERSION
+
+CMD ["bash"]
