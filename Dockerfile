@@ -9,14 +9,17 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ENV WORK_DIR /src/
-WORKDIR ${WORK_DIR}
+WORKDIR /src
+COPY ./src/cmd/c ./
 
-COPY ./src/cmd/c ${WORK_DIR}
-
-#
-# RUN: gcc で c-file をコンパイルし，実行ファイルを /src/exe ディレクトリに生成
-#
+RUN mkdir exe && \
+    echo $'\
+        for i in ./*.c; do\n\
+            if [ -r $i ]; then\n\
+                gcc $i -o exe/${i%.c} -march=native -O2\n\
+            fi\n\
+        done' \
+    | sh -s
 
 
 ARG BASE=debian
@@ -31,4 +34,6 @@ ARG BASE=debian
 ARG VERSION=latest
 ENV BASE=${BASE}
 ENV VERSION=${VERSION}
-CMD ["sh"]
+
+# FIXME: bash -> sh
+CMD ["bash"]
