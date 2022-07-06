@@ -12,6 +12,7 @@ RUN apt-get update && \
 WORKDIR /src
 COPY ./src/cmd/c ./
 
+# compile c-files in /src, and generate executable files in /src/exe
 RUN mkdir exe && \
     printf '\
         for i in ./*.c; do\n\
@@ -26,6 +27,7 @@ ARG BASE=debian
 ARG VERSION=latest
 FROM ${BASE}:${VERSION} as product
 
+# load self-made commands and shell's initialization file
 COPY --from=builder /src/exe /bin/
 COPY ./src/cmd/sh /bin/
 COPY ./src/cfg/dit_profile.sh /etc/profile.d/
