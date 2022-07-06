@@ -13,10 +13,10 @@ WORKDIR /src
 COPY ./src/cmd/c ./
 
 RUN mkdir exe && \
-    echo -e '\
+    printf '\
         for i in ./*.c; do\n\
             if [ -r $i ]; then\n\
-                gcc $i -o exe/${i%.c} -march=native -O2\n\
+                gcc $i -o exe/${i%%.c} -march=native -O2\n\
             fi\n\
         done' \
     | sh -s
