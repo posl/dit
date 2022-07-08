@@ -27,7 +27,7 @@ ARG BASE=debian
 ARG VERSION=latest
 FROM ${BASE}:${VERSION} as product
 
-# load self-made commands and shell's initialization file
+# load self-made commands, and shell's initialization file
 COPY --from=builder /src/exe /bin/
 COPY ./src/cmd/sh /bin/
 COPY ./src/cfg/dit_profile.sh /etc/profile.d/
