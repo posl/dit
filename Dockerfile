@@ -31,6 +31,3 @@ ARG BASE=debian
 ARG VERSION=latest
 ENV BASE=${BASE}
 ENV VERSION=${VERSION}
-
-# FIXME: bash -> sh
-CMD ["bash"]
