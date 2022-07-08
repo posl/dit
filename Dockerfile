@@ -14,13 +14,8 @@ COPY ./src/cmd/c ./
 
 # compile c-files in /src, and generate executable files in /src/exe
 RUN mkdir exe && \
-    printf '\
-        for i in ./*.c; do\n\
-            if [ -r $i ]; then\n\
-                gcc $i -o exe/${i%%.c} -march=native -O2\n\
-            fi\n\
-        done' \
-    | sh -s
+    chmod +x compile.sh && \
+    ./compile.sh
 
 
 ARG BASE=debian
