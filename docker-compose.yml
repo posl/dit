@@ -1,0 +1,21 @@
+version: "3.8"
+
+# user-defined variables (in order: base-image name, base-image version and directory to be bound)
+x-var0: &BASE
+  debian
+x-var1: &VERSION
+  latest
+x-var2: &SHARED_DIR
+  ./dit
+
+services:
+  dit:
+    build:
+      context: ./docker
+      args:
+        BASE: *BASE
+        VERSION: *VERSION
+    volumes:
+      - type: bind
+        source: *SHARED_DIR
+        target: /dit
