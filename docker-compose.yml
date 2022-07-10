@@ -15,6 +15,7 @@ services:
       args:
         BASE: *BASE
         VERSION: *VERSION
+    image: docker-interaction-tool
     volumes:
       - type: bind
         source: *SHARED_DIR
