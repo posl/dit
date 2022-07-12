@@ -1,12 +1,12 @@
 #!/bin/sh
 
 
-# =============================================================================
-# initialize files in shared directory
-# =============================================================================
+#
+# initialize files related Docker in shared directory
+#
 
 if ! pushd /dit; then
-    echo "Please check if you granted run-time option like '--mount type=bind,src=<YourDir>,dst=/dit'"
+    echo "Please check if you created or specified the directory to be bound."
     exit
 fi
 
@@ -17,62 +17,50 @@ fi
 
 if [ ! -e Dockerfile.draft ]; then
     echo "FROM ${BASE}:${VERSION}" > Dockerfile.draft
+    echo "WORKDIR $(pwd)" >> Dockerfile.draft
 fi
 unset BASE
 unset VERSION
 
 if [ ! -e .dockerignore ]; then
     cat << EOF > .dockerignore
-.cmd_log
-.cmd_ignore
-.cmd_disregard
+.cmd_history
+.ignore_hist
+.ignore_dock
+user_entry.sh
 EOF
 fi
 
 
-if [ ! -e .cmd_log ]; then
-    touch .cmd_log
+
+#
+# if necessary, reproduce the environment under construction
+#
+
+if [ ! -e .cmd_history ]; then
+    touch .cmd_history
 fi
 
-if [ ! -e .cmd_ignore ]; then
-    cat << EOF > .cmd_ignore
-commit
-optimize
-inspect
-setuser
-label
-healthcheck
-ignore
-disregard
-EOF
-fi
-
-if [ ! -e .cmd_disregard ]; then
-    cat << EOF > .cmd_disregard
-ls
-less
-more
-EOF
+if [ -s .cmd_history ]; then
+    source .cmd_history > /dev/null
 fi
 
 popd
 
 
 
-# =============================================================================
-# if log-file isn't empty, reproduce the environment under construction
-# =============================================================================
+#
+# set PS1, to be referred every time any command is executed
+#
 
+PROMPT_OPT(){
+    :
+}
 
-if [ -s .cmd_log ]; then
-    . .cmd_log > /dev/null
-fi
+PROMPT_STR(){
+    echo '\u@\h:\w \$ '
+}
 
-
-
-# =============================================================================
-# set PS1, to realize interactional development in docker container
-# =============================================================================
-
-export PS1='\u@\h:\w \$ '
-ls -alhSF
+PS1='$( (reflect -n && PROMPT_OPT) > /dev/null )'"$( PROMPT_STR )"
+export PS1
+readonly PS1
