@@ -12,8 +12,7 @@ WORKDIR /src
 COPY ./src/cmd/c ./
 
 # compile c-files in /src, and generate executable files in /src/exe
-RUN mkdir exe && \
-    chmod +x compile.sh && \
+RUN chmod +x compile.sh && \
     ./compile.sh
 
 
