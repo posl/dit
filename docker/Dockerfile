@@ -2,9 +2,8 @@ ARG BASE=debian
 ARG VERSION=latest
 FROM ${BASE}:${VERSION} as builder
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && \
+RUN DEBIAN_FRONTEND=noninteractive \
+    apt-get update && \
     apt-get install -y --no-install-recommends build-essential gcc && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
