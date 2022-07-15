@@ -6,7 +6,7 @@ x-var0: &BASE
 x-var1: &VERSION
   latest
 x-var2: &SHARED_DIR
-  ./dit
+  ./app
 
 services:
   dit:
@@ -16,7 +16,10 @@ services:
         BASE: *BASE
         VERSION: *VERSION
     image: docker-interaction-tool
+    network_mode: "none"
+    stdin_open: true
+    tty: true
     volumes:
       - type: bind
         source: *SHARED_DIR
-        target: /dit
+        target: /dit/share

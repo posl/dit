@@ -5,29 +5,24 @@
 # initialize files related Docker in shared directory
 #
 
-if [ ! -e /dit ]; then
+if [ ! -e /dit/share ]; then
     echo "Error: please check if you created or specified the directory to be bound." 1>&2
     exit 1
 fi
 
 
-if [ ! -e /dit/Dockerfile ]; then
-    touch /dit/Dockerfile
+if [ ! -e /dit/share/Dockerfile ]; then
+    touch /dit/share/Dockerfile
 fi
 
-if [ ! -e /dit/Dockerfile.draft ]; then
-    ( echo "FROM ${BASE}:${VERSION}"; echo "WORKDIR $(pwd)" ) > /dit/Dockerfile.draft
+if [ ! -e /dit/share/Dockerfile.draft ]; then
+    ( echo "FROM ${BASE}:${VERSION}"; echo "WORKDIR $(pwd)" ) > /dit/share/Dockerfile.draft
 fi
 unset BASE
 unset VERSION
 
-if [ ! -e /dit/.dockerignore ]; then
-    cat << EOF > /dit/.dockerignore
-.cmd_history
-.cmd_ignore.h
-.cmd_ignore.d
-user_entry.sh
-EOF
+if [ ! -e /dit/share/.dockerignore ]; then
+    echo ".cmd_history" > /dit/share/.dockerignore
 fi
 
 
@@ -92,10 +87,10 @@ readonly PS1
 # if necessary, reproduce the environment under construction
 #
 
-if [ -e /dit/.cmd_history ]; then
-    if [ -s /dit/.cmd_history ]; then
-        . /dit/.cmd_history > /dev/null
+if [ -e /dit/share/.cmd_history ]; then
+    if [ -s /dit/share/.cmd_history ]; then
+        . /dit/share/.cmd_history > /dev/null
     fi
 else
-    touch /dit/.cmd_history
+    touch /dit/share/.cmd_history
 fi
