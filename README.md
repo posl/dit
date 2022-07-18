@@ -1,5 +1,5 @@
 <!-- omit in toc -->
-# Interaction Tool for Docker
+# Interactive Tool for Docker
 
 1. [Procedure](#procedure)
 
