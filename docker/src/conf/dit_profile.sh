@@ -16,10 +16,14 @@ if [ ! -e /dit/share/Dockerfile ]; then
 fi
 
 if [ ! -e /dit/share/Dockerfile.draft ]; then
-    ( echo "FROM ${BASE}:${VERSION}"; echo "WORKDIR $(pwd)" ) > /dit/share/Dockerfile.draft
+    cat <<EOF > /dit/share/Dockerfile.draft
+FROM ${BASE}:${VERSION}
+SHELL [ "${SHELL:-/bin/sh}", "-c" ]
+WORKDIR $(pwd)
+EOF
+    unset BASE
+    unset VERSION
 fi
-unset BASE
-unset VERSION
 
 if [ ! -e /dit/share/.dockerignore ]; then
     echo ".cmd_history" > /dit/share/.dockerignore
