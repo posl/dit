@@ -2,8 +2,8 @@ ARG BASE=debian
 ARG VERSION=latest
 FROM ${BASE}:${VERSION} as builder
 
-RUN DEBIAN_FRONTEND=noninteractive \
-    apt-get update && \
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential gcc && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -22,9 +22,9 @@ ARG BASE=debian
 ARG VERSION=latest
 FROM ${BASE}:${VERSION} as product
 
-# load tool-specific commands, shell's initialization file and files stored in shared directory
+# load tool-specific commands, initialization file and configuration files
 COPY --from=builder /src/exe /usr/local/bin/
-COPY ./src/conf/.dit_profile /etc/profile.d/
+COPY ./src/conf/dit_profile.sh /etc/profile.d/
 COPY ./src/conf/.cmd_ignore.* /dit/conf/
 
 ARG BASE=debian
