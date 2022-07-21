@@ -3,6 +3,7 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 
@@ -28,7 +29,7 @@ int optimize(int, char **);
 utility functions
 */
 
-int arg_bsearch(const char *, const char **, int);
+char *fget_line(FILE *, int);
 
 
 #endif

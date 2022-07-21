@@ -35,21 +35,16 @@ fi
 # set environment variables, reserved by this tool
 #
 
-CHANGE_IN_HISTORY=+0
-CHANGE_IN_DOCKERFILE=+0
+CHANGE_IN_HISTORY=0
+CHANGE_IN_DOCKERFILE=0
 
 MODE_OF_REFLECT=both
 MODE_OF_IGNORE=simple
 
-MAXLEN_OF_COMMAND=128
-MAXLEN_OF_LINE=1024
-
-
 export \
     LAST_EXIT_STATUS  LAST_SENTENCE \
     CHANGE_IN_HISTORY  CHANGE_IN_DOCKERFILE \
-    MODE_OF_REFLECT  MODE_OF_IGNORE \
-    MAXLEN_OF_COMMAND  MAXLEN_OF_LINE
+    MODE_OF_REFLECT  MODE_OF_IGNORE
 
 
 
@@ -71,7 +66,7 @@ PROMPT_OPTION(){
 }
 
 PROMPT_REPORT(){
-    echo "[hist:${CHANGE_IN_HISTORY%:*} dock:${CHANGE_IN_DOCKERFILE%:*}] "
+    echo "[hist:+${CHANGE_IN_HISTORY%:*} dock:+${CHANGE_IN_DOCKERFILE%:*}] "
 }
 
 export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT || true
@@ -84,6 +79,29 @@ export PROMPT_STRING
 PS1='$( (PROMPT_REFLECT && PROMPT_OPTION) > /dev/null && PROMPT_REPORT )'"${PROMPT_STRING:-\\$ }"
 export PS1
 readonly PS1
+
+
+
+#
+# define alias of tool-specific commands
+#
+
+alias \
+    commit='dit commit' \
+    config='dit config' \
+    conf='config' \
+    convert='dit convert' \
+    conv='convert' \
+    erase='dit erase' \
+    healthcheck='dit healthcheck' \
+    hc='healthcheck' \
+    ignore='dit ignore' \
+    ig='ignore' \
+    inspect='dit inspect' \
+    insp='inspect' \
+    label='dit label' \
+    optimize='dit optimize' \
+    opt='optimize'
 
 
 
