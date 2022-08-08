@@ -1,12 +1,35 @@
+/**
+ * @file main.c
+ *
+ * Copyright (c) 2022 Tsukasa Inada
+ *
+ * @brief Described the main function and the functions commonly used in other files.
+ * @author Tsukasa Inada
+ * @date 2022/07/18
+ */
+
 #include "main.h"
 
 #define CMDS_NUM 10
 
 
-static int (* const __get_subcmd(char *))(int, char **);
+static int (* const __get_subcmd(const char *target))(int, char **);
 
 
 
+
+/******************************************************************************
+    * Global Main Interface
+******************************************************************************/
+
+
+/**
+ * @brief user interface for all subcommand
+ *
+ * @param[in]  argc  the number of command line arguments
+ * @param[out] argv  array of strings that are command line arguments
+ * @return int  command's exit status
+ */
 int main(int argc, char **argv){
     if (--argc <= 0){
         fputs("dit: requires one subcommand. See 'dit help'.\n", stderr);
@@ -23,7 +46,15 @@ int main(int argc, char **argv){
 }
 
 
-static int (* const __get_subcmd(char *target))(int, char **){
+/**
+ * @brief extract the corresponding subcommand.
+ *
+ * @param[in]  target  string of the first argument passed on the command line
+ * @return int(* const)(int, char**)  function of the desired subcommand or NULL
+ *
+ * @note using binary search.
+ */
+static int (* const __get_subcmd(const char *target))(int, char **){
     const char *cmds_str[CMDS_NUM] = {
         "commit",
         "config",
@@ -49,10 +80,7 @@ static int (* const __get_subcmd(char *target))(int, char **){
         optimize
     };
 
-    int min, max, mid, tmp;
-    min = 0;
-    max = CMDS_NUM - 1;
-
+    int min = 0, max = CMDS_NUM - 1, mid, tmp;
     while (min < max){
         mid = (min + max) / 2;
         tmp = strcmp(target, cmds_str[mid]);
@@ -73,29 +101,93 @@ static int (* const __get_subcmd(char *target))(int, char **){
 
 
 
+/******************************************************************************
+    * Extensions of Standard Library Functions
+******************************************************************************/
 
 
-char *fget_line(FILE *stream, int block_size){
-    char *line, *tmp;
-    line = (tmp = (char *) malloc(sizeof(char) * block_size));
-
-    int len = 0;
-    while ((! fgets(tmp, block_size, stream)) && ((len += (int) strlen(tmp)) > 0)){
-        if (line[len - 1] != '\n')
-            if (! feof(stream)){
-                line = (char *) realloc(line, sizeof(char) * (len + block_size));
-                tmp = &line[len];
-                continue;
-            }
-        else
-            line[len - 1] = '\0';
-        return line;
+/**
+ * @brief extension of malloc function
+ * @details added processing to exit abnormally when an error occurs.
+ *
+ * @param[in]  size  the number of bytes you want to reserve in the heap area
+ * @return void*  pointer to the beginning of the reserved area
+ */
+void *xmalloc(size_t size){
+    void *p;
+    if (! (p = malloc(size))){
+        perror("malloc");
+        exit(1);
     }
+    return p;
+}
 
-    free(line);
-    if (ferror(stream)){
-        perror("fgets");
-        exit(EXIT_FAILURE);
+
+/**
+ * @brief extension of realloc function
+ * @details added processing to exit abnormally when an error occurs.
+ *
+ * @param[out] ptr  pointer that has already reserved a heap area
+ * @param[in]  size  the number of bytes you want to again-reserve in the heap area
+ * @return void*  pointer to the beginning of the again-reserved area
+ */
+void *xrealloc(void *ptr, size_t size){
+    if (! (ptr = realloc(ptr, size))){
+        perror("realloc");
+        exit(1);
     }
-    return NULL;
+    return ptr;
+}
+
+
+
+
+/******************************************************************************
+    * Extra Implementation of Library Functions
+******************************************************************************/
+
+
+/**
+ * @brief extra implementation of strndup function
+ *
+ * @param[in]  src  string you want to make a copy of in the heap area
+ * @param[in]  n  the length of string
+ * @return char*  pointer to string copied in the heap area
+ */
+char *xstrndup(const char *src, size_t n){
+    char *dest, *tmp;
+    dest = (tmp = (char *) xmalloc(sizeof(char) * (n + 1)));
+    while (n--)
+        *(tmp++) = *(src++);
+    *tmp = '\0';
+    return dest;
+}
+
+
+
+
+/******************************************************************************
+    * Utilitys
+******************************************************************************/
+
+
+/**
+ * @brief  detect whether the first string forwardly matches the second string.
+ *
+ * @param[in]  target  target string to see if it matches prefix with expected string
+ * @param[in]  expected  expected string
+ * @return int  comparison result
+ *
+ * @attention both of the arguments must not be NULL.
+ */
+int strcmp_forward_match(const char *target, const char *expected){
+    char c;
+    do
+        if (! *target)
+            return 0;
+        else if (! *expected)
+            return 1;
+    while (! (c = *(target++) - *(expected++)));
+
+    return (c < 0) ? -1 : 1;
 }
