@@ -2,6 +2,7 @@
 #define DOCKER_INTERACTIVE_TOOL
 
 
+#include <ctype.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>

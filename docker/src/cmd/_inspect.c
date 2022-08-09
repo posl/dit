@@ -86,7 +86,7 @@ static void __print_file_mode(mode_t mode);
 static void __print_file_user(uid_t uid, bool numeric_id);
 static void __print_file_group(gid_t gid, bool numeric_id);
 static void __print_file_size(off_t size);
-static void __print_file_name(const char *name, mode_t mode, bool link_invalid, bool color, bool classify);
+static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool color, bool classify);
 
 
 
@@ -724,15 +724,23 @@ static void __print_file_size(off_t size){
 /**
  * @brief display file name on screen.
  *
- * @param[in]  name  file name
+ * @param[out] name  file name
  * @param[in]  mode  file mode
  * @param[in]  link_invalid  whether file name is relative to a file that is an invalid symlink
  * @param[in]  color  whether to colorize file name depending on file mode
  * @param[in]  classify  whether to append indicator to file name depending on file mode
  */
-static void __print_file_name(const char *name, mode_t mode, bool link_invalid, bool color, bool classify){
+static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool color, bool classify){
+    char *tmp;
+    tmp = name;
+    while (*tmp){
+        if (iscntrl((int) *tmp))
+            *tmp = '?';
+        tmp++;
+    }
+
     if (color){
-        char *code =
+        tmp =
             link_invalid ? "31" :
             S_ISREG(mode) ? (
                 (mode & S_ISUID) ? "37;41" :
@@ -753,7 +761,7 @@ static void __print_file_name(const char *name, mode_t mode, bool link_invalid, 
             S_ISLNK(mode) ? "1;36" :
             S_ISSOCK(mode) ? "1;35" :
             "0";
-        printf("\033[%sm%s\033[0m", code, name);
+        printf("\033[%sm%s\033[0m", tmp, name);
     }
     else
         printf(name);
