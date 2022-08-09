@@ -1,12 +1,12 @@
-ARG BASE=debian
-ARG VERSION=latest
-FROM ${BASE}:${VERSION} as builder
+ARG BASE_IMAGE=debian
+ARG BASE_VERSION=latest
+FROM ${BASE_IMAGE}:${BASE_VERSION} as builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential \
         gcc \
+        libc-dev \
     && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -19,18 +19,18 @@ RUN gcc *.c -o dit -march=native -O2
 
 
 
-ARG BASE=debian
-ARG VERSION=latest
-FROM ${BASE}:${VERSION} as product
+ARG BASE_IMAGE=debian
+ARG BASE_VERSION=latest
+FROM ${BASE_IMAGE}:${BASE_VERSION} as product
 
-# load tool-specific commands, initialization file and configuration files
+# load dit command, initialization file and configuration files
 COPY --from=builder /cmd/dit /usr/local/bin/
 COPY ./src/dit_profile.sh /etc/profile.d/
 COPY ./conf /dit/conf/
 
-ARG BASE=debian
-ARG VERSION=latest
-ENV BASE=${BASE}
-ENV VERSION=${VERSION}
+ARG BASE_IMAGE=debian
+ARG BASE_VERSION=latest
+ENV BASE_IMAGE=${BASE_IMAGE}
+ENV BASE_VERSION=${BASE_VERSION}
 
 ENTRYPOINT [ "/bin/bash", "--login" ]
