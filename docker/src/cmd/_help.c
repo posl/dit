@@ -66,8 +66,10 @@ int help(int argc, char **argv){
  * @return int(* const)(int, char**)  desired help function or NULL
  */
 static void (* const __get_help_func(const char *target))(){
-    if (! strcmp(target, "hc"))
+    if (! strcmp(target, "hc")){
+        puts("< healthcheck >");
         return help_healthcheck;
+    }
 
     void (* const help_funcs[CMDS_NUM])() = {
         help_commit,
@@ -86,8 +88,10 @@ static void (* const __get_help_func(const char *target))(){
     char *desc;
     if ((i = bsearch_subcmds(target, strcmp_forward_match)) >= 0){
         if (((! i) || strcmp_forward_match(target, subcmds[i - 1])) && \
-            ((i == CMDS_NUM - 1) || strcmp_forward_match(target, subcmds[i + 1])))
+            ((i == CMDS_NUM - 1) || strcmp_forward_match(target, subcmds[i + 1]))){
+            printf("< %s >\n", subcmds[i]);
             return help_funcs[i];
+        }
 
         desc = "ambiguous";
     }
