@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described subcommand that display the directory tree
+ * @brief Described subcommand that displays the directory tree
  * @author Tsukasa Inada
  * @date 2022/07/18
  */
@@ -109,7 +109,7 @@ static void __print_file_name(const char *name, mode_t mode, bool link_invalid, 
 int inspect(int argc, char **argv){
     if (setvbuf(stdout, NULL, _IOFBF, 0)){
         perror("setvbuf");
-        exit(1);
+        return 1;
     }
 
     int nonopt_index;
@@ -209,24 +209,7 @@ static int __parse_args(int argc, char **argv, options *opt){
                 }
                 break;
             case 2:
-                puts("Usage: dit inspect [OPTION]... [DIRECTORY]...");
-                puts("List information about the files under the specified DIRECTORYs in a tree format.\n");
-                puts("Options:");
-                puts("  -c, --color              colorize the output to distinguish file types");
-                puts("  -F, --classify           append indicator (one of */=|) to each file name:");
-                puts("                             to executable file, directory, socket or fifo, in order");
-                puts("  -n, --numeric-uid-gid    list the corresponding IDs instead of user or group name");
-                puts("  -S, --sort-size          sort by file size, largest first");
-                puts("  -X, --sort-extension     sort by file extension, alphabetically");
-                puts("      --sort=WORD          replace the default sorting method:");
-                puts("                             size (-S), extension (-X)");
-                puts("      --help               display this help and exit\n");
-                puts("Each directory is sorted alphabetically unless otherwise specified.");
-                puts("Prefixs representing file size are k,M,G,T,P,E,Z, which is powers of 1000.");
-                puts("Undisplayable characters appearing in the file name are uniformly replaced with '?'.");
-                puts("Two hyphens can mark the end of the option like any other command.\n");
-                puts("The above options are similar to the 'ls' command which is a GNU one.");
-                puts("See that man page for more details.");
+                help_inspect();
                 exit(0);
             case ':':
                 fputs("inspect: option '--sort' requires an argument\n", stderr);
@@ -522,10 +505,7 @@ static int __comp_file_name(const void *a, const void *b, int (* const addition)
     file_tree *file2 = *((file_tree **) b);
 
     int i;
-    if (addition && (i = addition(file1, file2)))
-        return i;
-
-    return strcmp(file1->name, file2->name);
+    return (addition && (i = addition(file1, file2))) ? i : strcmp(file1->name, file2->name);
 }
 
 

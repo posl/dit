@@ -10,10 +10,22 @@
 
 #include "main.h"
 
-#define CMDS_NUM 10
-
 
 static int (* const __get_subcmd(const char *target))(int, char **);
+
+
+const char * const subcmds[CMDS_NUM] = {
+    "commit",
+    "config",
+    "convert",
+    "erase",
+    "healthcheck",
+    "help",
+    "ignore",
+    "inspect",
+    "label",
+    "optimize"
+};
 
 
 
@@ -31,43 +43,29 @@ static int (* const __get_subcmd(const char *target))(int, char **);
  * @return int  command's exit status
  */
 int main(int argc, char **argv){
-    if (--argc <= 0){
-        fputs("dit: requires one subcommand. See 'dit help'.\n", stderr);
-        return 1;
-    }
+    if (--argc > 0){
+        int (* subcmd)(int, char **);
+        if ((subcmd = __get_subcmd(*(++argv))))
+            return subcmd(argc, argv);
 
-    int (* subcmd)(int, char **);
-    if (! (subcmd = __get_subcmd(*(++argv)))){
-        fprintf(stderr, "dit: '%s' is not a dit command. See 'dit help'.\n", *argv);
-        return 1;
+        fprintf(stderr, "dit: '%s' is not a dit command.\n", *argv);
     }
+    else
+        fputs("dit: requires one subcommand.\n", stderr);
 
-    return subcmd(argc, argv);
+    fputs("Try 'dit help' for more information.\n", stderr);
+    return 1;
 }
 
 
 /**
  * @brief extract the corresponding subcommand.
  *
- * @param[in]  target  string of the first argument passed on the command line
+ * @param[in]  target  string that is the first argument passed on the command line
  * @return int(* const)(int, char**)  function of the desired subcommand or NULL
- *
- * @note using binary search.
  */
 static int (* const __get_subcmd(const char *target))(int, char **){
-    const char *cmds_str[CMDS_NUM] = {
-        "commit",
-        "config",
-        "convert",
-        "erase",
-        "healthcheck",
-        "help",
-        "ignore",
-        "inspect",
-        "label",
-        "optimize"
-    };
-    int (* const cmds_func[CMDS_NUM])(int, char **) = {
+    int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
         commit,
         config,
         convert,
@@ -80,22 +78,8 @@ static int (* const __get_subcmd(const char *target))(int, char **){
         optimize
     };
 
-    int min = 0, max = CMDS_NUM - 1, mid, tmp;
-    while (min < max){
-        mid = (min + max) / 2;
-        tmp = strcmp(target, cmds_str[mid]);
-        if (tmp)
-            if (tmp > 0)
-                min = mid + 1;
-            else
-                max = mid - 1;
-        else
-            return cmds_func[mid];
-    }
-
-    if ((min == max) && (! strcmp(target, cmds_str[min])))
-        return cmds_func[min];
-    return NULL;
+    int i;
+    return ((i = bsearch_subcmds(target, strcmp)) >= 0) ? cmd_funcs[i] : NULL;
 }
 
 
@@ -153,8 +137,15 @@ void *xrealloc(void *ptr, size_t size){
  * @param[in]  src  string you want to make a copy of in the heap area
  * @param[in]  n  the length of string
  * @return char*  pointer to string copied in the heap area
+ *
+ * @note considering the possibility that size_t type is not unsigned.
  */
 char *xstrndup(const char *src, size_t n){
+    if (n < 0){
+        fputs("xstrndup: the length of string must not be a negative integer", stderr);
+        exit(1);
+    }
+
     char *dest, *tmp;
     dest = (tmp = (char *) xmalloc(sizeof(char) * (n + 1)));
     while (n--)
@@ -172,16 +163,44 @@ char *xstrndup(const char *src, size_t n){
 
 
 /**
- * @brief  detect whether the first string forwardly matches the second string.
+ * @brief search subcommands for target string.
  *
- * @param[in]  target  target string to see if it matches prefix with expected string
+ * @param[in]  target  target string
+ * @param[in]  comp  comparison function
+ * @return int  index of the corresponding subcommand or -1
+ *
+ * @note using binary search.
+ */
+int bsearch_subcmds(const char *target, int (* const comp)(const char *, const char *)){
+    int min = 0, max = CMDS_NUM - 1, mid, tmp;
+    while (min < max){
+        mid = (min + max) / 2;
+        tmp = comp(target, subcmds[mid]);
+        if (tmp){
+            if (tmp > 0)
+                min = mid + 1;
+            else
+                max = mid - 1;
+        }
+        else
+            return mid;
+    }
+
+    return ((min == max) && (! comp(target, subcmds[min]))) ? min : -1;
+}
+
+
+/**
+ * @brief detect whether the first string forwardly matches the second string.
+ *
+ * @param[in]  target  target string
  * @param[in]  expected  expected string
  * @return int  comparison result
  *
  * @attention both of the arguments must not be NULL.
  */
 int strcmp_forward_match(const char *target, const char *expected){
-    char c;
+    signed char c;
     do
         if (! *target)
             return 0;
