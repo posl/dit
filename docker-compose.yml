@@ -1,9 +1,9 @@
 version: "3.8"
 
 # user-defined variables (in order: base-image name, base-image version and directory to be bound)
-x-var0: &BASE
+x-var0: &BASE_IMAGE
   debian
-x-var1: &VERSION
+x-var1: &BASE_VERSION
   latest
 x-var2: &SHARED_DIR
   ./app
@@ -13,8 +13,8 @@ services:
     build:
       context: ./docker
       args:
-        BASE: *BASE
-        VERSION: *VERSION
+        BASE_IMAGE: *BASE_IMAGE
+        BASE_VERSION: *BASE_VERSION
     image: docker-interactive-tool
     network_mode: "none"
     stdin_open: true
