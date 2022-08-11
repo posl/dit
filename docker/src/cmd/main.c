@@ -15,16 +15,18 @@ static int (* const __get_subcmd(const char *target))(int, char **);
 
 
 const char * const subcmds[CMDS_NUM] = {
-    "commit",
     "config",
     "convert",
+    "cp",
     "erase",
     "healthcheck",
     "help",
     "ignore",
     "inspect",
     "label",
-    "optimize"
+    "onbuild",
+    "optimize",
+    "setcmd"
 };
 
 
@@ -66,16 +68,18 @@ int main(int argc, char **argv){
  */
 static int (* const __get_subcmd(const char *target))(int, char **){
     int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
-        commit,
         config,
         convert,
+        cp,
         erase,
         healthcheck,
         help,
         ignore,
         inspect,
         label,
-        optimize
+        onbuild,
+        optimize,
+        setcmd
     };
 
     int i;
@@ -86,7 +90,7 @@ static int (* const __get_subcmd(const char *target))(int, char **){
 
 
 /******************************************************************************
-    * Extensions of Standard Library Functions
+    * Extension of Library Functions
 ******************************************************************************/
 
 
@@ -124,15 +128,8 @@ void *xrealloc(void *ptr, size_t size){
 }
 
 
-
-
-/******************************************************************************
-    * Extra Implementation of Library Functions
-******************************************************************************/
-
-
 /**
- * @brief extra implementation of strndup function
+ * @brief extension of strndup function
  *
  * @param[in]  src  string you want to make a copy of in the heap area
  * @param[in]  n  the length of string

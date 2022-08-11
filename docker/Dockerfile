@@ -25,7 +25,8 @@ FROM ${BASE_IMAGE}:${BASE_VERSION} as product
 
 # load dit command, initialization file and configuration files
 COPY --from=builder /cmd/dit /usr/local/bin/
-COPY ./src/dit_profile.sh /etc/profile.d/
+COPY ./src/script/dit_profile.sh /etc/profile.d/
+COPY ./src/script/*.awk /dit/script/
 COPY ./conf /dit/conf/
 
 ARG BASE_IMAGE=debian

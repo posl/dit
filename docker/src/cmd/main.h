@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CMDS_NUM 10
+#define CMDS_NUM 12
 
 
 
@@ -17,16 +17,18 @@
     * Tool-specific Functions
 ******************************************************************************/
 
-int commit(int argc, char **argv);
 int config(int argc, char **argv);
 int convert(int argc, char **argv);
+int cp(int argc, char **argv);
 int erase(int argc, char **argv);
 int healthcheck(int argc, char **argv);
 int help(int argc, char **argv);
 int ignore(int argc, char **argv);
 int inspect(int argc, char **argv);
 int label(int argc, char **argv);
+int onbuild(int argc, char **argv);
 int optimize(int argc, char **argv);
+int setcmd(int argc, char **argv);
 
 
 
@@ -34,32 +36,27 @@ int optimize(int argc, char **argv);
     * Help Function for each Subcommand
 ******************************************************************************/
 
-void help_commit();
 void help_config();
 void help_convert();
+void help_cp();
 void help_erase();
 void help_healthcheck();
 void help_help();
 void help_ignore();
 void help_inspect();
 void help_label();
+void help_onbuild();
 void help_optimize();
+void help_setcmd();
 
 
 
 /******************************************************************************
-    * Extensions of Standard Library Functions
+    * Extension of Library Functions
 ******************************************************************************/
 
 void *xmalloc(size_t size);
 void *xrealloc(void *ptr, size_t size);
-
-
-
-/******************************************************************************
-    * Extra Implementation of Library Functions
-******************************************************************************/
-
 char *xstrndup(const char *src, size_t n);
 
 

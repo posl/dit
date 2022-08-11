@@ -66,9 +66,9 @@ typedef int (* const comp_func)(const void *, const void *);
 static int __parse_args(int argc, char **argv, options *opt);
 
 static file_tree *__construct_file_tree(const char *base_path, options *opt);
-static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, comp_func comp);
+static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp);
 static void __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
-static file_tree *__new_file(const char *path, const char *name);
+static file_tree *__new_file(char *path, char *name);
 static void __append_file(file_tree *dir, file_tree *file);
 
 static comp_func __get_comp_func(int sort_style);
@@ -114,7 +114,7 @@ int inspect(int argc, char **argv){
 
     int nonopt_index;
     options opt;
-    char *path;
+    const char *path;
 
     if ((nonopt_index = __parse_args(argc, argv, &opt)) == argc){
         argc = 1;
@@ -276,7 +276,7 @@ static file_tree *__construct_file_tree(const char *base_path, options *opt){
  *
  * @note at the same time, sort files in directory.
  */
-static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, comp_func comp){
+static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp){
     file_tree *file;
     file = __new_file(ipath->ptr, name);
 
@@ -353,7 +353,7 @@ static void __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
  * @param[in]  name  name of the file we are currently looking at
  * @return file_tree*  new element that makes up the directory tree
  */
-static file_tree *__new_file(const char *path, const char *name){
+static file_tree *__new_file(char *path, char *name){
     struct stat file_stat;
     if (lstat(path, &file_stat)){
         fputs("inspect: ", stderr);
@@ -529,7 +529,7 @@ static int __comp_file_size(file_tree *file1, file_tree *file2){
  * @return int  comparison result
  */
 static int __comp_file_extension(file_tree *file1, file_tree *file2){
-    char *ext1, *ext2;
+    const char *ext1, *ext2;
     ext1 = __get_file_extension(file1->name);
     ext2 = __get_file_extension(file2->name);
     return strcmp(ext1, ext2);
@@ -543,7 +543,7 @@ static int __comp_file_extension(file_tree *file1, file_tree *file2){
  * @return const char*  string representing the file extension
  */
 static const char *__get_file_extension(const char *name){
-    char *ext;
+    const char *ext;
     ext = name;
     while (*name)
         if (*(name++) == '.')

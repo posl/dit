@@ -64,24 +64,32 @@ int help(int argc, char **argv){
  *
  * @param[in]  target  string that is the argument passed on the command line
  * @return int(* const)(int, char**)  desired help function or NULL
+ *
+ * @note "cfg" and "hc", which are default aliases of config and heatlthcheck, are supported.
  */
 static void (* const __get_help_func(const char *target))(){
+    if (! strcmp(target, "cfg")){
+        puts(" < config >");
+        return help_config;
+    }
     if (! strcmp(target, "hc")){
-        puts("< healthcheck >");
+        puts(" < healthcheck >");
         return help_healthcheck;
     }
 
     void (* const help_funcs[CMDS_NUM])() = {
-        help_commit,
         help_config,
         help_convert,
+        help_cp,
         help_erase,
         help_healthcheck,
         help_help,
         help_ignore,
         help_inspect,
         help_label,
-        help_optimize
+        help_onbuild,
+        help_optimize,
+        help_setcmd
     };
 
     int i;
@@ -89,7 +97,7 @@ static void (* const __get_help_func(const char *target))(){
     if ((i = bsearch_subcmds(target, strcmp_forward_match)) >= 0){
         if (((! i) || strcmp_forward_match(target, subcmds[i - 1])) && \
             ((i == CMDS_NUM - 1) || strcmp_forward_match(target, subcmds[i + 1]))){
-            printf("< %s >\n", subcmds[i]);
+            printf(" < %s >\n", subcmds[i]);
             return help_funcs[i];
         }
 
@@ -115,25 +123,22 @@ void __help_dit(){
     puts("By specifying one of the following SUBCOMMANDs, you can use the tool-specific functions.\n");
     puts("Subcommands:\n");
     puts("main features of this tool");
-    puts("  convert           output how a command line is reflected in the history-file and Dockerfile");
-    puts("  optimize          refactoring Dockerfile based on its best practices\n");
+    puts("  convert        output how a command line is reflected to Dockerfile and history-file");
+    puts("  optimize       refactoring Dockerfile based on its best practices\n");
     puts("customize tool settings");
-    puts("  config            change the specification of how the executed command line is reflected");
-    puts("  ignore            edit set of commands that is ignored when reflecting a command line\n");
-    puts("add/delete its own instructions to Dockerfile");
-    puts("  commit            add/delete CMD or ENTRYPOINT instruction");
-    puts("  healthcheck       add/delete HEALTHCHECK instruction");
-    puts("  label             add/delete LABEL or EXPOSE instruction\n");
+    puts("  config         change the specification of how a executed command line is reflected");
+    puts("  ignore         edit set of commands that is ignored when reflecting a command line\n");
+    puts("edit the Dockerfile");
+    puts("  cp             copy files from shared directory, and reflect this as COPY or ADD instruction");
+    puts("  label          edit LABEL or EXPOSE instruction");
+    puts("  setcmd         reflect the last command line as CMD or ENTRYPOINT instruction");
+    puts("  healthcheck    reflect the last command line as HEALTHCHECK instruction");
+    puts("  onbuild        reflect the last command line as ONBUILD instruction\n");
     puts("utilitys");
-    puts("  erase             remove specific lines from a tool-specific file");
-    puts("  inspect           display the directory tree under the specified file path");
-    puts("  help              show how to use dit command\n");
+    puts("  erase          remove specific lines from a tool-specific file");
+    puts("  inspect        display the directory tree under the specified file path");
+    puts("  help           show how to use dit command\n");
     puts("See 'dit help [SUBCOMMAND]...' for more details.");
-}
-
-
-void help_commit(){
-    puts("help commit");
 }
 
 
@@ -144,6 +149,11 @@ void help_config(){
 
 void help_convert(){
     puts("help convert");
+}
+
+
+void help_cp(){
+    puts("help cp");
 }
 
 
@@ -195,6 +205,16 @@ void help_label(){
 }
 
 
+void help_onbuild(){
+    puts("help onbuild");
+}
+
+
 void help_optimize(){
     puts("help optimize");
+}
+
+
+void help_setcmd(){
+    puts("help setcmd");
 }
