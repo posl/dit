@@ -52,21 +52,12 @@ void help_setcmd();
 
 
 /******************************************************************************
-    * Extension of Library Functions
-******************************************************************************/
-
-void *xmalloc(size_t size);
-void *xrealloc(void *ptr, size_t size);
-char *xstrndup(const char *src, size_t n);
-
-
-
-/******************************************************************************
     * Utilitys
 ******************************************************************************/
 
 int bsearch_subcmds(const char *target, int (* const comp)(const char *, const char *));
 int strcmp_forward_match(const char *target, const char *expected);
+char *xstrndup(const char *src, size_t n);
 
 
 #endif

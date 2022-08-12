@@ -60,16 +60,16 @@ typedef struct {
 
 
 /** Data type for storing comparison function used when qsort */
-typedef int (* const comp_func)(const void *, const void *);
+typedef int (* comp_func)(const void *, const void *);
 
 
 static int __parse_args(int argc, char **argv, options *opt);
 
 static file_tree *__construct_file_tree(const char *base_path, options *opt);
 static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp);
-static void __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
+static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
 static file_tree *__new_file(char *path, char *name);
-static void __append_file(file_tree *dir, file_tree *file);
+static bool __append_file(file_tree *dir, file_tree *file);
 
 static comp_func __get_comp_func(int sort_style);
 static int __comp_func_unspecified(const void *a, const void *b);
@@ -107,35 +107,40 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
  * @attention try this with '--help' option for more information.
  */
 int inspect(int argc, char **argv){
-    if (setvbuf(stdout, NULL, _IOFBF, 0)){
-        perror("setvbuf");
-        return 1;
-    }
+    if (setvbuf(stdout, NULL, _IOFBF, 0))
+        perror("inspect: setvbuf");
 
-    int nonopt_index;
+    int i;
     options opt;
-    const char *path;
 
-    if ((nonopt_index = __parse_args(argc, argv, &opt)) == argc){
+    if ((i = __parse_args(argc, argv, &opt)))
+        return (i < 0) ? 1 : 0;
+
+    const char *path;
+    if (argc <= optind){
         argc = 1;
         path = ".";
     }
     else {
-        argc -= nonopt_index;
-        argv += nonopt_index;
+        argc -= optind;
+        argv += optind;
         path = *argv;
     }
 
     file_tree *tree;
+    bool error_only = true;
+
     while (1){
-        if ((tree = __construct_file_tree(path, &opt)))
+        if ((tree = __construct_file_tree(path, &opt))){
             __display_file_tree(tree, &opt);
+            error_only = false;
+        }
         if (--argc > 0){
             path = *(++argv);
             putchar('\n');
         }
         else
-            return 0;
+            return error_only ? 1 : 0;
     }
 }
 
@@ -146,9 +151,9 @@ int inspect(int argc, char **argv){
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  index pointing to the beginning of non-optional arguments
+ * @return int  parse result (zero : parse success, positive : help success, negative : parse failure)
  *
- * @note the arguments are expected to be passed as-is from main function
+ * @note the arguments are expected to be passed as-is from main function.
  */
 static int __parse_args(int argc, char **argv, options *opt){
     optind = 1;
@@ -159,8 +164,6 @@ static int __parse_args(int argc, char **argv, options *opt){
         { "color",           no_argument,       NULL, 'c' },
         { "classify",        no_argument,       NULL, 'F' },
         { "numeric-uid-gid", no_argument,       NULL, 'n' },
-        { "sort-size",       no_argument,       NULL, 'S' },
-        { "sort-extension",  no_argument,       NULL, 'X' },
         { "sort",            required_argument, NULL,  1  },
         { "help",            no_argument,       NULL,  2  },
         {  0,                 0,                 0,    0  }
@@ -210,7 +213,7 @@ static int __parse_args(int argc, char **argv, options *opt){
                 break;
             case 2:
                 help_inspect();
-                exit(0);
+                return 1;
             case ':':
                 fputs("inspect: option '--sort' requires an argument\n", stderr);
                 goto error_occurred;
@@ -222,11 +225,11 @@ static int __parse_args(int argc, char **argv, options *opt){
                 goto error_occurred;
         }
     }
-    return optind;
+    return 0;
 
 error_occurred:
     fputs("Try 'dit inspect --help' for more information.\n", stderr);
-    exit(1);
+    return -1;
 }
 
 
@@ -251,16 +254,20 @@ static file_tree *__construct_file_tree(const char *base_path, options *opt){
     if ((path_len = strlen(base_path)) > 0){
         inf_path ipath;
         ipath.max = 1024;
-        ipath.ptr = (char *) xmalloc(sizeof(char) * ipath.max);
-        __concat_inf_path(&ipath, 0, base_path, path_len);
 
-        char *name;
-        name = xstrndup(base_path, path_len);
-        if (! (tree = __construct_recursive(&ipath, path_len, name, __get_comp_func(opt->sort_style))))
-            free(name);
-        free(ipath.ptr);
+        if ((ipath.ptr = (char *) malloc(sizeof(char) * ipath.max))){
+            if (__concat_inf_path(&ipath, 0, base_path, path_len)){
+                char *name;
+                if ((name = xstrndup(base_path, path_len))){
+                    comp_func comp;
+                    if (! ((comp = __get_comp_func(opt->sort_style)) \
+                        && (tree = __construct_recursive(&ipath, path_len, name, comp))))
+                        free(name);
+                }
+            }
+            free(ipath.ptr);
+        }
     }
-
     return tree;
 }
 
@@ -286,9 +293,7 @@ static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
             fputs("inspect: ", stderr);
             perror(ipath->ptr);
         }
-        else {
-            __concat_inf_path(ipath, ipath_len++, "/", 1);
-
+        else if (__concat_inf_path(ipath, ipath_len++, "/", 1)){
             struct dirent *entry;
             while ((entry = readdir(dir))){
                 name = entry->d_name;
@@ -297,14 +302,23 @@ static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
 
                 size_t name_len;
                 name_len = strlen(name);
-                name = xstrndup(name, name_len);
-                __concat_inf_path(ipath, ipath_len, name, name_len);
 
-                file_tree *tmp;
-                if (tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp))
-                    __append_file(file, tmp);
-                else
+                if ((name = xstrndup(name, name_len))){
+                    bool continue_flag = false;
+                    if (__concat_inf_path(ipath, ipath_len, name, name_len)){
+                        file_tree *tmp;
+                        if (tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp)){
+                            if (__append_file(file, tmp))
+                                continue;
+                        }
+                        else
+                            continue_flag = true;
+                    }
                     free(name);
+                    if (continue_flag)
+                        continue;
+                }
+                break;
             }
 
             if (file->children)
@@ -325,17 +339,20 @@ static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
  * @param[in]  ipath_len  the length of base path string
  * @param[in]  suf  string to concatenate to the end of base path string
  * @param[in]  suf_len  the length of the string
+ * @return bool  successful or not
  *
  * @note path string of arbitrary length can be achieved.
  */
-static void __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len){
+static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len){
     size_t needed_len;
     needed_len = ipath_len + suf_len + 1;
     if (ipath->max < needed_len){
         do
             ipath->max *= 2;
         while (ipath->max < needed_len);
-        ipath->ptr = (char *) xrealloc(ipath->ptr, sizeof(char) * ipath->max);
+
+        if (! (ipath->ptr = (char *) realloc(ipath->ptr, sizeof(char) * ipath->max)))
+            return false;
     }
 
     char *path;
@@ -343,6 +360,8 @@ static void __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
     while (suf_len--)
         *(path++) = *(suf++);
     *path = '\0';
+
+    return true;
 }
 
 
@@ -362,42 +381,41 @@ static file_tree *__new_file(char *path, char *name){
     }
 
     file_tree *file;
-    file = (file_tree *) xmalloc(sizeof(file_tree));
+    if ((file = (file_tree *) malloc(sizeof(file_tree)))){
+        file->name = name;
+        file->mode = file_stat.st_mode;
+        file->uid = file_stat.st_uid;
+        file->gid = file_stat.st_gid;
+        file->size = file_stat.st_size;
 
-    file->name = name;
-    file->mode = file_stat.st_mode;
-    file->uid = file_stat.st_uid;
-    file->gid = file_stat.st_gid;
-    file->size = file_stat.st_size;
+        file->link_path = NULL;
+        file->link_mode = 0;
+        file->link_invalid = true;
 
-    file->link_path = NULL;
-    file->link_mode = 0;
-    file->link_invalid = true;
+        if (S_ISLNK(file->mode)){
+            char *link_path;
+            if ((link_path = (char *) malloc(sizeof(char) * (file->size + 1)))){
+                size_t link_len;
+                if ((link_len = readlink(path, link_path, file->size)) > 0){
+                    link_path[link_len] = '\0';
+                    file->link_path = link_path;
 
-    if (S_ISLNK(file->mode)){
-        char *link_path;
-        size_t link_len;
-        link_path = (char *) xmalloc(sizeof(char) * (file->size + 1));
-        link_len = readlink(path, link_path, file->size);
-
-        if (link_len > 0){
-            link_path[link_len] = '\0';
-            file->link_path = link_path;
-            if (! stat(path, &file_stat)){
-                file->link_mode = file_stat.st_mode;
-                file->link_invalid = false;
+                    if (! stat(path, &file_stat)){
+                        file->link_mode = file_stat.st_mode;
+                        file->link_invalid = false;
+                    }
+                }
+                else
+                    free(link_path);
             }
         }
         else
-            free(link_path);
+            file->link_invalid = false;
+
+        file->children = NULL;
+        file->children_num = 0;
+        file->children_max = 0;
     }
-    else
-        file->link_invalid = false;
-
-    file->children = NULL;
-    file->children_num = 0;
-    file->children_max = 0;
-
     return file;
 }
 
@@ -407,23 +425,31 @@ static file_tree *__new_file(char *path, char *name){
  *
  * @param[out] dir  the directory tree under construction
  * @param[in]  file  file to append to the directory tree
+ * @return bool  successful or not
  *
  * @note any directory can have a virtually unlimited number of files.
  */
-static void __append_file(file_tree *dir, file_tree *file){
+static bool __append_file(file_tree *dir, file_tree *file){
     if (dir->children_num == dir->children_max){
+        void *ptr;
         if (! dir->children){
             dir->children_max = 128;
-            dir->children = (file_tree **) xmalloc(sizeof(file_tree *) * dir->children_max);
+            ptr = malloc(sizeof(file_tree *) * dir->children_max);
         }
         else {
             dir->children_max *= 2;
-            dir->children = (file_tree **) xrealloc(dir->children, sizeof(file_tree *) * dir->children_max);
+            ptr = realloc(dir->children, sizeof(file_tree *) * dir->children_max);
         }
+
+        if (ptr)
+            dir->children = (file_tree **) ptr;
+        else
+            return false;
     }
 
     dir->size += file->size;
     dir->children[dir->children_num++] = file;
+    return true;
 }
 
 
@@ -656,7 +682,7 @@ static void __print_file_mode(mode_t mode){
  * @param[in]  uid  file uid
  * @param[in]  numeric_id  whether to represent users and groups numerically
  *
- * @attention if the uid exceeds 8 digits, the output will be confused.
+ * @attention if the uid exceeds 8 digits, print a string that represents a numeric excess.
  */
 static void __print_file_user(uid_t uid, bool numeric_id){
     if (! numeric_id){
@@ -666,7 +692,10 @@ static void __print_file_user(uid_t uid, bool numeric_id){
             return;
         }
     }
-    printf("%8d  ", uid);
+    if (uid < 100000000)
+        printf("%8d  ", uid);
+    else
+        puts(" #EXCESS  ");
 }
 
 
@@ -676,7 +705,7 @@ static void __print_file_user(uid_t uid, bool numeric_id){
  * @param[in]  gid  file gid
  * @param[in]  numeric_id  whether to represent users and groups numerically
  *
- * @attention if the gid exceeds 8 digits, the output will be confused.
+ * @attention if the gid exceeds 8 digits, print a string that represents a numeric excess.
  */
 static void __print_file_group(gid_t gid, bool numeric_id){
     if (! numeric_id){
@@ -686,7 +715,10 @@ static void __print_file_group(gid_t gid, bool numeric_id){
             return;
         }
     }
-    printf("%8d  ", gid);
+    if (gid < 100000000)
+        printf("%8d  ", gid);
+    else
+        puts(" #EXCESS  ");
 }
 
 
@@ -710,13 +742,12 @@ static void __print_file_size(off_t size){
             size /= 1000;
         } while (size >= 1000);
 
-        if (i > 6){
-            fputs("inspect: file size exceeds the upper limit of 1ZB.\n", stderr);
-            exit(1);
+        if (i <= 6){
+            rem /= 100;
+            printf("%3d.%1d %cB    ", (int) size, rem, units[i]);
         }
-
-        rem /= 100;
-        printf("%3d.%1d %cB    ", (int) size, rem, units[i]);
+        else
+            puts(" #EXCESS    ");
     }
 }
 
@@ -767,7 +798,8 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
         printf(name);
 
     if (classify){
-        char indicator =
+        char indicator;
+        indicator =
             (S_ISREG(mode) && (mode & S_IXUGO)) ? '*' :
             S_ISDIR(mode) ? '/' :
             S_ISFIFO(mode) ? '|' :

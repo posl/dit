@@ -90,71 +90,6 @@ static int (* const __get_subcmd(const char *target))(int, char **){
 
 
 /******************************************************************************
-    * Extension of Library Functions
-******************************************************************************/
-
-
-/**
- * @brief extension of malloc function
- * @details added processing to exit abnormally when an error occurs.
- *
- * @param[in]  size  the number of bytes you want to reserve in the heap area
- * @return void*  pointer to the beginning of the reserved area
- */
-void *xmalloc(size_t size){
-    void *p;
-    if (! (p = malloc(size))){
-        perror("malloc");
-        exit(1);
-    }
-    return p;
-}
-
-
-/**
- * @brief extension of realloc function
- * @details added processing to exit abnormally when an error occurs.
- *
- * @param[out] ptr  pointer that has already reserved a heap area
- * @param[in]  size  the number of bytes you want to again-reserve in the heap area
- * @return void*  pointer to the beginning of the again-reserved area
- */
-void *xrealloc(void *ptr, size_t size){
-    if (! (ptr = realloc(ptr, size))){
-        perror("realloc");
-        exit(1);
-    }
-    return ptr;
-}
-
-
-/**
- * @brief extension of strndup function
- *
- * @param[in]  src  string you want to make a copy of in the heap area
- * @param[in]  n  the length of string
- * @return char*  pointer to string copied in the heap area
- *
- * @note considering the possibility that size_t type is not unsigned.
- */
-char *xstrndup(const char *src, size_t n){
-    if (n < 0){
-        fputs("xstrndup: the length of string must not be a negative integer", stderr);
-        exit(1);
-    }
-
-    char *dest, *tmp;
-    dest = (tmp = (char *) xmalloc(sizeof(char) * (n + 1)));
-    while (n--)
-        *(tmp++) = *(src++);
-    *tmp = '\0';
-    return dest;
-}
-
-
-
-
-/******************************************************************************
     * Utilitys
 ******************************************************************************/
 
@@ -206,4 +141,27 @@ int strcmp_forward_match(const char *target, const char *expected){
     while (! (c = *(target++) - *(expected++)));
 
     return (c < 0) ? -1 : 1;
+}
+
+
+/**
+ * @brief another implementation of strndup function
+ *
+ * @param[in]  src  string you want to make a copy of in the heap area
+ * @param[in]  n  the length of string
+ * @return char*  pointer to string copied in the heap area
+ *
+ * @note considering the possibility that size_t type is not unsigned.
+ */
+char *xstrndup(const char *src, size_t n){
+    char *dest;
+    if ((n < 0) || (! (dest = (char *) malloc(sizeof(char) * (n + 1)))))
+        return NULL;
+
+    char *tmp;
+    tmp = dest;
+    while (n--)
+        *(tmp++) = *(src++);
+    *tmp = '\0';
+    return dest;
 }
