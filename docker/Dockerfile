@@ -25,8 +25,7 @@ FROM ${BASE_IMAGE}:${BASE_VERSION} as product
 
 # load dit command, initialization file and configuration files
 COPY --from=builder /cmd/dit /usr/local/bin/
-COPY ./src/script/dit_profile.sh /etc/profile.d/
-COPY ./src/script/*.awk /dit/script/
+COPY ./src/script /dit/script/
 COPY ./conf /dit/conf/
 
 ARG BASE_IMAGE=debian
@@ -34,4 +33,4 @@ ARG BASE_VERSION=latest
 ENV BASE_IMAGE=${BASE_IMAGE}
 ENV BASE_VERSION=${BASE_VERSION}
 
-ENTRYPOINT [ "/bin/bash", "--login" ]
+ENTRYPOINT [ "/bin/bash", "/dit/script/dit_entrypoint.sh" ]
