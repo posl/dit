@@ -182,7 +182,7 @@ void help_inspect(){
     puts("Usage: dit inspect [OPTION]... [DIRECTORY]...");
     puts("List information about the files under the specified DIRECTORYs in a tree format.\n");
     puts("Options:");
-    puts("  -c, --color              colorize the output to distinguish file types");
+    puts("  -C, --color              colorize the output to distinguish file types");
     puts("  -F, --classify           append indicator (one of */=|) to each file name:");
     puts("                             to executable file, directory, socket or fifo, in order");
     puts("  -n, --numeric-uid-gid    list the corresponding IDs instead of user or group name");
@@ -192,6 +192,8 @@ void help_inspect(){
     puts("                             name(default), size(-S), extension(-X)");
     puts("      --help               display this help, and exit normally\n");
     puts("Each directory is sorted alphabetically unless otherwise specified.");
+    puts("User or group name longer than 8 characters are converted to corresponding ID,");
+    puts("  and and IDs longer than 8 digits are converted to #EXCESS as undisplayable.");
     puts("Prefixs representing file size are k,M,G,T,P,E,Z, which is powers of 1000.");
     puts("Undisplayable characters appearing in the file name are uniformly replaced with '?'.");
     puts("Two hyphens can mark the end of the option like any other command.\n");

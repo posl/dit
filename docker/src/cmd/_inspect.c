@@ -159,9 +159,9 @@ static int __parse_args(int argc, char **argv, options *opt){
     optind = 1;
     opterr = 0;
 
-    const char *short_opts = ":cFnSX";
+    const char *short_opts = ":CFnSX";
     const struct option long_opts[] = {
-        { "color",           no_argument,       NULL, 'c' },
+        { "color",           no_argument,       NULL, 'C' },
         { "classify",        no_argument,       NULL, 'F' },
         { "numeric-uid-gid", no_argument,       NULL, 'n' },
         { "sort",            required_argument, NULL,  1  },
@@ -177,7 +177,7 @@ static int __parse_args(int argc, char **argv, options *opt){
     int c;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1){
         switch (c){
-            case 'c':
+            case 'C':
                 opt->color = true;
                 break;
             case 'F':
