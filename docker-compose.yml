@@ -16,7 +16,6 @@ services:
         BASE_IMAGE: *BASE_IMAGE
         BASE_VERSION: *BASE_VERSION
     image: docker-interactive-tool
-    network_mode: "none"
     stdin_open: true
     tty: true
     volumes:
