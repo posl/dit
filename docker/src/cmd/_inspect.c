@@ -26,7 +26,7 @@ typedef struct {
     bool classify;    /** whether to append indicator to file name depending on file mode */
     bool numeric_id;  /** whether to represent users and groups numerically */
     enum {
-        unspecified,
+        name,
         size,
         extension
     } sort_style;     /** sort style for each directory */
@@ -172,7 +172,7 @@ static int __parse_args(int argc, char **argv, options *opt){
     opt->color = false;
     opt->classify = false;
     opt->numeric_id = false;
-    opt->sort_style = unspecified;
+    opt->sort_style = name;
 
     int c;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1){
@@ -195,13 +195,15 @@ static int __parse_args(int argc, char **argv, options *opt){
             case 1:
                 if (optarg){
                     if (strlen(optarg)){
-                        if (! strcmp_forward_match(optarg, "size"))
+                        if (! strcmp_forward_match(optarg, "name"))
+                            opt->sort_style = name;
+                        else if (! strcmp_forward_match(optarg, "size"))
                             opt->sort_style = size;
                         else if (! strcmp_forward_match(optarg, "extension"))
                             opt->sort_style = extension;
                         else {
                             fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
-                            fputs("Valid arguments are:\n  - 'size'\n  - 'extension'\n", stderr);
+                            fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
                             goto error_occurred;
                         }
                     }
@@ -468,7 +470,7 @@ static bool __append_file(file_tree *dir, file_tree *file){
  */
 static comp_func __get_comp_func(int sort_style){
     switch (sort_style){
-        case unspecified:
+        case name:
             return __comp_func_unspecified;
         case size:
             return __comp_func_size;
@@ -481,7 +483,7 @@ static comp_func __get_comp_func(int sort_style){
 
 
 /**
- * @brief comparison function used when sort style is unspecified
+ * @brief comparison function used when sort style is unspecified or specified as name
  *
  * @param[in]  a  pointer to file1
  * @param[in]  b  pointer to file2

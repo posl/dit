@@ -186,8 +186,10 @@ void help_inspect(){
     puts("  -F, --classify           append indicator (one of */=|) to each file name:");
     puts("                             to executable file, directory, socket or fifo, in order");
     puts("  -n, --numeric-uid-gid    list the corresponding IDs instead of user or group name");
-    puts("  -S, --sort=size          sort by file size, largest first");
-    puts("  -X, --sort=extension     sort by file extension, alphabetically");
+    puts("  -S                       sort by file size, largest first");
+    puts("  -X                       sort by file extension, alphabetically");
+    puts("      --sort=WORD          replace file sorting method:");
+    puts("                             name(default), size(-S), extension(-X)");
     puts("      --help               display this help, and exit normally\n");
     puts("Each directory is sorted alphabetically unless otherwise specified.");
     puts("Prefixs representing file size are k,M,G,T,P,E,Z, which is powers of 1000.");
