@@ -71,3 +71,14 @@ if ( unset PS1 ); then
 fi
 
 export PS1
+
+
+
+#
+# if necessary, reproducing the environment under construction
+#
+
+if [ "$( head -n1 /dit/tmp/dit-current-status 2> /dev/null )" = 'now initializing' ]; then
+    . /dit/share/.cmd_history > /dev/null
+    echo 'under development' > /dit/tmp/dit-current-status
+fi

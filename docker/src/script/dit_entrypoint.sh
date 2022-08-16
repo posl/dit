@@ -71,17 +71,15 @@ touch \
     /dit/tmp/change-list.hist \
     /dit/tmp/change-report
 
+echo 'now initializing' > /dit/tmp/dit-current-status
+
 umask "${DEFAULT_UMASK_VALUE}"
 
 
 
 #
-# after reproducing the environment as necessary, start a login shell
+# launch a login shell, and start development of Dockerfile
 #
-
-if [ -s /dit/share/.cmd_history ]; then
-    . /dit/share/.cmd_history > /dev/null
-fi
 
 cp -f /dit/script/dit_profile.sh /etc/profile.d/
 
