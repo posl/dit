@@ -2,8 +2,8 @@ ARG BASE_IMAGE=debian
 ARG BASE_VERSION=latest
 FROM ${BASE_IMAGE}:${BASE_VERSION} as builder
 
-ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
+RUN DEBIAN_FRONTEND=noninteractive \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
         libc-dev \

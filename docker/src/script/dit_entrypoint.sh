@@ -69,6 +69,7 @@ touch \
     /dit/tmp/last-convert-result \
     /dit/tmp/change-list.dock \
     /dit/tmp/change-list.hist \
+    /dit/tmp/change-list.onbuild \
     /dit/tmp/change-report
 
 echo 'now initializing' > /dit/tmp/dit-current-status
