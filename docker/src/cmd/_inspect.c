@@ -30,7 +30,7 @@ typedef struct {
         size,
         extension
     } sort_style;     /** sort style for each directory */
-} options;
+} insp_options;
 
 
 /** Data type that is applied to the smallest element that makes up the directory tree */
@@ -63,9 +63,9 @@ typedef struct {
 typedef int (* comp_func)(const void *, const void *);
 
 
-static int __parse_args(int argc, char **argv, options *opt);
+static int __parse_args(int argc, char **argv, insp_options *opt);
 
-static file_tree *__construct_file_tree(const char *base_path, options *opt);
+static file_tree *__construct_file_tree(const char *base_path, insp_options *opt);
 static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp);
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
 static file_tree *__new_file(char *path, char *name);
@@ -80,8 +80,8 @@ static int __comp_file_size(file_tree *file1, file_tree *file2);
 static int __comp_file_extension(file_tree *file1, file_tree *file2);
 static const char *__get_file_extension(const char *name);
 
-static void __display_file_tree(file_tree *tree, options *opt);
-static void __display_recursive(file_tree *file, options *opt, int depth);
+static void __display_file_tree(file_tree *tree, insp_options *opt);
+static void __display_recursive(file_tree *file, insp_options *opt, int depth);
 static void __print_file_mode(mode_t mode);
 static void __print_file_user(uid_t uid, bool numeric_id);
 static void __print_file_group(gid_t gid, bool numeric_id);
@@ -111,7 +111,7 @@ int inspect(int argc, char **argv){
         perror("inspect: setvbuf");
 
     int i;
-    options opt;
+    insp_options opt;
 
     if ((i = __parse_args(argc, argv, &opt)))
         return (i < 0) ? 1 : 0;
@@ -155,7 +155,7 @@ int inspect(int argc, char **argv){
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_args(int argc, char **argv, options *opt){
+static int __parse_args(int argc, char **argv, insp_options *opt){
     optind = 1;
     opterr = 0;
 
@@ -249,7 +249,7 @@ error_occurred:
  * @param[in]  opt  variable containing the result of option parse
  * @return file_tree*  the result of constructing
  */
-static file_tree *__construct_file_tree(const char *base_path, options *opt){
+static file_tree *__construct_file_tree(const char *base_path, insp_options *opt){
     file_tree *tree = NULL;
 
     size_t path_len;
@@ -593,7 +593,7 @@ static const char *__get_file_extension(const char *name){
  * @param[out] tree  pre-constructed directory tree
  * @param[in]  opt  variable containing the result of option parse
  */
-static void __display_file_tree(file_tree *tree, options *opt){
+static void __display_file_tree(file_tree *tree, insp_options *opt){
     puts("Permission      User     Group      Size");
     puts("=========================================");
     __display_recursive(tree, opt, 0);
@@ -609,7 +609,7 @@ static void __display_file_tree(file_tree *tree, options *opt){
  *
  * @note at the same time, release the data that is no longer needed.
  */
-static void __display_recursive(file_tree *file, options *opt, int depth){
+static void __display_recursive(file_tree *file, insp_options *opt, int depth){
     __print_file_mode(file->mode);
     __print_file_user(file->uid, opt->numeric_id);
     __print_file_group(file->gid, opt->numeric_id);
