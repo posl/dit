@@ -33,5 +33,5 @@ END {
     if (CHANGE_IN_HIST > 0)
         print CHANGE_IN_HIST >> "/dit/tmp/change-log.hist"
 
-    printf ("[dock:+%u hist:+%u] ", CHANGE_IN_DOCK, CHANGE_IN_HIST) > "/dit/tmp/change-report.act"
+    printf ("[dock:+%u hist:+%u] \n", CHANGE_IN_DOCK, CHANGE_IN_HIST) > "/dit/tmp/change-report.act"
 }
