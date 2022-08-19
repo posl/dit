@@ -96,8 +96,12 @@ chmod a=rx \
 
 
 #
-# launch a login shell, and start development of Dockerfile
+# perform other necessary initializations, and launch a login shell
 #
+
+dit config -c
+dit ignore -c
+dit erase -c both
 
 cp -f /dit/script/dit_profile.sh /etc/profile.d/
 
