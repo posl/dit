@@ -15,7 +15,7 @@ if [ ! -e /dit/share/Dockerfile ]; then
     touch /dit/share/Dockerfile
 fi
 
-if [ ! -e /dit/share/Dockerfile.draft ]; then
+if [ ! -s /dit/share/Dockerfile.draft ]; then
     cat <<EOF > /dit/share/Dockerfile.draft
 FROM ${BASE_IMAGE}:${BASE_VERSION}
 SHELL [ "${SHELL:-/bin/sh}", "-c" ]
@@ -27,7 +27,7 @@ unset BASE_IMAGE
 unset BASE_VERSION
 
 
-if [ ! -e /dit/share/.dockerignore ]; then
+if [ ! -s /dit/share/.dockerignore ]; then
     echo ".cmd_history" > /dit/share/.dockerignore
 fi
 
@@ -49,32 +49,49 @@ chmod a=rw \
     /dit/share/.dockerignore \
     /dit/share/.cmd_history
 
-
 find /dit/script -type f -exec chmod a=r {} +
-find /dit/conf -type f -exec chmod a=rw {} +
 
+
+DEFAULT_UMASK_VALUE="$( umask )"
+umask 0000
+
+if [ ! -e /dit/conf ]; then
+    mkdir /dit/conf
+fi
 
 if [ ! -e /dit/tmp ]; then
     mkdir /dit/tmp
 fi
 
-DEFAULT_UMASK_VALUE="$( umask )"
-umask 0000
-
 touch \
+    /dit/conf/cmd-ignore.dock \
+    /dit/conf/cmd-ignore.hist \
+    /dit/conf/current-spec.conv \
+    /dit/conf/current-spec.opt \
+    \
+    /dit/tmp/change-log.dock \
+    /dit/tmp/change-log.hist \
+    /dit/tmp/change-log.onb \
+    /dit/tmp/change-report.act \
+    /dit/tmp/change-report.prov \
+    \
+    /dit/tmp/current-status.dev \
+    /dit/tmp/current-status.opt \
+    \
     /dit/tmp/last-history-number \
     /dit/tmp/last-exit-status \
     /dit/tmp/last-command-line \
     /dit/tmp/last-parse-result \
-    /dit/tmp/last-convert-result \
-    /dit/tmp/change-list.dock \
-    /dit/tmp/change-list.hist \
-    /dit/tmp/change-list.onbuild \
-    /dit/tmp/change-report
-
-echo 'now initializing' > /dit/tmp/dit-current-status
+    /dit/tmp/last-convert-result
 
 umask "${DEFAULT_UMASK_VALUE}"
+
+
+chmod a=rx \
+    /dit \
+    /dit/script \
+    /dit/conf \
+    /dit/tmp
 
 
 

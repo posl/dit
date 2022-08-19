@@ -50,12 +50,13 @@ PROMPT_OPTION(){
 }
 
 PROMPT_REPORT(){
-    if [ -s /dit/tmp/change-report ]; then
-        cat /dit/tmp/change-report
-        : > /dit/tmp/change-report
+    if [ -s /dit/tmp/change-report.act ]; then
+        cat /dit/tmp/change-report.act
     else
-        echo "[dock:+0 hist:+0] "
+        echo '[dock:+0 hist:+0] '
     fi
+
+    echo '0 0' > /dit/tmp/change-report.prov
 }
 
 export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT 2> /dev/null || true
@@ -78,7 +79,7 @@ export PS1
 # if necessary, reproducing the environment under construction
 #
 
-if [ "$( head -n1 /dit/tmp/dit-current-status 2> /dev/null )" = 'now initializing' ]; then
+if [ ! -s /dit/tmp/current-status.dev ]; then
     . /dit/share/.cmd_history > /dev/null
-    echo 'under development' > /dit/tmp/dit-current-status
+    echo 'under development' > /dit/tmp/current-status.dev
 fi

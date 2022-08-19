@@ -15,5 +15,5 @@ int convert(int argc, char **argv){
         return 0;
     }
     else
-        return 1;
+        return 1;    // 構文エラーなどで last-convert-result が更新できない場合は，エラー終了する
 }

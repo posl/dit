@@ -36,18 +36,18 @@ int setcmd(int argc, char **argv);
     * Help Function for each Subcommand
 ******************************************************************************/
 
-void help_config();
-void help_convert();
-void help_cp();
-void help_erase();
-void help_healthcheck();
-void help_help();
-void help_ignore();
-void help_inspect();
-void help_label();
-void help_onbuild();
-void help_optimize();
-void help_setcmd();
+void config_usage();
+void convert_usage();
+void cp_usage();
+void erase_usage();
+void healthcheck_usage();
+void help_usage();
+void ignore_usage();
+void inspect_usage();
+void label_usage();
+void onbuild_usage();
+void optimize_usage();
+void setcmd_usage();
 
 
 

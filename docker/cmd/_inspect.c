@@ -214,7 +214,7 @@ static int __parse_args(int argc, char **argv, insp_options *opt){
                 }
                 break;
             case 2:
-                help_inspect();
+                inspect_usage();
                 return 1;
             case ':':
                 fputs("inspect: option '--sort' requires an argument\n", stderr);
@@ -768,7 +768,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
     tmp = name;
     while (*tmp){
         if (iscntrl((int) *tmp))
-            *tmp = '?';
+            *tmp = '\?';
         tmp++;
     }
 
@@ -797,7 +797,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
         printf("\033[%sm%s\033[0m", tmp, name);
     }
     else
-        printf(name);
+        printf("%s", name);
 
     if (classify){
         char indicator;

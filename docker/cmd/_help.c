@@ -13,7 +13,7 @@
 
 static void (* const __get_help_func(const char *target))();
 
-static void __help_dit();
+static void __dit_usage();
 
 
 extern const char * const subcmds[CMDS_NUM];
@@ -54,7 +54,7 @@ int help(int argc, char **argv){
             return 1;
     }
     else
-        __help_dit();
+        __dit_usage();
     return 0;
 }
 
@@ -70,26 +70,26 @@ int help(int argc, char **argv){
 static void (* const __get_help_func(const char *target))(){
     if (! strcmp(target, "cfg")){
         puts(" < config >");
-        return help_config;
+        return config_usage;
     }
     if (! strcmp(target, "hc")){
         puts(" < healthcheck >");
-        return help_healthcheck;
+        return healthcheck_usage;
     }
 
     void (* const help_funcs[CMDS_NUM])() = {
-        help_config,
-        help_convert,
-        help_cp,
-        help_erase,
-        help_healthcheck,
-        help_help,
-        help_ignore,
-        help_inspect,
-        help_label,
-        help_onbuild,
-        help_optimize,
-        help_setcmd
+        config_usage,
+        convert_usage,
+        cp_usage,
+        erase_usage,
+        healthcheck_usage,
+        help_usage,
+        ignore_usage,
+        inspect_usage,
+        label_usage,
+        onbuild_usage,
+        optimize_usage,
+        setcmd_usage
     };
 
     int i;
@@ -118,7 +118,7 @@ static void (* const __get_help_func(const char *target))(){
 ******************************************************************************/
 
 
-void __help_dit(){
+void __dit_usage(){
     puts("Usage: dit [SUBCOMMAND] [ARGS]...");
     puts("By specifying one of the following SUBCOMMANDs, you can use the tool-specific functions.\n");
     puts("Subcommands:\n");
@@ -142,43 +142,43 @@ void __help_dit(){
 }
 
 
-void help_config(){
+void config_usage(){
     puts("help config");
 }
 
 
-void help_convert(){
+void convert_usage(){
     puts("help convert");
 }
 
 
-void help_cp(){
+void cp_usage(){
     puts("help cp");
 }
 
 
-void help_erase(){
+void erase_usage(){
     puts("help erase");
 }
 
 
-void help_healthcheck(){
+void healthcheck_usage(){
     puts("help healthcheck");
 }
 
 
-void help_help(){
+void help_usage(){
     puts("Usage: dit help [SUBCOMMAND]...");
     puts("Show detailed usage of each subcommand.");
 }
 
 
-void help_ignore(){
+void ignore_usage(){
     puts("help ignore");
 }
 
 
-void help_inspect(){
+void inspect_usage(){
     puts("Usage: dit inspect [OPTION]... [DIRECTORY]...");
     puts("List information about the files under the specified DIRECTORYs in a tree format.\n");
     puts("Options:");
@@ -193,7 +193,7 @@ void help_inspect(){
     puts("      --help               display this help, and exit normally\n");
     puts("Each directory is sorted alphabetically unless otherwise specified.");
     puts("User or group name longer than 8 characters are converted to corresponding ID,");
-    puts("  and and IDs longer than 8 digits are converted to #EXCESS as undisplayable.");
+    puts("  and IDs longer than 8 digits are converted to #EXCESS as undisplayable.");
     puts("Prefixs representing file size are k,M,G,T,P,E,Z, which is powers of 1000.");
     puts("Undisplayable characters appearing in the file name are uniformly replaced with '?'.");
     puts("Two hyphens can mark the end of the option like any other command.\n");
@@ -202,21 +202,21 @@ void help_inspect(){
 }
 
 
-void help_label(){
+void label_usage(){
     puts("help label");
 }
 
 
-void help_onbuild(){
+void onbuild_usage(){
     puts("help onbuild");
 }
 
 
-void help_optimize(){
+void optimize_usage(){
     puts("help optimize");
 }
 
 
-void help_setcmd(){
+void setcmd_usage(){
     puts("help setcmd");
 }
