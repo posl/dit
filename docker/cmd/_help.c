@@ -11,7 +11,7 @@
 #include "main.h"
 
 
-static int __parse_args(int argc, char **argv);
+static int __parse_opts(int argc, char **argv);
 static int __display_usage(const char *target, int is_plural);
 
 static void __dit_usage();
@@ -41,7 +41,7 @@ int help(int argc, char **argv){
     setvbuf(stdout, NULL, _IOFBF, 0);
 
     int i;
-    if ((i = __parse_args(argc, argv)))
+    if ((i = __parse_opts(argc, argv)))
         return (i > 0) ? 0 : 1;
 
     int error_occurred = 0;
@@ -77,7 +77,7 @@ int help(int argc, char **argv){
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_args(int argc, char **argv){
+static int __parse_opts(int argc, char **argv){
     optind = 1;
     opterr = 0;
 
