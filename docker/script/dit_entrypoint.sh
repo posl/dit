@@ -99,9 +99,9 @@ chmod a=rx \
 # perform other necessary initializations, and launch a login shell
 #
 
-dit config -c
-dit ignore -c
-dit erase -c both
+dit config -r
+dit ignore -r
+dit erase -r both
 
 cp -f /dit/script/dit_profile.sh /etc/profile.d/
 
