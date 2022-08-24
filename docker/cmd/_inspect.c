@@ -3,21 +3,12 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described subcommand that displays the directory tree
+ * @brief Described the dit command 'inspect', that shows the directory tree
  * @author Tsukasa Inada
  * @date 2022/07/18
  */
 
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <pwd.h>
-#include <grp.h>
 #include "main.h"
-
-#ifndef S_IXUGO
-#define S_IXUGO  (S_IXUSR | S_IXGRP | S_IXOTH)
-#endif
 
 
 /** Data type for storing the results of option parse */
@@ -45,10 +36,13 @@ typedef struct file_tree{
     mode_t link_mode;
     bool   link_invalid;
 
-    struct file_tree \
+    struct file_tree
          **children;
     size_t children_num;
     size_t children_max;
+
+    int    err_id;
+    bool   noinfo;
 } file_tree;
 
 
@@ -97,7 +91,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
 
 
 /**
- * @brief display the directory tree.
+ * @brief show the directory tree.
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
@@ -107,14 +101,13 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
  * @attention try this with '--help' option for more information.
  */
 int inspect(int argc, char **argv){
-    if (setvbuf(stdout, NULL, _IOFBF, 0))
-        perror("inspect: setvbuf");
+    setvbuf(stdout, NULL, _IOFBF, 0);
 
     int i;
     insp_options opt;
 
     if ((i = __parse_args(argc, argv, &opt)))
-        return (i < 0) ? 1 : 0;
+        return (i > 0) ? 0 : 1;
 
     const char *path;
     if (argc <= optind){
@@ -128,19 +121,20 @@ int inspect(int argc, char **argv){
     }
 
     file_tree *tree;
-    bool error_only = true;
+    int error_occurred = 0;
 
     while (1){
-        if ((tree = __construct_file_tree(path, &opt))){
+        if ((tree = __construct_file_tree(path, &opt)))
             __display_file_tree(tree, &opt);
-            error_only = false;
-        }
-        if (--argc > 0){
+        else
+            error_occurred = 1;
+
+        if (--argc){
             path = *(++argv);
             putchar('\n');
         }
         else
-            return error_only ? 1 : 0;
+            return error_occurred;
     }
 }
 
@@ -151,7 +145,7 @@ int inspect(int argc, char **argv){
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  parse result (zero : parse success, positive : help success, negative : parse failure)
+ * @return int  parse result (zero: parse success, positive: help success, negative: parse failure)
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
@@ -164,9 +158,15 @@ static int __parse_args(int argc, char **argv, insp_options *opt){
         { "color",           no_argument,       NULL, 'C' },
         { "classify",        no_argument,       NULL, 'F' },
         { "numeric-uid-gid", no_argument,       NULL, 'n' },
-        { "sort",            required_argument, NULL,  1  },
-        { "help",            no_argument,       NULL,  2  },
+        { "sort",            required_argument, NULL,  2  },
+        { "help",            no_argument,       NULL,  1  },
         {  0,                 0,                 0,    0  }
+    };
+
+    const char * const sort_arguments[] = {
+        "extension",
+        "name",
+        "size"
     };
 
     opt->color = false;
@@ -192,34 +192,27 @@ static int __parse_args(int argc, char **argv, insp_options *opt){
             case 'X':
                 opt->sort_style = extension;
                 break;
-            case 1:
-                if (optarg){
-                    if (strlen(optarg)){
-                        if (! strcmp_forward_match(optarg, "name"))
-                            opt->sort_style = name;
-                        else if (! strcmp_forward_match(optarg, "size"))
-                            opt->sort_style = size;
-                        else if (! strcmp_forward_match(optarg, "extension"))
-                            opt->sort_style = extension;
-                        else {
-                            fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
-                            fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
-                            goto error_occurred;
-                        }
-                    }
-                    else {
-                        fputs("inspect: ambiguous argument '' for '--sort'\n", stderr);
-                        goto error_occurred;
-                    }
-                }
-                break;
             case 2:
+                if (optarg){
+                    if ((c = receive_expected_string(optarg, sort_arguments, 3, 2)) >= 0){
+                        opt->sort_style = (c ? ((c == 1) ? name : size) : extension);
+                        break;
+                    }
+                    if (c == -1)
+                        fputs("inspect: ambiguous argument '' for '--sort'\n", stderr);
+                    else {
+                        fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
+                        fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
+                    }
+                    goto error_occurred;
+                }
+            case ':':
+                fputs("inspect: '--sort' requires an argument\n", stderr);
+                goto error_occurred;
+            case 1:
                 inspect_usage();
                 return 1;
-            case ':':
-                fputs("inspect: option '--sort' requires an argument\n", stderr);
-                goto error_occurred;
-            case '?':
+            case '\?':
                 if (argv[--optind][1] == '-')
                     fprintf(stderr, "inspect: unrecognized option '%s'\n", argv[optind]);
                 else
@@ -243,7 +236,7 @@ error_occurred:
 
 
 /**
- * @brief construct the directory tree to display.
+ * @brief construct the directory tree with details about each file also collected together.
  *
  * @param[in]  base_path  file path to the root of the directory tree
  * @param[in]  opt  variable containing the result of option parse
@@ -262,9 +255,9 @@ static file_tree *__construct_file_tree(const char *base_path, insp_options *opt
                 char *name;
                 if ((name = xstrndup(base_path, path_len))){
                     comp_func comp;
-                    if (! ((comp = __get_comp_func(opt->sort_style)) \
+                    if (! ((comp = __get_comp_func(opt->sort_style))
                         && (tree = __construct_recursive(&ipath, path_len, name, comp))))
-                        free(name);
+                            free(name);
                 }
             }
             free(ipath.ptr);
@@ -275,7 +268,7 @@ static file_tree *__construct_file_tree(const char *base_path, insp_options *opt
 
 
 /**
- * @brief construct the directory tree recursively.
+ * @brief construct the directory tree, recursively.
  *
  * @param[out] ipath  file path to the file we are currently looking at
  * @param[in]  ipath_len  the length of path string
@@ -291,42 +284,38 @@ static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
 
     if (file && S_ISDIR(file->mode)){
         DIR *dir;
-        if (! (dir = opendir(ipath->ptr))){
-            fputs("inspect: ", stderr);
-            perror(ipath->ptr);
-        }
-        else if (__concat_inf_path(ipath, ipath_len++, "/", 1)){
-            struct dirent *entry;
-            while ((entry = readdir(dir))){
-                name = entry->d_name;
-                if ((name[0] == '.') && (name[1 + ((name[1] == '.') ? 1 : 0)] == '\0'))
-                    continue;
-
+        if ((dir = opendir(ipath->ptr))){
+            if (__concat_inf_path(ipath, ipath_len++, "/", 1)){
+                struct dirent *entry;
                 size_t name_len;
-                name_len = strlen(name);
+                file_tree *tmp;
 
-                if ((name = xstrndup(name, name_len))){
-                    bool continue_flag = false;
-                    if (__concat_inf_path(ipath, ipath_len, name, name_len)){
-                        file_tree *tmp;
-                        if (tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp)){
-                            if (__append_file(file, tmp))
-                                continue;
-                        }
-                        else
-                            continue_flag = true;
-                    }
-                    free(name);
-                    if (continue_flag)
+                while ((entry = readdir(dir))){
+                    name = entry->d_name;
+                    if ((name[0] == '.') && (! name[1 + ((name[1] != '.') ? 0 : 1)]))
                         continue;
-                }
-                break;
-            }
 
-            if (file->children)
-                qsort(file->children, file->children_num, sizeof(file_tree *), comp);
+                    name_len = strlen(name);
+                    if ((name = xstrndup(name, name_len))){
+                        if (__concat_inf_path(ipath, ipath_len, name, name_len)){
+                            if (tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp)){
+                                if (__append_file(file, tmp))
+                                    continue;
+                                free(tmp);
+                            }
+                        }
+                        free(name);
+                    }
+                    break;
+                }
+
+                if (file->children)
+                    qsort(file->children, file->children_num, sizeof(file_tree *), comp);
+            }
             closedir(dir);
         }
+        else
+            file->err_id = errno;
     }
     return file;
 }
@@ -375,48 +364,56 @@ static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
  * @return file_tree*  new element that makes up the directory tree
  */
 static file_tree *__new_file(char *path, char *name){
-    struct stat file_stat;
-    if (lstat(path, &file_stat)){
-        fputs("inspect: ", stderr);
-        perror(path);
-        return NULL;
-    }
-
     file_tree *file;
     if ((file = (file_tree *) malloc(sizeof(file_tree)))){
         file->name = name;
-        file->mode = file_stat.st_mode;
-        file->uid = file_stat.st_uid;
-        file->gid = file_stat.st_gid;
-        file->size = file_stat.st_size;
+        file->mode = 0;
+        file->uid = 0;
+        file->gid = 0;
+        file->size = 0;
 
         file->link_path = NULL;
         file->link_mode = 0;
         file->link_invalid = true;
 
-        if (S_ISLNK(file->mode)){
-            char *link_path;
-            if ((link_path = (char *) malloc(sizeof(char) * (file->size + 1)))){
-                size_t link_len;
-                if ((link_len = readlink(path, link_path, file->size)) > 0){
-                    link_path[link_len] = '\0';
-                    file->link_path = link_path;
-
-                    if (! stat(path, &file_stat)){
-                        file->link_mode = file_stat.st_mode;
-                        file->link_invalid = false;
-                    }
-                }
-                else
-                    free(link_path);
-            }
-        }
-        else
-            file->link_invalid = false;
-
         file->children = NULL;
         file->children_num = 0;
         file->children_max = 0;
+
+        file->err_id = 0;
+        file->noinfo = false;
+
+        struct stat file_stat;
+        if (! lstat(path, &file_stat)){
+            file->mode = file_stat.st_mode;
+            file->uid = file_stat.st_uid;
+            file->gid = file_stat.st_gid;
+            file->size = file_stat.st_size;
+
+            if (S_ISLNK(file->mode)){
+                char *link_path;
+                if ((link_path = (char *) malloc(sizeof(char) * (file->size + 1)))){
+                    size_t link_len;
+                    if ((link_len = readlink(path, link_path, file->size)) > 0){
+                        link_path[link_len] = '\0';
+                        file->link_path = link_path;
+
+                        if (! stat(path, &file_stat)){
+                            file->link_mode = file_stat.st_mode;
+                            file->link_invalid = false;
+                        }
+                    }
+                    else
+                        free(link_path);
+                }
+            }
+            else
+                file->link_invalid = false;
+        }
+        else {
+            file->err_id = errno;
+            file->noinfo = true;
+        }
     }
     return file;
 }
@@ -588,20 +585,20 @@ static const char *__get_file_extension(const char *name){
 
 
 /**
- * @brief actually display the directory tree.
+ * @brief display the directory tree, and release the heap space used for it.
  *
  * @param[out] tree  pre-constructed directory tree
  * @param[in]  opt  variable containing the result of option parse
  */
 static void __display_file_tree(file_tree *tree, insp_options *opt){
-    puts("Permission      User     Group      Size");
-    puts("=========================================");
+    puts(" Permission      User     Group      Size");
+    puts("==========================================");
     __display_recursive(tree, opt, 0);
 }
 
 
 /**
- * @brief display the directory tree recursively.
+ * @brief display and release the directory tree, recursively.
  *
  * @param[out] file  the file we are currently trying to display
  * @param[in]  opt  variable containing the result of option parse
@@ -610,10 +607,14 @@ static void __display_file_tree(file_tree *tree, insp_options *opt){
  * @note at the same time, release the data that is no longer needed.
  */
 static void __display_recursive(file_tree *file, insp_options *opt, int depth){
-    __print_file_mode(file->mode);
-    __print_file_user(file->uid, opt->numeric_id);
-    __print_file_group(file->gid, opt->numeric_id);
-    __print_file_size(file->size);
+    if (! (file->err_id && file->noinfo)){
+        __print_file_mode(file->mode);
+        __print_file_user(file->uid, opt->numeric_id);
+        __print_file_group(file->gid, opt->numeric_id);
+        __print_file_size(file->size);
+    }
+    else
+        printf("        ???       ???       ???       ???    ");
 
     int i;
     if (depth){
@@ -622,6 +623,7 @@ static void __display_recursive(file_tree *file, insp_options *opt, int depth){
             printf("|   ");
         printf("|-- ");
     }
+
     __print_file_name(file->name, file->mode, file->link_invalid, opt->color, opt->classify);
     free(file->name);
 
@@ -630,6 +632,9 @@ static void __display_recursive(file_tree *file, insp_options *opt, int depth){
         __print_file_name(file->link_path, file->link_mode, file->link_invalid, opt->color, opt->classify);
         free(file->link_path);
     }
+    else if (file->err_id)
+        printf("  (%s)", strerror(file->err_id));
+
     putchar('\n');
 
     if (file->children){
@@ -662,7 +667,7 @@ static void __print_file_mode(mode_t mode){
         S_ISFIFO(mode) ? 'p' :
         S_ISLNK(mode) ? 'l' :
         S_ISSOCK(mode) ? 's' :
-        '?';
+        '\?';
     S[1] = (mode & S_IRUSR) ? 'r' : '-';
     S[2] = (mode & S_IWUSR) ? 'w' : '-';
     S[3] = (mode & S_ISUID) ? ((mode & S_IXUSR) ? 's' : 'S') : ((mode & S_IXUSR) ? 'x' : '-');
@@ -674,7 +679,7 @@ static void __print_file_mode(mode_t mode){
     S[9] = (mode & S_ISVTX) ? ((mode & S_IXOTH) ? 't' : 'T') : ((mode & S_IXOTH) ? 'x' : '-');
     S[10] = '\0';
 
-    printf("%s  ", S);
+    printf(" %s  ", S);
 }
 
 
@@ -767,7 +772,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
     char *tmp;
     tmp = name;
     while (*tmp){
-        if (iscntrl((int) *tmp))
+        if (iscntrl(*tmp))
             *tmp = '\?';
         tmp++;
     }
@@ -778,7 +783,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
             S_ISREG(mode) ? (
                 (mode & S_ISUID) ? "37;41" :
                 (mode & S_ISGID) ? "30;43" :
-                (mode & S_IXUGO) ? "1;32" :
+                (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) ? "1;32" :
                 "0"
             ) :
             S_ISDIR(mode) ? (
@@ -802,7 +807,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
     if (classify){
         char indicator;
         indicator =
-            (S_ISREG(mode) && (mode & S_IXUGO)) ? '*' :
+            (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
             S_ISDIR(mode) ? '/' :
             S_ISFIFO(mode) ? '|' :
             S_ISSOCK(mode) ? '=' :

@@ -3,11 +3,17 @@
 
 
 #include <ctype.h>
+#include <dirent.h>
+#include <errno.h>
 #include <getopt.h>
+#include <grp.h>
+#include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define CMDS_NUM 12
 
@@ -33,7 +39,7 @@ int setcmd(int argc, char **argv);
 
 
 /******************************************************************************
-    * Help Function for each Subcommand
+    * Help Function for each dit command
 ******************************************************************************/
 
 void config_usage();
@@ -41,7 +47,6 @@ void convert_usage();
 void cp_usage();
 void erase_usage();
 void healthcheck_usage();
-void help_usage();
 void ignore_usage();
 void inspect_usage();
 void label_usage();
@@ -55,9 +60,18 @@ void setcmd_usage();
     * Utilitys
 ******************************************************************************/
 
-int bsearch_subcmds(const char *target, int (* const comp)(const char *, const char *));
-int strcmp_forward_match(const char *target, const char *expected);
 char *xstrndup(const char *src, size_t n);
+int strcmp_upper_case(const char *target, const char *expected);
+
+
+
+/******************************************************************************
+    * Argument Parsers
+******************************************************************************/
+
+int receive_positive_integer(const char *target);
+int receive_expected_string(const char *target, const char * const expected[], int size, int mode);
+int receive_yes_or_no(const char *target);
 
 
 #endif
