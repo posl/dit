@@ -73,7 +73,7 @@ int help(int argc, char **argv){
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
- * @return int  parse result (zero: parse success, positive: help success, negative: parse failure)
+ * @return int  0 (parse success), 1 (help success) or -1 (parse failure)
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
@@ -224,7 +224,7 @@ static void __help_usage(){
     puts("  dit help [OPTION]... [COMMAND]...");
     puts("Show detailed usage of each specified dit COMMAND.\n");
     puts("Options:");
-    puts("  -l, --list    list all commands available, and exit normally");
+    puts("  -l, --list    list all dit commands available, and exit normally");
     puts("      --help    display this help, and exit normally\n");
     puts("Remarks:");
     puts("  - If no SUBCOMMAND is specified, list a summary of each dit command.");

@@ -66,12 +66,12 @@ static file_tree *__new_file(char *path, char *name);
 static bool __append_file(file_tree *dir, file_tree *file);
 
 static comp_func __get_comp_func(int sort_style);
-static int __comp_func_unspecified(const void *a, const void *b);
+static int __comp_func_name(const void *a, const void *b);
 static int __comp_func_size(const void *a, const void *b);
 static int __comp_func_extension(const void *a, const void *b);
-static int __comp_file_name(const void *a, const void *b, int (* const addition)(file_tree *, file_tree *));
-static int __comp_file_size(file_tree *file1, file_tree *file2);
-static int __comp_file_extension(file_tree *file1, file_tree *file2);
+static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_tree *, file_tree *));
+static int __fcmp_size(file_tree *file1, file_tree *file2);
+static int __fcmp_extension(file_tree *file1, file_tree *file2);
 static const char *__get_file_extension(const char *name);
 
 static void __display_file_tree(file_tree *tree, insp_opts *opt);
@@ -145,7 +145,7 @@ int inspect(int argc, char **argv){
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  parse result (zero: parse success, positive: help success, negative: parse failure)
+ * @return int  0 (parse success), 1 (help success) or -1 (parse failure)
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
@@ -468,7 +468,7 @@ static bool __append_file(file_tree *dir, file_tree *file){
 static comp_func __get_comp_func(int sort_style){
     switch (sort_style){
         case name:
-            return __comp_func_unspecified;
+            return __comp_func_name;
         case size:
             return __comp_func_size;
         case extension:
@@ -486,8 +486,8 @@ static comp_func __get_comp_func(int sort_style){
  * @param[in]  b  pointer to file2
  * @return int  comparison result
  */
-static int __comp_func_unspecified(const void *a, const void *b){
-    return __comp_file_name(a, b, NULL);
+static int __comp_func_name(const void *a, const void *b){
+    return __fcmp_name(a, b, NULL);
 }
 
 
@@ -499,7 +499,7 @@ static int __comp_func_unspecified(const void *a, const void *b){
  * @return int  comparison result
  */
 static int __comp_func_size(const void *a, const void *b){
-    return __comp_file_name(a, b, __comp_file_size);
+    return __fcmp_name(a, b, __fcmp_size);
 }
 
 
@@ -511,7 +511,7 @@ static int __comp_func_size(const void *a, const void *b){
  * @return int  comparison result
  */
 static int __comp_func_extension(const void *a, const void *b){
-    return __comp_file_name(a, b, __comp_file_extension);
+    return __fcmp_name(a, b, __fcmp_extension);
 }
 
 
@@ -525,7 +525,7 @@ static int __comp_func_extension(const void *a, const void *b){
  * @param[in]  addition  additional comparison function used before comparison by file name
  * @return int  comparison result
  */
-static int __comp_file_name(const void *a, const void *b, int (* const addition)(file_tree *, file_tree *)){
+static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_tree *, file_tree *)){
     file_tree *file1 = *((file_tree **) a);
     file_tree *file2 = *((file_tree **) b);
 
@@ -541,7 +541,7 @@ static int __comp_file_name(const void *a, const void *b, int (* const addition)
  * @param[in]  file2
  * @return int  comparison result
  */
-static int __comp_file_size(file_tree *file1, file_tree *file2){
+static int __fcmp_size(file_tree *file1, file_tree *file2){
     return (int) (file2->size - file1->size);
 }
 
@@ -553,7 +553,7 @@ static int __comp_file_size(file_tree *file1, file_tree *file2){
  * @param[in]  file2
  * @return int  comparison result
  */
-static int __comp_file_extension(file_tree *file1, file_tree *file2){
+static int __fcmp_extension(file_tree *file1, file_tree *file2){
     const char *ext1, *ext2;
     ext1 = __get_file_extension(file1->name);
     ext2 = __get_file_extension(file2->name);

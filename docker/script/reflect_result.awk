@@ -21,8 +21,7 @@ END {
     CHANGE_IN_DOCK = ACT_CHANGES[1]
     CHANGE_IN_HIST = ACT_CHANGES[2]
 
-    getline PROV_REPORT < "/dit/tmp/change-report.prov"
-    if (PROV_REPORT ~ /^[0-9]+ [0-9]+$/){
+    if (((getline PROV_REPORT < "/dit/tmp/change-report.prov") > 0) && (PROV_REPORT ~ /^[0-9]+ [0-9]+$/)){
         split(PROV_REPORT, PROV_CHANGES, " ")
         CHANGE_IN_DOCK += PROV_CHANGES[1]
         CHANGE_IN_HIST += PROV_CHANGES[2]
