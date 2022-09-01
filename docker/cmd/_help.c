@@ -169,7 +169,7 @@ static int __display_usage(const char *target, int is_plural){
 
 static void __dit_usage(){
     puts("Usages:");
-    puts("  dit [COMMAND] [ARGS]...");
+    puts("  dit [COMMAND] [ARG]...");
     puts("By specifying one of the following COMMANDs, you can use the tool-specific functions.");
     putchar('\n');
     puts("Commands:");
@@ -177,9 +177,9 @@ static void __dit_usage(){
     puts("  convert        show how a command line is reflected to Dockerfile and history-file");
     puts("  optimize       do refactoring on Dockerfile based on its best practices");
     putchar('\n');
-    puts("customize tool settings");
-    puts("  config           edit the specification of how a executed command line is reflected");
-    puts("  ignore         edit set of commands that are ignored when reflecting a command line");
+    puts("customization of tool settings");
+    puts("  config         set the level of ignoring commands when reflecting a executed command line");
+    puts("  ignore         edit set of commands that are ignored when reflecting a executed command line");
     putchar('\n');
     puts("editing your Dockerfile");
     puts("  cp             copy files from the shared directory, and reflect this as COPY/ADD instructions");
@@ -199,23 +199,35 @@ static void __dit_usage(){
 
 void config_usage(){
     puts("Usages:");
-    puts("  dit config [OPTION]... [SPECIFICATION]");
-    puts("Edit the specification of how commands in a command line are ignored when reflecting them.");
+    puts("  dit config [OPTION]... [MODE[,MODE]...]");
+    puts("Decide at what level to ignore commands in a executed command line that should not be reflected.");
     putchar('\n');
     puts("Options:");
-    puts("  -r, --reset    reset the specification with default value");
+    puts("  -r, --reset    reset the mode with default value");
     puts("      --help     display this help, and exit normally");
     putchar('\n');
-    puts("Specifications:");
+    puts("Modes:");
     puts("   0,  no-reflect    in the first place, do not reflect");
     puts("   1,  strict        ignore all, strictly");
-    puts("   2,  normal        default");
+    puts("   2,  normal        ignore while respecting each command's dependencies");
     puts("   3,  simple        ignore only if the command line contains only one command");
-    puts("   4,  no-ignore     do not ignore");
+    puts("   4,  no-ignore     ignore nothing");
     putchar('\n');
     puts("Remarks:");
-    puts("  - If no SPECIFICATION is specified, display the current specification.");
-    puts("");
+    puts("  - If neither OPTION nor MODE is specified, display the current setting information.");
+    puts("  - To specify the mode, you can use the above serial numbers and strings,");
+    puts("    and any of the strings can be truncated as long as it is unique.");
+    puts("  - If you specify an underscore instead of the mode, the current setting is inherited.");
+    puts("  - You can change the modes used when reflecting to Dockerfile and/or history-file.");
+    puts("  - Each MODE is one of the following formats, and targets the files listed on the right.");
+    puts("      <mode>           both files");
+    puts("      [abdh]=<mode>    'a''b' (both files), 'd' (Dockerfile), 'h' (history-file)");
+    puts("      [0-4_][0-4_]     first character (Dockerfile), second character (history-file)");
+    putchar('\n');
+    puts("Examples:");
+    puts("  dit config strict");
+    puts("  dit config d=no-ig,h=sim");
+    puts("  dit config _3");
 }
 
 
@@ -273,7 +285,7 @@ void inspect_usage(){
     puts("  -S                       sort by file size, largest first");
     puts("  -X                       sort by file extension, alphabetically");
     puts("      --sort=WORD          replace file sorting method:");
-    puts("                             name(default), size(-S), extension(-X)");
+    puts("                             name (default), size (-S), extension (-X)");
     puts("      --help               display this help, and exit normally");
     putchar('\n');
     puts("Remarks:");

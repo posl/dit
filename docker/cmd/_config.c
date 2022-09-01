@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the dit command 'config', that edits the specifications of dit command 'convert'
+ * @brief Described the dit command 'config', that edits the modes of dit command 'convert'
  * @author Tsukasa Inada
  * @date 2022/08/29
  *
@@ -45,7 +45,7 @@ static int __receive_config_string(const char *token);
 
 
 /**
- * @brief edit the specifications of dit command 'convert'.
+ * @brief edit the modes of dit command 'convert'.
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
@@ -123,7 +123,7 @@ static int __parse_opts(int argc, char **argv, bool *opt){
                 *opt = true;
                 break;
             case 1:
-                __config_usage();
+                config_usage();
                 return 1;
             case '\?':
                 if (argv[--optind][1] == '-')
@@ -201,7 +201,7 @@ static int __config_contents(contents code, ...){
                         c = 5 * spec2d + spec2h;
                         write_flag = true;
                     }
-                    else if (code == get){
+                    else {
                         *(va_arg(sp, int *)) = spec2d;
                         *(va_arg(sp, int *)) = spec2h;
                     }
@@ -233,7 +233,7 @@ static int __config_contents(contents code, ...){
 
 
 /**
- * @brief initialize the specifications of dit command 'convert'.
+ * @brief initialize the modes of dit command 'convert'.
  *
  * @return int  exit status like command's one
  */
@@ -243,7 +243,7 @@ static int __init_config(){
 
 
 /**
- * @brief display the current specifications of dit command 'convert' on screen.
+ * @brief display the current modes of dit command 'convert' on screen.
  *
  * @return int  exit status like command's one
  */
@@ -253,9 +253,9 @@ static int __display_config(){
 
 
 /**
- * @brief update the specifications of dit command 'convert'.
+ * @brief update the modes of dit command 'convert'.
  *
- * @param[in]  config_arg  string for determining the specifications
+ * @param[in]  config_arg  string for determining the modes
  * @return int  0 (success), 1 (unexpected error) or -1 (recognition failure)
  */
 static int __update_config(const char *config_arg){
@@ -264,11 +264,11 @@ static int __update_config(const char *config_arg){
 
 
 /**
- * @brief get the specifications of dit command 'convert', and hand over it to the command.
+ * @brief get the modes of dit command 'convert', and hand over it to the command.
  *
- * @param[in]  config_arg  string for determining the specifications
- * @param[out] p_spec2d  variable to store the specification used when reflecting to Dockerfile
- * @param[out] p_spec2h  variable to store the specification used when reflecting to history-file
+ * @param[in]  config_arg  string for determining the modes
+ * @param[out] p_spec2d  variable to store the setting information used when reflecting to Dockerfile
+ * @param[out] p_spec2h  variable to store the setting information used when reflecting to history-file
  * @return int  0 (success), 1 (unexpected error) or -1 (recognition failure)
  */
 int get_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
@@ -284,11 +284,11 @@ int get_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
 
 
 /**
- * @brief parse the passed passed string, and generate next specifications.
+ * @brief parse the passed passed string, and generate next modes.
  *
- * @param[in]  config_arg  string for determining the specifications
- * @param[out] p_spec2d  variable to store the specification used when reflecting to Dockerfile
- * @param[out] p_spec2h  variable to store the specification used when reflecting to history-file
+ * @param[in]  config_arg  string for determining the modes
+ * @param[out] p_spec2d  variable to store the setting information used when reflecting to Dockerfile
+ * @param[out] p_spec2h  variable to store the setting information used when reflecting to history-file
  * @return bool  successful or not
  */
 static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
@@ -300,32 +300,30 @@ static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2
 
     const char *token;
     if ((token = strtok(A, ","))){
-        int spec2d, spec2h, i;
+        int spec2d, spec2h, i, j;
         spec2d = *p_spec2d;
         spec2h = *p_spec2h;
 
         do {
-            if (! (tmp = strlen(token) - 2)){
+            i = -1;
+            if (! (j = strlen(token) - 2)){
                 if (! (((spec2d = __receive_config_integer(token[0], spec2d)) < 0)
                     || ((spec2h = __receive_config_integer(token[1], spec2h)) < 0)))
                         continue;
-                i = -1;
             }
-            else if (tmp > 0){
+            else if (j > 0){
                 if (token[1] == '='){
                     if (token[3] == '\0'){
                         i = __receive_config_integer(token[2], 5);
 
-                        if (i == 5){
-                            if (strchr("abdh", *token))
-                                continue;
-                            i = -1;
-                        }
+                        if ((i == 5) && strchr("abdh", *token))
+                            continue;
                     }
-                    else
+
+                    if (i < 0)
                         i = __receive_config_string(token + 2);
 
-                    if (i >= 0){
+                    if ((i >= 0) && (i < 5)){
                         switch (*token){
                             case 'a':
                             case 'b':
@@ -338,16 +336,17 @@ static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2
                                 spec2h = i;
                                 continue;
                         }
-                        i = -1;
                     }
+                    i = 5;
                 }
-                else
-                    i = __receive_config_string(token);
             }
             else
                 i = __receive_config_integer(*token, -1);
 
-            if (i >= 0)
+            if (i < 0)
+                i = __receive_config_string(token);
+
+            if ((i >= 0) && (i < 5))
                 spec2d = (spec2h = i);
             else
                 return false;
@@ -362,10 +361,10 @@ static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2
 
 
 /**
- * @brief receive the passed character as integer corresponding to a specification.
+ * @brief receive the passed character as integer corresponding to a mode.
  *
  * @param[in]  c  target character
- * @param[in]  spare  integer to return if a underbar is passed
+ * @param[in]  spare  integer to return if a underscore is passed
  * @return int  the resulting integer, arbitrary integer, or -1
  */
 static int __receive_config_integer(int c, int spare){
@@ -374,7 +373,7 @@ static int __receive_config_integer(int c, int spare){
 
 
 /**
- * @brief generate integer corresponding to a specification from the passed string.
+ * @brief generate integer corresponding to a mode from the passed string.
  *
  * @param[in]  token  target string
  * @return int  the resulting integer or -1
