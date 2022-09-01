@@ -145,7 +145,7 @@ int inspect(int argc, char **argv){
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  0 (parse success), 1 (help success) or -1 (parse failure)
+ * @return int  0 (parse success), 1 (normally exit) or -1 (error exit)
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
@@ -192,6 +192,9 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
             case 'X':
                 opt->sort_style = extension;
                 break;
+            case 1:
+                inspect_usage();
+                return 1;
             case 2:
                 if (optarg){
                     if ((c = receive_expected_string(optarg, sort_arguments, 3, 2)) >= 0){
@@ -209,14 +212,12 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
             case ':':
                 fputs("inspect: '--sort' requires an argument\n", stderr);
                 goto error_occurred;
-            case 1:
-                inspect_usage();
-                return 1;
             case '\?':
                 if (argv[--optind][1] == '-')
                     fprintf(stderr, "inspect: unrecognized option '%s'\n", argv[optind]);
                 else
                     fprintf(stderr, "inspect: invalid option '-%c'\n", optopt);
+            default:
                 goto error_occurred;
         }
     }

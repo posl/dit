@@ -8,6 +8,7 @@
 #include <getopt.h>
 #include <grp.h>
 #include <pwd.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +40,7 @@ int setcmd(int argc, char **argv);
 
 
 /******************************************************************************
-    * Help Function for each dit command
+    * Help Functions for each dit command
 ******************************************************************************/
 
 void config_usage();
@@ -72,6 +73,14 @@ int strcmp_upper_case(const char *target, const char *expected);
 int receive_positive_integer(const char *target);
 int receive_expected_string(const char *target, const char * const expected[], int size, int mode);
 int receive_yes_or_no(const char *target);
+
+
+
+/******************************************************************************
+    * Functions provided in separate files
+******************************************************************************/
+
+int get_config(const char *config_arg, int *p_spec2d, int *p_spec2h);
 
 
 #endif

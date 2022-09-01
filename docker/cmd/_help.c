@@ -29,7 +29,7 @@ extern const char * const dit_cmds[CMDS_NUM];
 
 
 /**
- * @brief show information for some dit commands
+ * @brief show information for some dit commands.
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
@@ -73,7 +73,7 @@ int help(int argc, char **argv){
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
- * @return int  0 (parse success), 1 (help success) or -1 (parse failure)
+ * @return int  0 (parse success), 1 (normally exit) or -1 (error exit)
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
@@ -105,14 +105,12 @@ static int __parse_opts(int argc, char **argv){
                     fprintf(stderr, "help: unrecognized option '%s'\n", argv[optind]);
                 else
                     fprintf(stderr, "help: invalid option '-%c'\n", optopt);
-                goto error_occurred;
+            default:
+                fputs("Try 'dit help --help' for more information.\n", stderr);
+                return -1;
         }
     }
     return 0;
-
-error_occurred:
-    fputs("Try 'dit help --help' for more information.\n", stderr);
-    return -1;
 }
 
 
@@ -172,30 +170,52 @@ static int __display_usage(const char *target, int is_plural){
 static void __dit_usage(){
     puts("Usages:");
     puts("  dit [COMMAND] [ARGS]...");
-    puts("By specifying one of the following COMMANDs, you can use the tool-specific functions.\n");
+    puts("By specifying one of the following COMMANDs, you can use the tool-specific functions.");
+    putchar('\n');
     puts("Commands:");
     puts("main features of this tool");
     puts("  convert        show how a command line is reflected to Dockerfile and history-file");
-    puts("  optimize       refactoring Dockerfile based on its best practices\n");
+    puts("  optimize       do refactoring on Dockerfile based on its best practices");
+    putchar('\n');
     puts("customize tool settings");
-    puts("  config         make changes the specification of how a executed command line is reflected");
-    puts("  ignore         edit set of commands that is ignored when reflecting a command line\n");
-    puts("edit your Dockerfile");
-    puts("  cp             copy files from shared directory, and reflect this as COPY or ADD instruction");
-    puts("  label          make changes about LABEL or EXPOSE instruction");
-    puts("  setcmd         make changes about CMD or ENTRYPOINT instruction");
-    puts("  healthcheck    make changes about HEALTHCHECK instruction");
-    puts("  onbuild        make changes about ONBUILD instruction\n");
+    puts("  config           edit the specification of how a executed command line is reflected");
+    puts("  ignore         edit set of commands that are ignored when reflecting a command line");
+    putchar('\n');
+    puts("editing your Dockerfile");
+    puts("  cp             copy files from the shared directory, and reflect this as COPY/ADD instructions");
+    puts("  label          edit the metadata listed as LABEL/EXPOSE instructions");
+    puts("  setcmd         set the CMD/ENTRYPOINT instruction generated based on a command line");
+    puts("  healthcheck    set the HEALTHCHECK instruction generated based on a command line");
+    puts("  onbuild        add the ONBUILD instructions generated based on a command line");
+    putchar('\n');
     puts("utilitys");
-    puts("  erase          remove specific lines from Dockerfile and/or history-file");
+    puts("  erase          remove the specific lines from Dockerfile and/or history-file");
     puts("  inspect        show the directory tree with details about each file");
-    puts("  help           show information for some dit commands\n");
+    puts("  help           show information for some dit commands");
+    putchar('\n');
     puts("See 'dit [COMMAND] --help' or 'dit help [COMMAND]...' for more details.");
 }
 
 
 void config_usage(){
-    puts("help config");
+    puts("Usages:");
+    puts("  dit config [OPTION]... [SPECIFICATION]");
+    puts("Edit the specification of how commands in a command line are ignored when reflecting them.");
+    putchar('\n');
+    puts("Options:");
+    puts("  -r, --reset    reset the specification with default value");
+    puts("      --help     display this help, and exit normally");
+    putchar('\n');
+    puts("Specifications:");
+    puts("   0,  no-reflect    in the first place, do not reflect");
+    puts("   1,  strict        ignore all, strictly");
+    puts("   2,  normal        default");
+    puts("   3,  simple        ignore only if the command line contains only one command");
+    puts("   4,  no-ignore     do not ignore");
+    putchar('\n');
+    puts("Remarks:");
+    puts("  - If no SPECIFICATION is specified, display the current specification.");
+    puts("");
 }
 
 
@@ -222,10 +242,12 @@ void healthcheck_usage(){
 static void __help_usage(){
     puts("Usages:");
     puts("  dit help [OPTION]... [COMMAND]...");
-    puts("Show detailed usage of each specified dit COMMAND.\n");
+    puts("Show detailed usage of each specified dit COMMAND.");
+    putchar('\n');
     puts("Options:");
     puts("  -l, --list    list all dit commands available, and exit normally");
-    puts("      --help    display this help, and exit normally\n");
+    puts("      --help    display this help, and exit normally");
+    putchar('\n');
     puts("Remarks:");
     puts("  - If no SUBCOMMAND is specified, list a summary of each dit command.");
     puts("  - Each SUBCOMMAND can be truncated as long as it is unique,");
@@ -241,7 +263,8 @@ void ignore_usage(){
 void inspect_usage(){
     puts("Usages:");
     puts("  dit inspect [OPTION]... [DIRECTORY]...");
-    puts("List information about the files under the specified DIRECTORYs in a tree format.\n");
+    puts("List information about the files under the specified DIRECTORYs in a tree format.");
+    putchar('\n');
     puts("Options:");
     puts("  -C, --color              colorize the output to distinguish file types");
     puts("  -F, --classify           append indicator (one of '*/=|') to each file name:");
@@ -251,14 +274,16 @@ void inspect_usage(){
     puts("  -X                       sort by file extension, alphabetically");
     puts("      --sort=WORD          replace file sorting method:");
     puts("                             name(default), size(-S), extension(-X)");
-    puts("      --help               display this help, and exit normally\n");
+    puts("      --help               display this help, and exit normally");
+    putchar('\n');
     puts("Remarks:");
     puts("  - If no DIRECTORY is specified, it operates as if the current directory is specified.");
     puts("  - The WORD argument for '--sort' can be truncated and specified as long as it is unique.");
     puts("  - User or group name longer than 8 characters are converted to corresponding ID,");
     puts("    and IDs longer than 8 digits are converted to '#EXCESS' as undisplayable.");
     puts("  - The units of file size are 'k,M,G,T,P,E,Z', which is powers of 1000.");
-    puts("  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n");
+    puts("  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.");
+    putchar('\n');
     puts("The above options are similar to the 'ls' command which is a GNU one.");
     puts("See that man page for more details.");
 }

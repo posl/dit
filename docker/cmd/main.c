@@ -99,7 +99,7 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
  *
  * @param[in]  src  string you want to make a copy of in the heap area
  * @param[in]  n  the length of string
- * @return char*  pointer to string copied in the heap area
+ * @return char*  pointer to string copied in the heap area or NULL
  *
  * @note considering the possibility that size_t type is not unsigned.
  */
@@ -169,7 +169,7 @@ static int __strcmp_forward_match(const char *target, const char *expected, int 
 
 
 /**
- * @brief receive the passed string as positive integer
+ * @brief receive the passed string as positive integer.
  *
  * @param[in]  target  target string
  * @return int  the resulting integer or -1
@@ -261,7 +261,7 @@ int receive_expected_string(const char *target, const char * const expected[], i
 
 
 /**
- * @brief receive a yes or no response to a query
+ * @brief receive a yes or no response to a query.
  *
  * @param[in]  target  target string
  * @return int  the resulting answer or zero
