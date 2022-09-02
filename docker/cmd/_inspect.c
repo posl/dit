@@ -10,72 +10,68 @@
 
 #include "main.h"
 
-
-/** Data type for storing the results of option parse */
-typedef struct {
-    bool color;       /** whether to colorize file name depending on file mode */
-    bool classify;    /** whether to append indicator to file name depending on file mode */
-    bool numeric_id;  /** whether to represent users and groups numerically */
-    enum {
-        name,
-        size,
-        extension
-    } sort_style;     /** sort style for each directory */
-} insp_opts;
-
-
-/** Data type that is applied to the smallest element that makes up the directory tree */
-typedef struct file_tree{
-    char  *name;
-    mode_t mode;
-    uid_t  uid;
-	gid_t  gid;
-    off_t  size;
-
-    char  *link_path;
-    mode_t link_mode;
-    bool   link_invalid;
-
-    struct file_tree
-         **children;
-    size_t children_num;
-    size_t children_max;
-
-    int    err_id;
-    bool   noinfo;
-} file_tree;
-
-
-/** Data type for achieving a virtually infinite path length */
-typedef struct {
-    char  *ptr;
-    size_t max;
-} inf_path;
+#define comp(sort_style) __comp_func_##sort_style
 
 
 /** Data type for storing comparison function used when qsort */
 typedef int (* comp_func)(const void *, const void *);
 
 
+/** Data type for storing the results of option parse */
+typedef struct {
+    bool color;       /** whether to colorize file name based on file mode */
+    bool classify;    /** whether to append indicator to file name based on file mode */
+    bool numeric_id;  /** whether to represent users and groups numerically */
+    comp_func comp;   /** comparison function used when qsort */
+} insp_opts;
+
+
+/** Data type that is applied to the smallest element that makes up the directory tree */
+typedef struct file_node{
+    char *name;                   /** file name */
+    mode_t mode;                  /** file mode */
+    uid_t uid;                    /** file uid */
+	gid_t gid;                    /** file gid */
+    off_t size;                   /** file size */
+
+    char *link_path;              /** file name of link destination if this is a symbolic link */
+    mode_t link_mode;             /** file mode of link destination if this is a symbolic link */
+    bool link_invalid;            /** whether this is a invalid symbolic link */
+
+    struct file_node **children;  /** array for storing the children if this is a directory */
+    size_t children_num;          /** the current number of the children */
+    size_t children_max;          /** the current maximum length of the array */
+
+    int err_id;                   /** serial number of the error encountered */
+    bool noinfo;                  /** whether the file information could not be obtained */
+} file_node;
+
+
+/** Data type for achieving the virtually infinite length of file path */
+typedef struct {
+    char *ptr;   /** file path */
+    size_t max;  /** the current maximum length of file path */
+} inf_path;
+
+
 static int __parse_opts(int argc, char **argv, insp_opts *opt);
 
-static file_tree *__construct_file_tree(const char *base_path, insp_opts *opt);
-static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp);
+static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt);
+static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp);
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
-static file_tree *__new_file(char *path, char *name);
-static bool __append_file(file_tree *dir, file_tree *file);
+static file_node *__new_file(char *path, char *name);
+static bool __append_file(file_node *tree, file_node *file);
 
-static comp_func __get_comp_func(int sort_style);
 static int __comp_func_name(const void *a, const void *b);
 static int __comp_func_size(const void *a, const void *b);
 static int __comp_func_extension(const void *a, const void *b);
-static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_tree *, file_tree *));
-static int __fcmp_size(file_tree *file1, file_tree *file2);
-static int __fcmp_extension(file_tree *file1, file_tree *file2);
+static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_node *, file_node *));
+static int __fcmp_size(file_node *file1, file_node *file2);
+static int __fcmp_extension(file_node *file1, file_node *file2);
 static const char *__get_file_extension(const char *name);
 
-static void __display_file_tree(file_tree *tree, insp_opts *opt);
-static void __display_recursive(file_tree *file, insp_opts *opt, int depth);
+static void __display_dir_tree(file_node *tree, insp_opts *opt);
+static void __display_recursive(file_node *file, insp_opts *opt, int depth);
 static void __print_file_mode(mode_t mode);
 static void __print_file_user(uid_t uid, bool numeric_id);
 static void __print_file_group(gid_t gid, bool numeric_id);
@@ -120,12 +116,12 @@ int inspect(int argc, char **argv){
         path = *argv;
     }
 
-    file_tree *tree;
+    file_node *tree;
     int error_occurred = 0;
 
     while (1){
-        if ((tree = __construct_file_tree(path, &opt)))
-            __display_file_tree(tree, &opt);
+        if ((tree = __construct_dir_tree(path, &opt)))
+            __display_dir_tree(tree, &opt);
         else
             error_occurred = 1;
 
@@ -172,7 +168,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
     opt->color = false;
     opt->classify = false;
     opt->numeric_id = false;
-    opt->sort_style = name;
+    opt->comp = comp(name);
 
     int c;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1){
@@ -187,10 +183,10 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 opt->numeric_id = true;
                 break;
             case 'S':
-                opt->sort_style = size;
+                opt->comp = comp(size);
                 break;
             case 'X':
-                opt->sort_style = extension;
+                opt->comp = comp(extension);
                 break;
             case 1:
                 inspect_usage();
@@ -198,7 +194,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
             case 2:
                 if (optarg){
                     if ((c = receive_expected_string(optarg, sort_arguments, 3, 2)) >= 0){
-                        opt->sort_style = (c ? ((c == 1) ? name : size) : extension);
+                        opt->comp = (c ? ((c == 1) ? comp(name) : comp(size)) : comp(extension));
                         break;
                     }
                     if (c == -1)
@@ -241,10 +237,10 @@ error_occurred:
  *
  * @param[in]  base_path  file path to the root of the directory tree
  * @param[in]  opt  variable containing the result of option parse
- * @return file_tree*  the result of constructing
+ * @return file_node*  the result of constructing
  */
-static file_tree *__construct_file_tree(const char *base_path, insp_opts *opt){
-    file_tree *tree = NULL;
+static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
+    file_node *tree = NULL;
 
     size_t path_len;
     if ((path_len = strlen(base_path)) > 0){
@@ -255,10 +251,8 @@ static file_tree *__construct_file_tree(const char *base_path, insp_opts *opt){
             if (__concat_inf_path(&ipath, 0, base_path, path_len)){
                 char *name;
                 if ((name = xstrndup(base_path, path_len))){
-                    comp_func comp;
-                    if (! ((comp = __get_comp_func(opt->sort_style))
-                        && (tree = __construct_recursive(&ipath, path_len, name, comp))))
-                            free(name);
+                    if (! (tree = __construct_recursive(&ipath, path_len, name, opt->comp)))
+                        free(name);
                 }
             }
             free(ipath.ptr);
@@ -275,12 +269,12 @@ static file_tree *__construct_file_tree(const char *base_path, insp_opts *opt){
  * @param[in]  ipath_len  the length of path string
  * @param[in]  name  name of the file we are currently looking at
  * @param[in]  comp  comparison function used when qsort
- * @return file_tree*  the result of sub-constructing
+ * @return file_node*  the result of sub-constructing
  *
  * @note at the same time, sort files in directory.
  */
-static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp){
-    file_tree *file;
+static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp){
+    file_node *file;
     file = __new_file(ipath->ptr, name);
 
     if (file && S_ISDIR(file->mode)){
@@ -289,7 +283,7 @@ static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
             if (__concat_inf_path(ipath, ipath_len++, "/", 1)){
                 struct dirent *entry;
                 size_t name_len;
-                file_tree *tmp;
+                file_node *tmp;
 
                 while ((entry = readdir(dir))){
                     name = entry->d_name;
@@ -311,7 +305,7 @@ static file_tree *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
                 }
 
                 if (file->children)
-                    qsort(file->children, file->children_num, sizeof(file_tree *), comp);
+                    qsort(file->children, file->children_num, sizeof(file_node *), comp);
             }
             closedir(dir);
         }
@@ -362,11 +356,11 @@ static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
  *
  * @param[in]  path  file path to the file we are currently looking at
  * @param[in]  name  name of the file we are currently looking at
- * @return file_tree*  new element that makes up the directory tree
+ * @return file_node*  new element that makes up the directory tree
  */
-static file_tree *__new_file(char *path, char *name){
-    file_tree *file;
-    if ((file = (file_tree *) malloc(sizeof(file_tree)))){
+static file_node *__new_file(char *path, char *name){
+    file_node *file;
+    if ((file = (file_node *) malloc(sizeof(file_node)))){
         file->name = name;
         file->mode = 0;
         file->uid = 0;
@@ -423,32 +417,32 @@ static file_tree *__new_file(char *path, char *name){
 /**
  * @brief append file to the directory tree under construction.
  *
- * @param[out] dir  the directory tree under construction
+ * @param[out] tree  the directory tree under construction
  * @param[in]  file  file to append to the directory tree
  * @return bool  successful or not
  *
  * @note any directory can have a virtually unlimited number of files.
  */
-static bool __append_file(file_tree *dir, file_tree *file){
-    if (dir->children_num == dir->children_max){
+static bool __append_file(file_node *tree, file_node *file){
+    if (tree->children_num == tree->children_max){
         void *ptr;
-        if (! dir->children){
-            dir->children_max = 128;
-            ptr = malloc(sizeof(file_tree *) * dir->children_max);
+        if (! tree->children){
+            tree->children_max = 128;
+            ptr = malloc(sizeof(file_node *) * tree->children_max);
         }
         else {
-            dir->children_max *= 2;
-            ptr = realloc(dir->children, sizeof(file_tree *) * dir->children_max);
+            tree->children_max *= 2;
+            ptr = realloc(tree->children, sizeof(file_node *) * tree->children_max);
         }
 
         if (ptr)
-            dir->children = (file_tree **) ptr;
+            tree->children = (file_node **) ptr;
         else
             return false;
     }
 
-    dir->size += file->size;
-    dir->children[dir->children_num++] = file;
+    tree->size += file->size;
+    tree->children[tree->children_num++] = file;
     return true;
 }
 
@@ -458,26 +452,6 @@ static bool __append_file(file_tree *dir, file_tree *file){
 /******************************************************************************
     * Comparison Functions used when qsort
 ******************************************************************************/
-
-
-/**
- * @brief extract the comparison function used when qsort based on option parse.
- *
- * @param[in]  sort_style  file sorting style determined by option parse
- * @return comp_func  the desired comparison function or NULL
- */
-static comp_func __get_comp_func(int sort_style){
-    switch (sort_style){
-        case name:
-            return __comp_func_name;
-        case size:
-            return __comp_func_size;
-        case extension:
-            return __comp_func_extension;
-        default:
-            return NULL;
-    }
-}
 
 
 /**
@@ -526,9 +500,9 @@ static int __comp_func_extension(const void *a, const void *b){
  * @param[in]  addition  additional comparison function used before comparison by file name
  * @return int  comparison result
  */
-static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_tree *, file_tree *)){
-    file_tree *file1 = *((file_tree **) a);
-    file_tree *file2 = *((file_tree **) b);
+static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_node *, file_node *)){
+    file_node *file1 = *((file_node **) a);
+    file_node *file2 = *((file_node **) b);
 
     int i;
     return (addition && (i = addition(file1, file2))) ? i : strcmp(file1->name, file2->name);
@@ -542,7 +516,7 @@ static int __fcmp_name(const void *a, const void *b, int (* const addition)(file
  * @param[in]  file2
  * @return int  comparison result
  */
-static int __fcmp_size(file_tree *file1, file_tree *file2){
+static int __fcmp_size(file_node *file1, file_node *file2){
     return (int) (file2->size - file1->size);
 }
 
@@ -554,7 +528,7 @@ static int __fcmp_size(file_tree *file1, file_tree *file2){
  * @param[in]  file2
  * @return int  comparison result
  */
-static int __fcmp_extension(file_tree *file1, file_tree *file2){
+static int __fcmp_extension(file_node *file1, file_node *file2){
     const char *ext1, *ext2;
     ext1 = __get_file_extension(file1->name);
     ext2 = __get_file_extension(file2->name);
@@ -591,7 +565,7 @@ static const char *__get_file_extension(const char *name){
  * @param[out] tree  pre-constructed directory tree
  * @param[in]  opt  variable containing the result of option parse
  */
-static void __display_file_tree(file_tree *tree, insp_opts *opt){
+static void __display_dir_tree(file_node *tree, insp_opts *opt){
     puts(" Permission      User     Group      Size");
     puts("==========================================");
     __display_recursive(tree, opt, 0);
@@ -607,7 +581,7 @@ static void __display_file_tree(file_tree *tree, insp_opts *opt){
  *
  * @note at the same time, release the data that is no longer needed.
  */
-static void __display_recursive(file_tree *file, insp_opts *opt, int depth){
+static void __display_recursive(file_node *file, insp_opts *opt, int depth){
     if (! (file->err_id && file->noinfo)){
         __print_file_mode(file->mode);
         __print_file_user(file->uid, opt->numeric_id);
@@ -766,8 +740,8 @@ static void __print_file_size(off_t size){
  * @param[out] name  file name
  * @param[in]  mode  file mode
  * @param[in]  link_invalid  whether file name is relative to a file that is an invalid symlink
- * @param[in]  color  whether to colorize file name depending on file mode
- * @param[in]  classify  whether to append indicator to file name depending on file mode
+ * @param[in]  color  whether to colorize file name based on file mode
+ * @param[in]  classify  whether to append indicator to file name based on file mode
  */
 static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool color, bool classify){
     char *tmp;

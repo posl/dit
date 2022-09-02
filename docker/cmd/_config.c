@@ -55,18 +55,18 @@ static int __receive_config_string(const char *token);
  */
 int config(int argc, char **argv){
     int i;
-    bool reset_flag = false;
+    bool reset = false;
 
-    if ((i = __parse_opts(argc, argv, &reset_flag)))
+    if ((i = __parse_opts(argc, argv, &reset)))
         return (i > 0) ? 0 : 1;
 
     bool unexpected_error = true;
     if (! (argc -= optind)){
-        if (! (reset_flag ? __init_config() : __display_config()))
+        if (! (reset ? __init_config() : __display_config()))
             return 0;
     }
     else {
-        if (reset_flag)
+        if (reset)
             i = __init_config();
 
         if (! i){
@@ -89,7 +89,7 @@ int config(int argc, char **argv){
     }
 
     if (unexpected_error)
-        fputs("config: unexpected error when working with config-file\n", stderr);
+        fputs("config: unexpected error\n", stderr);
     fputs("Try 'dit config --help' for more information.\n", stderr);
     return 1;
 }
@@ -292,10 +292,10 @@ int get_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
  * @return bool  successful or not
  */
 static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
-    size_t tmp;
-    tmp = strlen(config_arg) + 1;
+    size_t len;
+    len = strlen(config_arg) + 1;
 
-    char A[tmp];
+    char A[len];
     strcpy(A, config_arg);
 
     const char *token;
