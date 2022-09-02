@@ -79,7 +79,7 @@ export PS1
 # if necessary, reproducing the environment under construction
 #
 
-if [ ! -s /dit/tmp/current-status.dev ]; then
+if [ ! -s /dit/tmp/current-status.dit ]; then
     . /dit/share/.cmd_history > /dev/null
-    echo 'under development' > /dit/tmp/current-status.dev
+    echo 'under development' > /dit/tmp/current-status.dit
 fi

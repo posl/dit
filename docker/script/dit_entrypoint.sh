@@ -72,10 +72,12 @@ touch \
     /dit/tmp/change-log.dock \
     /dit/tmp/change-log.hist \
     /dit/tmp/change-log.onb \
+    /dit/tmp/change-log.setc \
     /dit/tmp/change-report.act \
     /dit/tmp/change-report.prov \
     \
-    /dit/tmp/current-status.dev \
+    /dit/tmp/current-status.conv \
+    /dit/tmp/current-status.dit \
     /dit/tmp/current-status.opt \
     \
     /dit/tmp/last-history-number \
