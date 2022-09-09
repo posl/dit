@@ -60,7 +60,7 @@ int config(int argc, char **argv){
     if ((i = __parse_opts(argc, argv, &reset)))
         return (i > 0) ? 0 : 1;
 
-    bool unexpected_error = true;
+    bool err_flag = true;
     if (! (argc -= optind)){
         if (! (reset ? __init_config() : __display_config()))
             return 0;
@@ -77,18 +77,18 @@ int config(int argc, char **argv){
                 if (! (i = __update_config(config_arg)))
                     return 0;
                 if (i < 0){
-                    unexpected_error = false;
+                    err_flag = false;
                     fprintf(stderr, "config: unrecognized argument '%s'\n", config_arg);
                 }
             }
             else if (argc > 0) {
-                unexpected_error = false;
+                err_flag = false;
                 fputs("config: allow up to one non-optional argument\n", stderr);
             }
         }
     }
 
-    if (unexpected_error)
+    if (err_flag)
         fputs("config: unexpected error\n", stderr);
     fputs("Try 'dit config --help' for more information.\n", stderr);
     return 1;
@@ -153,71 +153,70 @@ static int __parse_opts(int argc, char **argv, bool *opt){
  * @return int  exit status tailored to caller
  */
 static int __config_contents(contents code, ...){
-    signed char c;
-    bool write_flag = false;
+    signed char c = 12;
+    bool write_flag = true;
     FILE *fp;
     int exit_status = 0;
 
-    if (code == init){
-        c = 12;
-        write_flag = true;
-    }
-    else if ((fp = fopen(CONFIG_FILE, "rb"))){
-        int spec2d = 2, spec2h = 2;
-        if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < 25)){
-            div_t tmp;
-            tmp = div(c, 5);
-            spec2d = tmp.quot;
-            spec2h = tmp.rem;
-        }
-        else if (code == get){
-            c = 12;
-            write_flag = true;
+    if (code != init){
+        if ((fp = fopen(CONFIG_FILE, "rb"))){
+            int spec2d = 2, spec2h = 2;
+
+            if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < 25)){
+                write_flag = false;
+
+                div_t tmp;
+                tmp = div(c, 5);
+                spec2d = tmp.quot;
+                spec2h = tmp.rem;
+            }
+            else if (code == get)
+                c = 12;
+            else
+                exit_status = 1;
+
+            if (! exit_status){
+                if (code == display){
+                    const char *config_strs[CONFIGS_NUM] = {
+                        "no-reflect",
+                        "strict",
+                        "normal",
+                        "simple",
+                        "no-ignore"
+                    };
+                    printf("d=%s\n", config_strs[spec2d]);
+                    printf("h=%s\n", config_strs[spec2h]);
+                }
+                else {
+                    va_list sp;
+                    va_start(sp, code);
+
+                    if (__receive_config(va_arg(sp, const char *), &spec2d, &spec2h)){
+                        if (code == update){
+                            signed char d;
+                            if (c != (d = 5 * spec2d + spec2h)){
+                                c = d;
+                                write_flag = true;
+                            }
+                        }
+                        else {
+                            *(va_arg(sp, int *)) = spec2d;
+                            *(va_arg(sp, int *)) = spec2h;
+                        }
+                    }
+                    else
+                        exit_status = -1;
+
+                    va_end(sp);
+                }
+            }
+            fclose(fp);
         }
         else
             exit_status = 1;
-
-        if (! exit_status){
-            if (code == display){
-                const char *config_strs[CONFIGS_NUM] = {
-                    "no-reflect",
-                    "strict",
-                    "normal",
-                    "simple",
-                    "no-ignore"
-                };
-                printf("d=%s\n", config_strs[spec2d]);
-                printf("h=%s\n", config_strs[spec2h]);
-            }
-            else {
-                va_list sp;
-                va_start(sp, code);
-
-                const char *config_arg;
-                config_arg = va_arg(sp, const char *);
-
-                if (__receive_config(config_arg, &spec2d, &spec2h)){
-                    if (code == update){
-                        c = 5 * spec2d + spec2h;
-                        write_flag = true;
-                    }
-                    else {
-                        *(va_arg(sp, int *)) = spec2d;
-                        *(va_arg(sp, int *)) = spec2h;
-                    }
-                }
-                else
-                    exit_status = -1;
-
-                va_end(sp);
-            }
-        }
-        fclose(fp);
     }
-    else
-        exit_status = 1;
 
-    if (write_flag && (! exit_status)){
+    if ((! exit_status) && write_flag){
         if ((fp = fopen(CONFIG_FILE, "wb"))){
             if (fwrite(&c, sizeof(c), 1, fp) != 1)
                 exit_status = 1;

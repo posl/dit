@@ -213,6 +213,9 @@ int receive_expected_string(const char *target, const char * const expected[], i
 
     char c;
     if ((c = *target)){
+        if (mode & 1)
+            c = toupper(c);
+
         while (min < max){
             mid = (min + max) / 2;
 
@@ -268,8 +271,8 @@ int receive_expected_string(const char *target, const char * const expected[], i
  */
 int receive_yes_or_no(const char *target){
     const char * const expected[] = {
-        "YES",
-        "NO"
+        "NO",
+        "YES"
     };
     int i;
     return ((! (i = receive_expected_string(target, expected, 2, 3))) ? 'y' : ((i > 0) ? 'n' : '\0'));

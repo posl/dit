@@ -19,38 +19,38 @@ typedef int (* comp_func)(const void *, const void *);
 
 /** Data type for storing the results of option parse */
 typedef struct {
-    bool color;       /** whether to colorize file name based on file mode */
-    bool classify;    /** whether to append indicator to file name based on file mode */
-    bool numeric_id;  /** whether to represent users and groups numerically */
-    comp_func comp;   /** comparison function used when qsort */
+    bool color;         /** whether to colorize file name based on file mode */
+    bool classify;      /** whether to append indicator to file name based on file mode */
+    bool numeric_id;    /** whether to represent users and groups numerically */
+    comp_func comp;     /** comparison function used when qsort */
 } insp_opts;
 
 
 /** Data type that is applied to the smallest element that makes up the directory tree */
 typedef struct file_node{
-    char *name;                   /** file name */
-    mode_t mode;                  /** file mode */
-    uid_t uid;                    /** file uid */
-	gid_t gid;                    /** file gid */
-    off_t size;                   /** file size */
+    char *name;
+    mode_t mode;
+    uid_t uid;
+	gid_t gid;
+    off_t size;
 
-    char *link_path;              /** file name of link destination if this is a symbolic link */
-    mode_t link_mode;             /** file mode of link destination if this is a symbolic link */
-    bool link_invalid;            /** whether this is a invalid symbolic link */
+    char *link_path;                /** file name of link destination if this is a symbolic link */
+    mode_t link_mode;               /** file mode of link destination if this is a symbolic link */
+    bool link_invalid;              /** whether this is a invalid symbolic link */
 
-    struct file_node **children;  /** array for storing the children if this is a directory */
-    size_t children_num;          /** the current number of the children */
-    size_t children_max;          /** the current maximum length of the array */
+    struct file_node **children;    /** array for storing the children if this is a directory */
+    size_t children_num;            /** the current number of the children */
+    size_t children_max;            /** the current maximum length of the array */
 
-    int err_id;                   /** serial number of the error encountered */
-    bool noinfo;                  /** whether the file information could not be obtained */
+    int err_id;                     /** serial number of the error encountered */
+    bool noinfo;                    /** whether the file information could not be obtained */
 } file_node;
 
 
 /** Data type for achieving the virtually infinite length of file path */
 typedef struct {
-    char *ptr;   /** file path */
-    size_t max;  /** the current maximum length of file path */
+    char *ptr;     /** file path */
+    size_t max;    /** the current maximum length of file path */
 } inf_path;
 
 
@@ -117,20 +117,20 @@ int inspect(int argc, char **argv){
     }
 
     file_node *tree;
-    int error_occurred = 0;
+    int err_flag = 0;
 
     while (1){
         if ((tree = __construct_dir_tree(path, &opt)))
             __display_dir_tree(tree, &opt);
         else
-            error_occurred = 1;
+            err_flag = 1;
 
         if (--argc){
             path = *(++argv);
             putchar('\n');
         }
         else
-            return error_occurred;
+            return err_flag;
     }
 }
 
@@ -203,23 +203,23 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                         fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
                         fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
                     }
-                    goto error_occurred;
+                    goto err_exit;
                 }
             case ':':
                 fputs("inspect: '--sort' requires an argument\n", stderr);
-                goto error_occurred;
+                goto err_exit;
             case '\?':
                 if (argv[--optind][1] == '-')
                     fprintf(stderr, "inspect: unrecognized option '%s'\n", argv[optind]);
                 else
                     fprintf(stderr, "inspect: invalid option '-%c'\n", optopt);
             default:
-                goto error_occurred;
+                goto err_exit;
         }
     }
     return 0;
 
-error_occurred:
+err_exit:
     fputs("Try 'dit inspect --help' for more information.\n", stderr);
     return -1;
 }

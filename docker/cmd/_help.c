@@ -44,14 +44,14 @@ int help(int argc, char **argv){
     if ((i = __parse_opts(argc, argv)))
         return (i > 0) ? 0 : 1;
 
-    int error_occurred = 0;
+    int err_flag = 0;
     if ((argc -= optind) > 0){
         argv += optind;
         i = (argc > 1);
 
         while (1){
             if (__display_usage(*argv, i))
-                error_occurred = 1;
+                err_flag = 1;
 
             if (--argc){
                 argv++;
@@ -64,7 +64,7 @@ int help(int argc, char **argv){
     else
         __dit_usage();
 
-    return error_occurred;
+    return err_flag;
 }
 
 
