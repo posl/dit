@@ -173,7 +173,7 @@ static int __strcmp_forward_match(const char *target, const char *expected, int 
 
 
 /**
- * @brief receive the passed string as positive integer.
+ * @brief receive the passed string as a positive integer.
  *
  * @param[in]  target  target string
  * @return int  the resulting integer or -1
@@ -271,7 +271,7 @@ int receive_expected_string(const char *target, const char * const expected[], i
  * @brief receive a yes or no response to a query.
  *
  * @param[in]  target  target string
- * @return int  the resulting answer or zero
+ * @return int  integer indentifying the response or zero
  */
 int receive_yes_or_no(const char *target){
     const char * const expected[] = {
@@ -280,4 +280,21 @@ int receive_yes_or_no(const char *target){
     };
     int i;
     return ((! (i = receive_expected_string(target, expected, 2, 3))) ? 'y' : ((i > 0) ? 'n' : '\0'));
+}
+
+
+/**
+ * @brief determine target file(s) based on the passed string.
+ *
+ * @param[in]  target  target string
+ * @return int  integer indentifying the target file(s) or zero
+ */
+int receive_target_file(const char *target){
+    const char * const expected[] = {
+        "both",
+        "dockerfile",
+        "history-file"
+    };
+    int i;
+    return (((i = receive_expected_string(target, expected, 3, 2)) >= 0) ? expected[i][0] : '\0');
 }

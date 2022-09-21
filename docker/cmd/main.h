@@ -18,6 +18,9 @@
 
 #define CMDS_NUM 13
 
+#define DOCKERFILE "/dit/usr/Dockerfile.draft"
+#define HISTORY_FILE "/dit/usr/.cmd_history"
+
 
 
 /******************************************************************************
@@ -75,6 +78,7 @@ int strcmp_upper_case(const char *target, const char *expected);
 int receive_positive_integer(const char *target);
 int receive_expected_string(const char *target, const char * const expected[], int size, int mode);
 int receive_yes_or_no(const char *target);
+int receive_target_file(const char *target);
 
 
 

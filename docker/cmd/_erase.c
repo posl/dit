@@ -12,9 +12,6 @@
 
 #include "main.h"
 
-#define LOG_FILE_D "/dit/tmp/change-log.dock"
-#define LOG_FILE_H "/dit/tmp/change-log.hist"
-
 
 /** Data type for storing the results of option parse */
 typedef struct {
@@ -139,7 +136,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                         break;
                     }
                     fputs("erase: invalid number of ", stderr);
-                    fprintf(stderr, "%s: %s", ((c == 'L') ? "lines limit" : "times to go back"), optarg);
+                    fprintf(stderr, "%s: %s\n", ((c == 'L') ? "lines limit" : "times to go back"), optarg);
                 }
             default:
                 fputs("Try 'dit erase --help' for more information.\n", stderr);

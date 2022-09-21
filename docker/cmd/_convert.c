@@ -25,8 +25,10 @@ int convert(int argc, char **argv){
             fprintf(fp, "%s\n", outputs[i]);
             fclose(fp);
         }
-        else
+        else {
+            fprintf(stderr, "convert: unexpected error in working with '%s'\n", files[i]);
             return 1;
+        }
 
         if (++i < 2)
             putchar('\n');

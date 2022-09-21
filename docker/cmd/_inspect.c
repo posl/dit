@@ -195,11 +195,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                         opt->comp = (c ? ((c == 1) ? comp(name) : comp(size)) : comp(extension));
                         break;
                     }
-                    if (c == -1)
-                        fputs("inspect: ambiguous argument '' for '--sort'\n", stderr);
-                    else
-                        fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
-
+                    fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
                     fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
                 }
             default:

@@ -23,7 +23,7 @@
 
 /** Data type that collects serial numbers of the contents that handle the config-file */
 typedef enum {
-    init,
+    reset,
     display,
     set,
     update,
@@ -66,14 +66,14 @@ const char * const config_reprs[CONFIGS_NUM] = {
  */
 int config(int argc, char **argv){
     int i;
-    bool reset = false, err_flag = false;
+    bool reset_flag = false, err_flag = false;
 
-    if ((i = __parse_opts(argc, argv, &reset))){
+    if ((i = __parse_opts(argc, argv, &reset_flag))){
         if (i > 0)
             return 0;
     }
     else if (! (argc -= optind)){
-        if (! __config_contents((reset ? init : display)))
+        if (! __config_contents((reset_flag ? reset : display)))
             return 0;
         else
             err_flag = true;
@@ -82,7 +82,7 @@ int config(int argc, char **argv){
         const char *config_arg;
         config_arg = argv[optind];
 
-        if (! (i = __config_contents((reset ? set : update), config_arg)))
+        if (! (i = __config_contents((reset_flag ? set : update), config_arg)))
             return 0;
         if (i < 0)
             fprintf(stderr, "config: unrecognized argument '%s'\n", config_arg);
@@ -146,7 +146,7 @@ static int __config_contents(contents code, ...){
     signed char c = INITIAL_CHAR;
     bool write_flag = true;
 
-    if (code != init){
+    if (code != reset){
         int mode2d = DEFAULT_MODE, mode2h = DEFAULT_MODE;
 
         if (code != set){
