@@ -12,29 +12,40 @@
 
 #include "main.h"
 
-#define CONFIG_FILE "/dit/conf/current-spec.conv"
+#define CONFIG_FILE "/dit/etc/current-spec.conv"
 #define CONFIGS_NUM 5
+#define DEFAULT_MODE 2
+
+#define MODES_TO_CHAR(mode2d, mode2h)  (CONFIGS_NUM * mode2d + mode2h)
+#define INITIAL_CHAR  MODES_TO_CHAR(DEFAULT_MODE, DEFAULT_MODE)
+#define EXCEED_CHAR  (CONFIGS_NUM * CONFIGS_NUM)
 
 
-/** Data type that collects serial numbers of the contents related to config-file */
+/** Data type that collects serial numbers of the contents that handle the config-file */
 typedef enum {
     init,
     display,
+    set,
     update,
     get
 } contents;
 
 
 static int __parse_opts(int argc, char **argv, bool *opt);
-
 static int __config_contents(contents code, ...);
-static int __init_config();
-static int __display_config();
-static int __update_config(const char *config_arg);
 
-static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2h);
+static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2h);
 static int __receive_config_integer(int c, int spare);
 static int __receive_config_string(const char *token);
+
+
+const char * const config_reprs[CONFIGS_NUM] = {
+    "no-ignore",
+    "no-reflect",
+    "normal",
+    "simple",
+    "strict"
+};
 
 
 
@@ -55,41 +66,34 @@ static int __receive_config_string(const char *token);
  */
 int config(int argc, char **argv){
     int i;
-    bool reset = false;
+    bool reset = false, err_flag = false;
 
-    if ((i = __parse_opts(argc, argv, &reset)))
-        return (i > 0) ? 0 : 1;
-
-    bool err_flag = true;
-    if (! (argc -= optind)){
-        if (! (reset ? __init_config() : __display_config()))
+    if ((i = __parse_opts(argc, argv, &reset))){
+        if (i > 0)
             return 0;
     }
-    else {
-        if (reset)
-            i = __init_config();
-
-        if (! i){
-            if (! (argc -= 1)){
-                const char *config_arg;
-                config_arg = argv[optind];
-
-                if (! (i = __update_config(config_arg)))
-                    return 0;
-                if (i < 0){
-                    err_flag = false;
-                    fprintf(stderr, "config: unrecognized argument '%s'\n", config_arg);
-                }
-            }
-            else if (argc > 0) {
-                err_flag = false;
-                fputs("config: allow up to one non-optional argument\n", stderr);
-            }
-        }
+    else if (! (argc -= optind)){
+        if (! __config_contents((reset ? init : display)))
+            return 0;
+        else
+            err_flag = true;
     }
+    else if (! (argc -= 1)){
+        const char *config_arg;
+        config_arg = argv[optind];
+
+        if (! (i = __config_contents((reset ? set : update), config_arg)))
+            return 0;
+        if (i < 0)
+            fprintf(stderr, "config: unrecognized argument '%s'\n", config_arg);
+        else
+            err_flag = true;
+    }
+    else if (argc > 0)
+        fputs("config: doesn't allow two or more arguments\n", stderr);
 
     if (err_flag)
-        fputs("config: unexpected error\n", stderr);
+        fputs("config: unexpected error in working with config-file\n", stderr);
     fputs("Try 'dit config --help' for more information.\n", stderr);
     return 1;
 }
@@ -106,10 +110,8 @@ int config(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int __parse_opts(int argc, char **argv, bool *opt){
-    optind = 1;
-    opterr = 0;
+    const char *short_opts = "r";
 
-    const char *short_opts = ":r";
     const struct option long_opts[] = {
         { "reset", no_argument, NULL, 'r' },
         { "help",  no_argument, NULL,  1  },
@@ -123,15 +125,9 @@ static int __parse_opts(int argc, char **argv, bool *opt){
                 *opt = true;
                 break;
             case 1:
-                config_usage();
+                config_manual();
                 return 1;
-            case '\?':
-                if (argv[--optind][1] == '-')
-                    fprintf(stderr, "config: unrecognized option '%s'\n", argv[optind]);
-                else
-                    fprintf(stderr, "config: invalid option '-%c'\n", optopt);
             default:
-                fputs("Try 'dit config --help' for more information.\n", stderr);
                 return -1;
         }
     }
@@ -139,87 +135,72 @@ static int __parse_opts(int argc, char **argv, bool *opt){
 }
 
 
-
-
-/******************************************************************************
-    * Contents
-******************************************************************************/
-
-
 /**
  * @brief function that combines the individual functions to use config-file into one
  *
- * @param[in]  code  serial number identifying the content
- * @return int  exit status tailored to caller
+ * @param[in]  code  serial number identifying the operation content
+ * @return int  0 (success), 1 (file manipulation error) or -1 (argument recognition error)
  */
 static int __config_contents(contents code, ...){
-    signed char c = 12;
-    bool write_flag = true;
     FILE *fp;
-    int exit_status = 0;
+    signed char c = INITIAL_CHAR;
+    bool write_flag = true;
 
     if (code != init){
-        if ((fp = fopen(CONFIG_FILE, "rb"))){
-            int spec2d = 2, spec2h = 2;
+        int mode2d = DEFAULT_MODE, mode2h = DEFAULT_MODE;
 
-            if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < 25)){
-                write_flag = false;
+        if (code != set){
+            if ((fp = fopen(CONFIG_FILE, "rb"))){
+                if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < EXCEED_CHAR)){
+                    write_flag = false;
 
-                div_t tmp;
-                tmp = div(c, 5);
-                spec2d = tmp.quot;
-                spec2h = tmp.rem;
+                    div_t tmp;
+                    tmp = div(c, CONFIGS_NUM);
+                    mode2d = tmp.quot;
+                    mode2h = tmp.rem;
+                }
+                else
+                    c = INITIAL_CHAR;
+
+                fclose(fp);
             }
-            else if (code == get)
-                c = 12;
-            else
-                exit_status = 1;
+            if (write_flag && (code != get))
+                return 1;
+        }
 
-            if (! exit_status){
-                if (code == display){
-                    const char *config_strs[CONFIGS_NUM] = {
-                        "no-reflect",
-                        "strict",
-                        "normal",
-                        "simple",
-                        "no-ignore"
-                    };
-                    printf("d=%s\n", config_strs[spec2d]);
-                    printf("h=%s\n", config_strs[spec2h]);
+        if (code == display){
+            const int A[CONFIGS_NUM] = {1, 4, 2, 3, 0};
+            printf("d=%s\nh=%s\n", config_reprs[A[mode2d]], config_reprs[A[mode2h]]);
+        }
+        else {
+            va_list sp;
+            va_start(sp, code);
+
+            bool success_flag;
+            if ((success_flag = __receive_config(va_arg(sp, const char *), &mode2d, &mode2h))){
+                if (code != get){
+                    signed char d;
+                    if (c != (d = MODES_TO_CHAR(mode2d, mode2h))){
+                        c = d;
+                        write_flag = true;
+                    }
                 }
                 else {
-                    va_list sp;
-                    va_start(sp, code);
-
-                    if (__receive_config(va_arg(sp, const char *), &spec2d, &spec2h)){
-                        if (code == update){
-                            signed char d;
-                            if (c != (d = 5 * spec2d + spec2h)){
-                                c = d;
-                                write_flag = true;
-                            }
-                        }
-                        else {
-                            *(va_arg(sp, int *)) = spec2d;
-                            *(va_arg(sp, int *)) = spec2h;
-                        }
-                    }
-                    else
-                        exit_status = -1;
-
-                    va_end(sp);
+                    *(va_arg(sp, int *)) = mode2d;
+                    *(va_arg(sp, int *)) = mode2h;
                 }
             }
-            fclose(fp);
+            va_end(sp);
+
+            if (! success_flag)
+                return -1;
         }
-        else
-            exit_status = 1;
     }
 
-    if ((! exit_status) && write_flag){
+    int exit_status = 0;
+    if (write_flag){
         if ((fp = fopen(CONFIG_FILE, "wb"))){
-            if (fwrite(&c, sizeof(c), 1, fp) != 1)
-                exit_status = 1;
+            exit_status = (fwrite(&c, sizeof(c), 1, fp) != 1);
             fclose(fp);
         }
         else
@@ -229,49 +210,16 @@ static int __config_contents(contents code, ...){
 }
 
 
-
-
-/**
- * @brief initialize the modes of dit command 'convert'.
- *
- * @return int  exit status like command's one
- */
-static int __init_config(){
-    return __config_contents(init);
-}
-
-
-/**
- * @brief display the current modes of dit command 'convert' on screen.
- *
- * @return int  exit status like command's one
- */
-static int __display_config(){
-    return __config_contents(display);
-}
-
-
-/**
- * @brief update the modes of dit command 'convert'.
- *
- * @param[in]  config_arg  string for determining the modes
- * @return int  0 (success), 1 (unexpected error) or -1 (recognition failure)
- */
-static int __update_config(const char *config_arg){
-    return __config_contents(update, config_arg);
-}
-
-
 /**
  * @brief get the modes of dit command 'convert', and hand over it to the command.
  *
  * @param[in]  config_arg  string for determining the modes
- * @param[out] p_spec2d  variable to store the setting information used when reflecting to Dockerfile
- * @param[out] p_spec2h  variable to store the setting information used when reflecting to history-file
- * @return int  0 (success), 1 (unexpected error) or -1 (recognition failure)
+ * @param[out] p_mode2d  variable to store the setting used when reflecting to Dockerfile
+ * @param[out] p_mode2h  variable to store the setting used when reflecting to history-file
+ * @return int  0 (success), 1 (file manipulation error) or -1 (argument recognition error)
  */
-int get_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
-    return __config_contents(get, config_arg, p_spec2d, p_spec2h);
+int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h){
+    return __config_contents(get, config_arg, p_mode2d, p_mode2h);
 }
 
 
@@ -283,14 +231,14 @@ int get_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
 
 
 /**
- * @brief parse the passed passed string, and generate next modes.
+ * @brief parse the passed string, and generate next modes.
  *
  * @param[in]  config_arg  string for determining the modes
- * @param[out] p_spec2d  variable to store the setting information used when reflecting to Dockerfile
- * @param[out] p_spec2h  variable to store the setting information used when reflecting to history-file
+ * @param[out] p_mode2d  variable to store the setting used when reflecting to Dockerfile
+ * @param[out] p_mode2h  variable to store the setting used when reflecting to history-file
  * @return bool  successful or not
  */
-static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2h){
+static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2h){
     size_t len;
     len = strlen(config_arg) + 1;
 
@@ -299,60 +247,60 @@ static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2
 
     const char *token;
     if ((token = strtok(A, ","))){
-        int spec2d, spec2h, i, j;
-        spec2d = *p_spec2d;
-        spec2h = *p_spec2h;
+        int mode2d, mode2h, mode, offset, target, tmp;
+        mode2d = *p_mode2d;
+        mode2h = *p_mode2h;
 
         do {
-            i = -1;
-            if (! (j = strlen(token) - 2)){
-                if (! (((spec2d = __receive_config_integer(token[0], spec2d)) < 0)
-                    || ((spec2h = __receive_config_integer(token[1], spec2h)) < 0)))
+            mode = -1;
+            offset = 0;
+            target = 'b';
+
+            if (! (tmp = strlen(token) - 2)){
+                if ((tmp = __receive_config_integer(token[0], mode2d)) >= 0){
+                    if ((mode = __receive_config_integer(token[1], mode2h)) >= 0){
+                        mode2d = tmp;
+                        mode2h = mode;
                         continue;
+                    }
+                }
+                else
+                    tmp = 0;
             }
-            else if (j > 0){
+            else if (tmp > 0){
                 if (token[1] == '='){
-                    if (token[3] == '\0'){
-                        i = __receive_config_integer(token[2], 5);
+                    if (! strchr("bdh", token[0]))
+                        return false;
+                    if (token[3] == '\0')
+                        tmp = -1;
 
-                        if ((i == 5) && strchr("abdh", *token))
-                            continue;
-                    }
-
-                    if (i < 0)
-                        i = __receive_config_string(token + 2);
-
-                    if ((i >= 0) && (i < 5)){
-                        switch (*token){
-                            case 'a':
-                            case 'b':
-                                spec2d = (spec2h = i);
-                                continue;
-                            case 'd':
-                                spec2d = i;
-                                continue;
-                            case 'h':
-                                spec2h = i;
-                                continue;
-                        }
-                    }
-                    i = 5;
+                    offset = 2;
+                    target = token[0];
                 }
             }
-            else
-                i = __receive_config_integer(*token, -1);
 
-            if (i < 0)
-                i = __receive_config_string(token);
+            if ((tmp < 0) && ((mode = __receive_config_integer(token[offset], -2)) < -1))
+                continue;
+            if (mode < 0)
+                mode = __receive_config_string(token + offset);
 
-            if ((i >= 0) && (i < 5))
-                spec2d = (spec2h = i);
+            if (mode >= 0){
+                switch (target){
+                    case 'b':
+                        mode2h = mode;
+                    case 'd':
+                        mode2d = mode;
+                        break;
+                    case 'h':
+                        mode2h = mode;
+                }
+            }
             else
                 return false;
         } while ((token = strtok(NULL, ",")));
 
-        *p_spec2d = spec2d;
-        *p_spec2h = spec2h;
+        *p_mode2d = mode2d;
+        *p_mode2h = mode2h;
     }
 
     return true;
@@ -367,7 +315,14 @@ static bool __receive_config(const char *config_arg, int *p_spec2d, int *p_spec2
  * @return int  the resulting integer, arbitrary integer, or -1
  */
 static int __receive_config_integer(int c, int spare){
-    return (((c >= '0') && (c < '5')) ? (c - '0') : ((c == '_') ? spare : -1));
+    int i;
+    if ((i = c - '0') >= 0){
+        if (i < CONFIGS_NUM)
+            return i;
+        if (c == '_')
+            return spare;
+    }
+    return -1;
 }
 
 
@@ -378,15 +333,8 @@ static int __receive_config_integer(int c, int spare){
  * @return int  the resulting integer or -1
  */
 static int __receive_config_string(const char *token){
-    const char * const config_strs[CONFIGS_NUM] = {
-        "no-ignore",
-        "no-reflect",
-        "normal",
-        "simple",
-        "strict"
-    };
-    int A[CONFIGS_NUM] = {4, 0, 2, 3, 1};
+    const int A[CONFIGS_NUM] = {4, 0, 2, 3, 1};
 
     int i;
-    return (((i = receive_expected_string(token, config_strs, CONFIGS_NUM, 2)) >= 0) ? A[i] : -1);
+    return (((i = receive_expected_string(token, config_reprs, CONFIGS_NUM, 2)) >= 0) ? A[i] : -1);
 }

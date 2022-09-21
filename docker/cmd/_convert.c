@@ -3,17 +3,35 @@
 
 
 int convert(int argc, char **argv){
+    const char * const files[2] = {
+        "/dit/tmp/convert-result.dock",
+        "/dit/tmp/convert-result.hist"
+    };
+    const char * const targets[2] = {
+        "Dockerfile",
+        "history-file"
+    };
+    const char * const outputs[2] = {
+        "ENV abc=123",
+        "export abc=123"
+    };
+
+    int i = 0;
     FILE* fp;
-    if ((fp = fopen("/dit/tmp/last-convert-result", "w"))){
-        fputs(" < Dockerfile >\n", fp);
-        fputs("ENV abc=123\n", fp);
-        fputc('\n', fp);
-        fputs(" < history-file >\n", fp);
-        fputs("export abc=123\n", fp);
-        fclose(fp);
-        puts("convert");
-        return 0;
+
+    while (1){
+        if ((fp = fopen(files[i], "w"))){
+            printf(" < %s >\n%s\n", targets[i], outputs[i]);
+            fprintf(fp, "%s\n", outputs[i]);
+            fclose(fp);
+        }
+        else
+            return 1;
+
+        if (++i < 2)
+            putchar('\n');
+        else
+            break;
     }
-    else
-        return 1;    // 構文エラーなどで last-convert-result が更新できない場合は，エラー終了する
+    return 0;
 }

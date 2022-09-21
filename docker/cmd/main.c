@@ -13,8 +13,10 @@
 
 static int (* const __get_dit_cmd(const char *target))(int, char **);
 
+static int __strcmp_forward_match(const char *target, const char *expected, int upper_flag);
 
-const char * const dit_cmds[CMDS_NUM] = {
+
+const char * const cmd_reprs[CMDS_NUM] = {
     "config",
     "convert",
     "cp",
@@ -26,6 +28,7 @@ const char * const dit_cmds[CMDS_NUM] = {
     "label",
     "onbuild",
     "optimize",
+    "reflect",
     "setcmd"
 };
 
@@ -79,11 +82,12 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
         label,
         onbuild,
         optimize,
+        reflect,
         setcmd
     };
 
     int i;
-    return ((i = receive_expected_string(target, dit_cmds, CMDS_NUM, 0)) >= 0) ? cmd_funcs[i] : NULL;
+    return ((i = receive_expected_string(target, cmd_reprs, CMDS_NUM, 0)) >= 0) ? cmd_funcs[i] : NULL;
 }
 
 

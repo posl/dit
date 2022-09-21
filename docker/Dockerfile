@@ -11,11 +11,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /cmd
+WORKDIR /dit/src
 COPY ./cmd ./
 
 # compile c-files and generate a executable file as dit
-RUN gcc *.c -o dit -march=native -O2
+RUN gcc *.c -o /usr/local/sbin/dit -march=native -O2
 
 
 
@@ -23,9 +23,9 @@ ARG BASE_IMAGE=debian
 ARG BASE_VERSION=latest
 FROM ${BASE_IMAGE}:${BASE_VERSION} as product
 
-# load dit command, initialization file and configuration files
-COPY --from=builder /cmd/dit /usr/local/bin/
-COPY ./script /dit/script/
+# load the dit command and the script files
+COPY --from=builder /usr/local/sbin/dit /usr/local/sbin/
+COPY ./script /dit/src/
 
 ARG BASE_IMAGE=debian
 ARG BASE_VERSION=latest
@@ -33,4 +33,4 @@ ENV BASE_IMAGE=${BASE_IMAGE}
 ENV BASE_VERSION=${BASE_VERSION}
 
 USER root
-ENTRYPOINT [ "/bin/bash", "/dit/script/dit_entrypoint.sh" ]
+ENTRYPOINT [ "/bin/bash", "/dit/src/dit_entry.sh" ]

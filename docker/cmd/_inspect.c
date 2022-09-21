@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-#define comp(sort_style) __comp_func_##sort_style
+#define comp(sort_style)  __comp_func_##sort_style
 
 
 /** Data type for storing comparison function used when qsort */
@@ -97,13 +97,13 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
  * @attention try this with '--help' option for more information.
  */
 int inspect(int argc, char **argv){
-    setvbuf(stdout, NULL, _IOFBF, 0);
-
     int i;
     insp_opts opt;
 
     if ((i = __parse_opts(argc, argv, &opt)))
         return (i > 0) ? 0 : 1;
+
+    setvbuf(stdout, NULL, _IOFBF, 0);
 
     const char *path;
     if (argc <= optind){
@@ -117,20 +117,20 @@ int inspect(int argc, char **argv){
     }
 
     file_node *tree;
-    int err_flag = 0;
+    int exit_status = 0;
 
     while (1){
         if ((tree = __construct_dir_tree(path, &opt)))
             __display_dir_tree(tree, &opt);
         else
-            err_flag = 1;
+            exit_status = 1;
 
         if (--argc){
             path = *(++argv);
             putchar('\n');
         }
         else
-            return err_flag;
+            return exit_status;
     }
 }
 
@@ -146,20 +146,18 @@ int inspect(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int __parse_opts(int argc, char **argv, insp_opts *opt){
-    optind = 1;
-    opterr = 0;
+    const char *short_opts = "CFnSX";
 
-    const char *short_opts = ":CFnSX";
     const struct option long_opts[] = {
         { "color",           no_argument,       NULL, 'C' },
         { "classify",        no_argument,       NULL, 'F' },
         { "numeric-uid-gid", no_argument,       NULL, 'n' },
-        { "sort",            required_argument, NULL,  2  },
         { "help",            no_argument,       NULL,  1  },
+        { "sort",            required_argument, NULL,  2  },
         {  0,                 0,                 0,    0  }
     };
 
-    const char * const sort_arguments[] = {
+    const char * const sort_args[] = {
         "extension",
         "name",
         "size"
@@ -189,39 +187,27 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 opt->comp = comp(extension);
                 break;
             case 1:
-                inspect_usage();
+                inspect_manual();
                 return 1;
             case 2:
                 if (optarg){
-                    if ((c = receive_expected_string(optarg, sort_arguments, 3, 2)) >= 0){
+                    if ((c = receive_expected_string(optarg, sort_args, 3, 2)) >= 0){
                         opt->comp = (c ? ((c == 1) ? comp(name) : comp(size)) : comp(extension));
                         break;
                     }
                     if (c == -1)
                         fputs("inspect: ambiguous argument '' for '--sort'\n", stderr);
-                    else {
+                    else
                         fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
-                        fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
-                    }
-                    goto err_exit;
+
+                    fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
                 }
-            case ':':
-                fputs("inspect: '--sort' requires an argument\n", stderr);
-                goto err_exit;
-            case '\?':
-                if (argv[--optind][1] == '-')
-                    fprintf(stderr, "inspect: unrecognized option '%s'\n", argv[optind]);
-                else
-                    fprintf(stderr, "inspect: invalid option '-%c'\n", optopt);
             default:
-                goto err_exit;
+                fputs("Try 'dit inspect --help' for more information.\n", stderr);
+                return -1;
         }
     }
     return 0;
-
-err_exit:
-    fputs("Try 'dit inspect --help' for more information.\n", stderr);
-    return -1;
 }
 
 

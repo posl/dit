@@ -2,7 +2,7 @@
 
 
 #
-# define alias of tool-specific commands
+# define alias of the tool-specific commands
 #
 
 alias \
@@ -11,11 +11,9 @@ alias \
     cfg='dit config' \
     convert='dit convert' \
     conv='dit convert' \
-    ditcp='dit cp' \
     erase='dit erase' \
     healthcheck='dit healthcheck' \
     hc='dit healthcheck' \
-    dithelp='dit help' \
     ignore='dit ignore' \
     ig='dit ignore' \
     inspect='dit inspect' \
@@ -24,7 +22,9 @@ alias \
     onbuild='dit onbuild' \
     onb='dit onbuild' \
     optimize='dit optimize' \
-    opt='optimize' \
+    opt='dit optimize' \
+    reflect='dit reflect' \
+    refl='dit reflect' \
     setcmd='dit setcmd' \
     setc='dit setcmd'
 
@@ -37,11 +37,12 @@ alias \
 PROMPT_REFLECT(){
     echo "$?" > /dit/tmp/last-exit-status
     : > /dit/tmp/last-command-line
-    : > /dit/tmp/last-parse-result
-    : > /dit/tmp/last-convert-result
+    : > /dit/tmp/convert-result.dock
+    : > /dit/tmp/convert-result.hist
 
-    if ( ( history 1 | awk -f /dit/script/parse_history.awk ) && dit convert -s ); then
-        awk -f /dit/script/reflect_result.awk < /dit/tmp/last-convert-result
+    if ( ( history 1 | awk -f /dit/src/parse_history.awk ) && dit convert ); then
+        dit reflect -d /dit/tmp/convert-result.dock
+        dit reflect -h /dit/tmp/convert-result.hist
     fi
 }
 
@@ -56,7 +57,7 @@ PROMPT_REPORT(){
         echo '[dock:+0 hist:+0] '
     fi
 
-    echo '0 0' > /dit/tmp/change-report.prov
+    : > /dit/tmp/change-report.prov
 }
 
 export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT 2> /dev/null || true
@@ -79,7 +80,8 @@ export PS1
 # if necessary, reproducing the environment under construction
 #
 
-if [ ! -s /dit/tmp/current-status.dit ]; then
-    . /dit/share/.cmd_history > /dev/null
-    echo 'under development' > /dit/tmp/current-status.dit
+if [ ! -s /dit/etc/current-status.dit ]; then
+    . /dit/usr/.cmd_history > /dev/null
+    history -r /dit/usr/.cmd_history
+    echo 'under development' > /dit/etc/current-status.dit
 fi

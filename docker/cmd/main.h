@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define CMDS_NUM 12
+#define CMDS_NUM 13
 
 
 
@@ -35,6 +35,7 @@ int inspect(int argc, char **argv);
 int label(int argc, char **argv);
 int onbuild(int argc, char **argv);
 int optimize(int argc, char **argv);
+int reflect(int argc, char **argv);
 int setcmd(int argc, char **argv);
 
 
@@ -43,17 +44,18 @@ int setcmd(int argc, char **argv);
     * Help Functions for each dit command
 ******************************************************************************/
 
-void config_usage();
-void convert_usage();
-void cp_usage();
-void erase_usage();
-void healthcheck_usage();
-void ignore_usage();
-void inspect_usage();
-void label_usage();
-void onbuild_usage();
-void optimize_usage();
-void setcmd_usage();
+void config_manual();
+void convert_manual();
+void cp_manual();
+void erase_manual();
+void healthcheck_manual();
+void ignore_manual();
+void inspect_manual();
+void label_manual();
+void onbuild_manual();
+void optimize_manual();
+void reflect_manual();
+void setcmd_manual();
 
 
 
@@ -77,10 +79,10 @@ int receive_yes_or_no(const char *target);
 
 
 /******************************************************************************
-    * Functions provided in separate files
+    * Functions used in separate files
 ******************************************************************************/
 
-int get_config(const char *config_arg, int *p_spec2d, int *p_spec2h);
+int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h);
 
 
 #endif
