@@ -22,8 +22,6 @@
 #define RESPONSES_NUM 2
 #define TARGETS_NUM 3
 
-#define DOCKER_FILE "/dit/mnt/Dockerfile.draft"
-#define HISTORY_FILE "/dit/mnt/.dit_history"
 #define VERSION_FILE "/dit/etc/dit_version"
 
 #define INVALID_CMDARG(c, desc, arg)  xperror_invalid_arg(c, -1, desc, arg)

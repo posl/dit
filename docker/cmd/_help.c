@@ -16,10 +16,10 @@
 #define OPTIONS " Options:\n"
 #define REMARKS " Remarks:\n"
 
-#define HELP_OPTION_DESC "display this help, and exit normally\n"
-
 #define WHEN_REFLECTING "when reflecting a executed command line"
 #define CAN_BE_TRUNCATED "can be truncated as long as it is unique"
+
+#define HELP_OPTION_DESC "display this help, and exit normally\n"
 
 
 /** Data type that collects serial numbers of the contents displayed by help function */

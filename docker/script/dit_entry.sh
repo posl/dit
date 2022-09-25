@@ -6,7 +6,7 @@
 #
 
 if [ ! -e /dit/mnt ]; then
-    echo "dit: please check if you created or specified the directory to be bound." 1>&2
+    echo " dit: please check if you created or specified the directory to be bound." 1>&2
     exit 1
 fi
 
@@ -65,24 +65,22 @@ fi
 
 touch \
     /dit/etc/dit_version \
-    /dit/etc/convert.conf \
-    /dit/etc/optimize.conf \
     \
-    /dit/tmp/change-report.act \
-    /dit/tmp/change-report.prov \
     /dit/tmp/convert-result.dock \
     /dit/tmp/convert-result.hist \
     /dit/tmp/last-command-line \
     /dit/tmp/last-exit-status \
     /dit/tmp/last-history-number \
+    /dit/tmp/reflect-report.act \
+    /dit/tmp/reflect-report.bak \
     \
-    /dit/var/change-log.dock \
-    /dit/var/change-log.hist \
-    /dit/var/ignore.dock \
-    /dit/var/ignore.hist \
-    /dit/var/current-spec.conv \
-    /dit/var/current-spec.opt \
-    /dit/var/current-status.opt
+    /dit/var/config.stat \
+    /dit/var/ignore.list.dock \
+    /dit/var/ignore.list.hist \
+    /dit/var/optimize.stat \
+    /dit/var/reflect.log.dock \
+    /dit/var/reflect.log.hist \
+    /dit/var/setcmd.log
 
 umask "${DEFAULT_UMASK_VALUE}"
 

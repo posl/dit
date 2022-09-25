@@ -36,13 +36,11 @@ alias \
 
 PROMPT_REFLECT(){
     echo "$?" > /dit/tmp/last-exit-status
-    : > /dit/tmp/last-command-line
     : > /dit/tmp/convert-result.dock
     : > /dit/tmp/convert-result.hist
 
     if ( ( history 1 | awk -f /dit/etc/dit_update.awk ) && dit convert ); then
-        dit reflect -d /dit/tmp/convert-result.dock
-        dit reflect -h /dit/tmp/convert-result.hist
+        dit reflect -dh
     fi
 }
 
@@ -51,13 +49,13 @@ PROMPT_OPTION(){
 }
 
 PROMPT_REPORT(){
-    if [ -s /dit/tmp/change-report.act ]; then
-        cat /dit/tmp/change-report.act
+    if [ -s /dit/tmp/reflect-report.act ]; then
+        cat /dit/tmp/reflect-report.act
     else
         echo '[dock:+0 hist:+0] '
     fi
 
-    : > /dit/tmp/change-report.prov
+    : > /dit/tmp/reflect-report.bak
 }
 
 export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT 2> /dev/null || true

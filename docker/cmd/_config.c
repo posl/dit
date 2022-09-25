@@ -12,7 +12,7 @@
 
 #include "main.h"
 
-#define CONFIG_FILE "/dit/var/current-spec.conv"
+#define CONFIG_FILE "/dit/var/config.stat"
 #define CONFIGS_NUM 5
 #define DEFAULT_MODE 2
 
