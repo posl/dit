@@ -3,14 +3,18 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the dit command 'inspect', that shows the directory tree
+ * @brief Described the dit command 'inspect', that shows the directory tree.
  * @author Tsukasa Inada
  * @date 2022/07/18
  */
 
 #include "main.h"
 
+#define SORTS_NUM 3
 #define comp(sort_style)  __comp_func_##sort_style
+
+#define HEADER_LEN 42
+#define EXCESS_STR " #EXCESS"
 
 
 /** Data type for storing comparison function used when qsort */
@@ -71,7 +75,7 @@ static int __fcmp_extension(file_node *file1, file_node *file2);
 static const char *__get_file_extension(const char *name);
 
 static void __display_dir_tree(file_node *tree, insp_opts *opt);
-static void __display_recursive(file_node *file, insp_opts *opt, int depth);
+static void __display_recursive(file_node *file, insp_opts *opt, unsigned int depth);
 static void __print_file_mode(mode_t mode);
 static void __print_file_user(uid_t uid, bool numeric_id);
 static void __print_file_group(gid_t gid, bool numeric_id);
@@ -100,8 +104,13 @@ int inspect(int argc, char **argv){
     int i;
     insp_opts opt;
 
-    if ((i = __parse_opts(argc, argv, &opt)))
-        return (i > 0) ? 0 : 1;
+    if ((i = __parse_opts(argc, argv, &opt))){
+        if (i > 0)
+            return 0;
+
+        xperror_suggestion(true);
+        return 1;
+    }
 
     setvbuf(stdout, NULL, _IOFBF, 0);
 
@@ -119,7 +128,7 @@ int inspect(int argc, char **argv){
     file_node *tree;
     int exit_status = 0;
 
-    while (1){
+    do {
         if ((tree = __construct_dir_tree(path, &opt)))
             __display_dir_tree(tree, &opt);
         else
@@ -131,7 +140,7 @@ int inspect(int argc, char **argv){
         }
         else
             return exit_status;
-    }
+    } while(1);
 }
 
 
@@ -157,7 +166,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
         {  0,                 0,                 0,    0  }
     };
 
-    const char * const sort_args[] = {
+    const char * const sort_args[SORTS_NUM] = {
         "extension",
         "name",
         "size"
@@ -168,8 +177,8 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
     opt->numeric_id = false;
     opt->comp = comp(name);
 
-    int c;
-    while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1){
+    int c, i;
+    while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
         switch (c){
             case 'C':
                 opt->color = true;
@@ -190,16 +199,13 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 inspect_manual();
                 return 1;
             case 2:
-                if (optarg){
-                    if ((c = receive_expected_string(optarg, sort_args, 3, 2)) >= 0){
-                        opt->comp = (c ? ((c == 1) ? comp(name) : comp(size)) : comp(extension));
-                        break;
-                    }
-                    fprintf(stderr, "inspect: invalid argument '%s' for '--sort'\n", optarg);
-                    fputs("Valid arguments are:\n  - 'name'\n  - 'size'\n  - 'extension'\n", stderr);
+                if ((c = receive_expected_string(optarg, sort_args, SORTS_NUM, 2)) >= 0){
+                    opt->comp = (c ? ((c == 1) ? comp(name) : comp(size)) : comp(extension));
+                    break;
                 }
+                INVALID_OPTARG(c, long_opts[i].name, optarg);
+                xperror_valid_args(sort_args, SORTS_NUM);
             default:
-                fputs("Try 'dit inspect --help' for more information.\n", stderr);
                 return -1;
         }
     }
@@ -275,7 +281,7 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
                     name_len = strlen(name);
                     if ((name = xstrndup(name, name_len))){
                         if (__concat_inf_path(ipath, ipath_len, name, name_len)){
-                            if (tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp)){
+                            if ((tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp))){
                                 if (__append_file(file, tmp))
                                     continue;
                                 free(tmp);
@@ -548,8 +554,13 @@ static const char *__get_file_extension(const char *name){
  * @param[in]  opt  variable containing the result of option parse
  */
 static void __display_dir_tree(file_node *tree, insp_opts *opt){
-    puts(" Permission      User     Group      Size");
-    puts("==========================================");
+    const char header[HEADER_LEN] = " Permission      User     Group      Size";
+    puts(header);
+
+    for (int i = HEADER_LEN; i--;)
+        putchar('=');
+    putchar('\n');
+
     __display_recursive(tree, opt, 0);
 }
 
@@ -563,29 +574,33 @@ static void __display_dir_tree(file_node *tree, insp_opts *opt){
  *
  * @note at the same time, release the data that is no longer needed.
  */
-static void __display_recursive(file_node *file, insp_opts *opt, int depth){
+static void __display_recursive(file_node *file, insp_opts *opt, unsigned int depth){
+    int i;
+
     if (! (file->err_id && file->noinfo)){
         __print_file_mode(file->mode);
         __print_file_user(file->uid, opt->numeric_id);
         __print_file_group(file->gid, opt->numeric_id);
         __print_file_size(file->size);
     }
-    else
-        printf("        ???       ???       ???       ???    ");
+    else {
+        putchar(' ');
+        for (i = 4; i--;)
+            fputs("       ???", stdout);
+    }
+    fputs("    ", stdout);
 
-    int i;
     if (depth){
-        i = 0;
-        while (++i < depth)
-            printf("|   ");
-        printf("|-- ");
+        for (i = depth; --i;)
+            fputs("|   ", stdout);
+        fputs("|-- ", stdout);
     }
 
     __print_file_name(file->name, file->mode, file->link_invalid, opt->color, opt->classify);
     free(file->name);
 
     if (file->link_path){
-        printf(" -> ");
+        fputs(" -> ", stdout);
         __print_file_name(file->link_path, file->link_mode, file->link_invalid, opt->color, opt->classify);
         free(file->link_path);
     }
@@ -649,17 +664,21 @@ static void __print_file_mode(mode_t mode){
  * @attention if the uid exceeds 8 digits, print a string that represents a numeric excess.
  */
 static void __print_file_user(uid_t uid, bool numeric_id){
-    if (! numeric_id){
-        struct passwd *passwd;
-        if ((passwd = getpwuid(uid)) && (strlen(passwd->pw_name) <= 8)){
-            printf("%8s  ", passwd->pw_name);
-            return;
+    do {
+        if (! numeric_id){
+            struct passwd *passwd;
+            if ((passwd = getpwuid(uid)) && (strlen(passwd->pw_name) <= 8)){
+                printf("%8s", passwd->pw_name);
+                break;
+            }
         }
-    }
-    if (uid < 100000000)
-        printf("%8d  ", uid);
-    else
-        puts(" #EXCESS  ");
+        if (uid < 100000000)
+            printf("%8d", uid);
+        else
+            fputs(EXCESS_STR, stdout);
+    } while (0);
+
+    fputs("  ", stdout);
 }
 
 
@@ -672,17 +691,21 @@ static void __print_file_user(uid_t uid, bool numeric_id){
  * @attention if the gid exceeds 8 digits, print a string that represents a numeric excess.
  */
 static void __print_file_group(gid_t gid, bool numeric_id){
-    if (! numeric_id){
-        struct group *group;
-        if ((group = getgrgid(gid)) && (strlen(group->gr_name) <= 8)){
-            printf("%8s  ", group->gr_name);
-            return;
+    do {
+        if (! numeric_id){
+            struct group *group;
+            if ((group = getgrgid(gid)) && (strlen(group->gr_name) <= 8)){
+                printf("%8s", group->gr_name);
+                break;
+            }
         }
-    }
-    if (gid < 100000000)
-        printf("%8d  ", gid);
-    else
-        puts(" #EXCESS  ");
+        if (gid < 100000000)
+            printf("%8d", gid);
+        else
+            fputs(EXCESS_STR, stdout);
+    } while (0);
+
+    fputs("  ", stdout);
 }
 
 
@@ -695,7 +718,7 @@ static void __print_file_group(gid_t gid, bool numeric_id){
  */
 static void __print_file_size(off_t size){
     if (size < 1000)
-        printf("%6d B    ", (int) size);
+        printf("%6d B", (int) size);
     else {
         int i = -1, rem;
         char *units = "kMGTPEZ";
@@ -708,10 +731,10 @@ static void __print_file_size(off_t size){
 
         if (i <= 6){
             rem /= 100;
-            printf("%3d.%1d %cB    ", (int) size, rem, units[i]);
+            printf("%3d.%1d %cB", (int) size, rem, units[i]);
         }
         else
-            puts(" #EXCESS    ");
+            fputs(EXCESS_STR, stdout);
     }
 }
 
@@ -759,7 +782,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
         printf("\033[%sm%s\033[0m", tmp, name);
     }
     else
-        printf("%s", name);
+        fputs(name, stdout);
 
     if (classify){
         char indicator;

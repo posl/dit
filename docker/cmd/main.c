@@ -16,6 +16,7 @@ static int (* const __get_dit_cmd(const char *target))(int, char **);
 static int __strcmp_forward_match(const char *target, const char *expected, int upper_flag);
 
 
+/** array of strings representing each dit command in alphabetical order */
 const char * const cmd_reprs[CMDS_NUM] = {
     "config",
     "convert",
@@ -31,6 +32,30 @@ const char * const cmd_reprs[CMDS_NUM] = {
     "reflect",
     "setcmd"
 };
+
+/** array of strings representing each argument for '--display' in alphabetical order */
+const char * const display_contents_reprs[DISPLAYS_NUM] = {
+    "BOTH",
+    "IN",
+    "OUT"
+};
+
+/** array of strings representing each response to the Y/n question in alphabetical order */
+const char * const response_reprs[RESPONSES_NUM] = {
+    "NO",
+    "YES"
+};
+
+/** array of strings representing each argument for '--target' in alphabetical order */
+const char * const target_files_reprs[TARGETS_NUM] = {
+    "both",
+    "dockerfile",
+    "history-file"
+};
+
+
+/** string representing a dit command invoked */
+const char *program_name;
 
 
 
@@ -49,16 +74,18 @@ const char * const cmd_reprs[CMDS_NUM] = {
  */
 int main(int argc, char **argv){
     if (--argc > 0){
+        program_name = *(++argv);
+
         int (* cmd)(int, char **);
-        if ((cmd = __get_dit_cmd(*(++argv))))
+        if ((cmd = __get_dit_cmd(program_name)))
             return cmd(argc, argv);
 
-        fprintf(stderr, "dit: '%s' is not a dit command\n", *argv);
+        fprintf(stderr, " dit: '%s' is not a dit command\n", program_name);
     }
     else
-        fputs("dit: requires a dit command\n", stderr);
+        fputs(" dit: requires a dit command\n", stderr);
 
-    fputs("Try 'dit help' for more information.\n", stderr);
+    xperror_suggestion(false);
     return 1;
 }
 
@@ -94,6 +121,107 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
 
 
 /******************************************************************************
+    * Error Handling Functions
+******************************************************************************/
+
+
+/**
+ * @brief print a suggenstion message to stderr.
+ *
+ * @param[in]  individual_flag  whether to suggest displaying the manual of each dit command
+ */
+void xperror_suggestion(bool individual_flag){
+    fputs(" Try 'dit ", stderr);
+    if (individual_flag)
+        fprintf(stderr, "%s --", program_name);
+    fputs("help' for more information.\n", stderr);
+}
+
+
+/**
+ * @brief print the error message corresponding to errno to stderr, along with the program name.
+ *
+ */
+void xperror_standards(){
+    fputc(' ', stderr);
+    perror(program_name);
+}
+
+
+/**
+ * @brief print an error message about the number of arguments to stderr.
+ *
+ * @param[in]  limit  the maximum number of arguments
+ *
+ * @attention if limit is 2 or more, it does not work as expected.
+ */
+void xperror_numofarg(unsigned int limit){
+    fprintf(stderr, " %s: doesn't allow ", program_name);
+    if (limit)
+        fputs("two or more ", stderr);
+    fputs("arguments\n", stderr);
+}
+
+
+/**
+ * @brief print an error message about invalid argument to stderr.
+ *
+ * @param[in]  type  error type (0 (unrecognized), -1 (ambiguous) or others (invalid))
+ * @param[in]  code  error code (0 (for optarg), positive (for number) or negative (for cmdarg))
+ *
+ * @note the return value of 'receive_expected_string' can be used as it is for the error code.
+ */
+void xperror_invalid_arg(int type, int code, ...){
+    const char *adj;
+    adj = (type ? ((type == -1) ? "ambiguous" : "invalid") : "unrecognized");
+    fprintf(stderr, " %s: %s ", program_name, adj);
+
+    const char *format;
+    if (code){
+        if (code > 0)
+            fputs("number of ", stderr);
+        format = "%s: '%s'";
+    }
+    else
+        format = "argument '%s' for '--%s'";
+
+    va_list sp;
+    va_start(sp, code);
+    vfprintf(stderr, format, sp);
+    va_end(sp);
+
+    fputc('\n', stderr);
+}
+
+
+/**
+ * @brief print the valid arguments to stderr.
+ *
+ * @param[in]  expected  array of expected string
+ * @param[in]  size  array size
+ */
+void xperror_valid_args(const char * const expected[], int size){
+    fputs(" Valid arguments are:\n", stderr);
+    for (int i = 0; i < size; i++)
+        fprintf(stderr, "   - '%s'\n", expected[i]);
+}
+
+
+/**
+ * @brief print an error message about the target file specification to stderr.
+ *
+ * @param[in]  require  requirements for the target file or NULL
+ */
+void xperror_target_file(const char *require){
+    if (! require)
+        require = "specified by '-d', '-h' or '--target'";
+    fprintf(stderr, " %s: target file must be %s\n", program_name, require);
+}
+
+
+
+
+/******************************************************************************
     * Utilitys
 ******************************************************************************/
 
@@ -103,20 +231,20 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
  *
  * @param[in]  src  string you want to make a copy of in the heap area
  * @param[in]  n  the length of string
- * @return char*  pointer to string copied in the heap area or NULL
+ * @return char*  string copied in the heap area or NULL
  *
- * @note considering the possibility that size_t type is not unsigned.
+ * @note considering the possibility that 'size_t' is not unsigned type.
  */
 char *xstrndup(const char *src, size_t n){
-    char *dest;
-    if ((n < 0) || (! (dest = (char *) malloc(sizeof(char) * (n + 1)))))
-        return NULL;
+    char *dest = NULL;
+    if ((n >= 0) && (dest = (char *) malloc(sizeof(char) * (n + 1)))){
+        char *tmp;
+        tmp = dest;
 
-    char *tmp;
-    tmp = dest;
-    while (n--)
-        *(tmp++) = *(src++);
-    *tmp = '\0';
+        while (n--)
+            *(tmp++) = *(src++);
+        *tmp = '\0';
+    }
     return dest;
 }
 
@@ -168,7 +296,7 @@ static int __strcmp_forward_match(const char *target, const char *expected, int 
 
 
 /******************************************************************************
-    * Argument Parsers
+    * String Recognizers
 ******************************************************************************/
 
 
@@ -181,16 +309,20 @@ static int __strcmp_forward_match(const char *target, const char *expected, int 
  * @note receive an integer that can be expressed as "/^[0-9]+$/" in a regular expression.
  */
 int receive_positive_integer(const char *target){
-    int i = 0;
-    do
-        if (isdigit(*target)){
-            i *= 10;
-            i += (*target - '0');
-        }
-        else
-            return -1;
-    while (*(++target));
-
+    int i = -1;
+    if (target){
+        i = 0;
+        do
+            if (isdigit(*target)){
+                i *= 10;
+                i += (*target - '0');
+            }
+            else {
+                i = -1;
+                break;
+            }
+        while (*(++target));
+    }
     return i;
 }
 
@@ -202,99 +334,69 @@ int receive_positive_integer(const char *target){
  * @param[in]  expected  array of expected string
  * @param[in]  size  array size
  * @param[in]  mode  mode of compare (bit 1: perform uppercase conversion, bit 2: allow forward match)
- * @return int  index number of the corresponding string, -1 (ambiguous) or -2 (invalid)
+ * @return int  index number of the corresponding string, -1 (ambiguous) or others (invalid)
  *
  * @note make efficient by applying binary search sequentially from the first character of target string.
  * @attention array of expected string must be pre-sorted alphabetically.
  */
 int receive_expected_string(const char *target, const char * const expected[], int size, int mode){
-    const char *A[size];
-    memcpy(A, expected, size * sizeof(const char *));
+    if (target){
+        const char *A[size];
+        memcpy(A, expected, size * sizeof(const char *));
 
-    int min, max, mid, tmp;
-    min = 0;
-    max = size - 1;
+        int min, max, mid, tmp;
+        min = 0;
+        max = size - 1;
 
-    char c;
-    if ((c = *target)){
-        if (mode & 1)
-            c = toupper(c);
+        char c;
+        if ((c = *target)){
+            if (mode & 1)
+                c = toupper(c);
 
-        while (min < max){
-            mid = (min + max) / 2;
+            while (min < max){
+                mid = (min + max) / 2;
 
-            if ((tmp = *(A[mid]++))){
-                tmp -= c;
-                if (tmp){
-                    if (tmp < 0)
-                        min = mid + 1;
-                    else
-                        max = mid - 1;
+                if ((tmp = *(A[mid]++))){
+                    tmp -= c;
+                    if (tmp){
+                        if (tmp < 0)
+                            min = mid + 1;
+                        else
+                            max = mid - 1;
+                    }
+                    else {
+                        tmp = mid;
+                        while ((--tmp >= min) && (c == *(A[tmp]++)));
+                        min = tmp + 1;
+
+                        tmp = mid;
+                        while ((++tmp <= max) && (c == *(A[tmp]++)));
+                        max = tmp - 1;
+
+                        if (! (c = *(++target)))
+                            break;
+                        if (mode & 1)
+                            c = toupper(c);
+                    }
                 }
-                else {
-                    tmp = mid;
-                    while ((--tmp >= min) && (c == *(A[tmp]++)));
-                    min = tmp + 1;
-
-                    tmp = mid;
-                    while ((++tmp <= max) && (c == *(A[tmp]++)));
-                    max = tmp - 1;
-
-                    if (! (c = *(++target)))
-                        break;
-                    else if (mode & 1)
-                        c = toupper(c);
-                }
+                else
+                    min = mid + 1;
             }
-            else
-                min = mid + 1;
         }
+
+        if (min == max){
+            tmp =
+                (mode & 2) ? __strcmp_forward_match(target, A[min], (mode & 1)) :
+                (mode & 1) ? strcmp_upper_case(target, A[min]) :
+                strcmp(target, A[min]);
+
+            if (! tmp)
+                return min;
+        }
+        else if (min < max)
+            return -1;
+
+        return -2;
     }
-
-    if (min == max){
-        tmp =
-            (mode & 2) ? __strcmp_forward_match(target, A[min], (mode & 1)) :
-            (mode & 1) ? strcmp_upper_case(target, A[min]) :
-            strcmp(target, A[min]);
-
-        if (! tmp)
-            return min;
-    }
-    else if (min < max)
-        return -1;
-
-    return -2;
-}
-
-
-/**
- * @brief receive a yes or no response to a query.
- *
- * @param[in]  target  target string
- * @return int  integer indentifying the response or zero
- */
-int receive_yes_or_no(const char *target){
-    const char * const expected[] = {
-        "NO",
-        "YES"
-    };
-    int i;
-    return ((! (i = receive_expected_string(target, expected, 2, 3))) ? 'y' : ((i > 0) ? 'n' : '\0'));
-}
-
-
-/**
- * @brief determine target file(s) based on the passed string.
- *
- * @param[in]  target  target string
- * @return int  integer indentifying the target file(s) or zero
- */
-int receive_target_file(const char *target){
-    const char * const expected[] = {
-        "both",
-        "dockerfile",
-        "history-file"
-    };
-    int i;
-    return (((i = receive_expected_string(target, expected, 3, 2)) >= 0) ? expected[i][0] : '\0');
+    return -3;
 }

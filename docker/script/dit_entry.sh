@@ -5,27 +5,27 @@
 # initialize the files in shared directory
 #
 
-if [ ! -e /dit/usr ]; then
+if [ ! -e /dit/mnt ]; then
     echo "dit: please check if you created or specified the directory to be bound." 1>&2
     exit 1
 fi
 
 
-if [ ! -e /dit/usr/.cmd_history ]; then
-    touch /dit/usr/.cmd_history
+if [ ! -e /dit/mnt/.dit_history ]; then
+    touch /dit/mnt/.dit_history
 fi
 
-if [ ! -s /dit/usr/.dockerignore ]; then
-    echo ".cmd_history" > /dit/usr/.dockerignore
+if [ ! -s /dit/mnt/.dockerignore ]; then
+    echo ".dit_history" > /dit/mnt/.dockerignore
 fi
 
 
-if [ ! -e /dit/usr/Dockerfile ]; then
-    touch /dit/usr/Dockerfile
+if [ ! -e /dit/mnt/Dockerfile ]; then
+    touch /dit/mnt/Dockerfile
 fi
 
-if [ ! -s /dit/usr/Dockerfile.draft ]; then
-    cat <<EOF > /dit/usr/Dockerfile.draft
+if [ ! -s /dit/mnt/Dockerfile.draft ]; then
+    cat <<EOF > /dit/mnt/Dockerfile.draft
 FROM ${BASE_IMAGE}:${BASE_VERSION}
 SHELL [ "${SHELL:-/bin/sh}", "-c" ]
 WORKDIR $(pwd)
@@ -44,36 +44,29 @@ unset BASE_VERSION
 chmod a=x /usr/local/sbin/dit
 
 chmod a=rw \
-    /dit/usr/.cmd_history \
-    /dit/usr/.dockerignore \
-    /dit/usr/Dockerfile \
-    /dit/usr/Dockerfile.draft
+    /dit/mnt/.dit_history \
+    /dit/mnt/.dockerignore \
+    /dit/mnt/Dockerfile \
+    /dit/mnt/Dockerfile.draft
 
-find /dit/src -type f -exec chmod a=r {} +
+find /dit/etc -type f -exec chmod a=r {} +
 
 
 DEFAULT_UMASK_VALUE="$( umask )"
 umask 0000
 
-if [ ! -e /dit/etc ]; then
-    mkdir /dit/etc
-fi
-
 if [ ! -e /dit/tmp ]; then
     mkdir /dit/tmp
 fi
 
+if [ ! -e /dit/var ]; then
+    mkdir /dit/var
+fi
+
 touch \
-    /dit/etc/change-log.dock \
-    /dit/etc/change-log.hist \
-    /dit/etc/cmd-ignore.dock \
-    /dit/etc/cmd-ignore.hist \
-    \
-    /dit/etc/current-spec.conv \
-    /dit/etc/current-spec.opt \
-    /dit/etc/current-status.dit \
-    /dit/etc/current-status.opt \
-    /dit/etc/current-status.refl \
+    /dit/etc/dit_version \
+    /dit/etc/convert.conf \
+    /dit/etc/optimize.conf \
     \
     /dit/tmp/change-report.act \
     /dit/tmp/change-report.prov \
@@ -81,7 +74,15 @@ touch \
     /dit/tmp/convert-result.hist \
     /dit/tmp/last-command-line \
     /dit/tmp/last-exit-status \
-    /dit/tmp/last-history-number
+    /dit/tmp/last-history-number \
+    \
+    /dit/var/change-log.dock \
+    /dit/var/change-log.hist \
+    /dit/var/ignore.dock \
+    /dit/var/ignore.hist \
+    /dit/var/current-spec.conv \
+    /dit/var/current-spec.opt \
+    /dit/var/current-status.opt
 
 umask "${DEFAULT_UMASK_VALUE}"
 
@@ -89,8 +90,8 @@ umask "${DEFAULT_UMASK_VALUE}"
 chmod a=rx \
     /dit \
     /dit/etc \
-    /dit/src \
-    /dit/tmp
+    /dit/tmp \
+    /dit/var
 
 
 
@@ -100,8 +101,8 @@ chmod a=rx \
 
 dit config -r
 dit ignore -r
-dit erase -r both
+dit erase -dhr
 
-cp -f /dit/src/dit_profile.sh /etc/profile.d/
+cp -f /dit/etc/dit_profile.sh /etc/profile.d/
 
 exec /bin/bash --login

@@ -10,6 +10,8 @@
 
 #include "main.h"
 
+#define BLANKS_NUM 3
+
 
 /** Data type for storing the results of option parse */
 typedef struct {
@@ -19,6 +21,9 @@ typedef struct {
 
 
 static int __parse_opts(int argc, char **argv, refl_opts *opt);
+
+
+extern const char * const target_files_reprs[TARGETS_NUM];
 
 
 
@@ -41,8 +46,12 @@ int reflect(int argc, char **argv){
     int i;
     refl_opts opt;
 
-    if ((i = __parse_opts(argc, argv, &opt)))
-        return (i > 0) ? 0 : 1;
+    if ((i = __parse_opts(argc, argv, &opt))){
+        if (i > 0)
+            return 0;
+
+        xperror_suggestion(true);
+    }
 
     return 0;
 }
@@ -68,7 +77,7 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
         {  0,        0,                 0,   0 }
     };
 
-    const char * const blank_args[] = {
+    const char * const blank_args[BLANKS_NUM] = {
         "ignore",
         "preserve",
         "squeeze"
@@ -77,10 +86,10 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
     opt->target = '\0';
     opt->blank = 'i';
 
-    int c, i;
-    char *valid_args = NULL;
+    int c, i, size;
+    const char * const *valid_args = NULL;
 
-    while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) != -1){
+    while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
         switch (c){
             case 'd':
             case 'h':
@@ -94,38 +103,37 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
                 erase_manual();
                 return 1;
             case 2:
-                if (optarg){
-                    if ((c = receive_target_file(optarg))){
-                        if (c != 'b'){
-                            opt->target = c;
-                            break;
-                        }
-                        else
-                            fputs("reflect: destination file must be limited to one\n", stderr);
-                    }
-                    valid_args = "- 'dockerfile'\n  - 'history-file'\n";
-                    goto err_exit;
-                }
-            case 3:
-                if (optarg){
-                    if ((c = receive_expected_string(optarg, blank_args, 3, 2)) >= 0){
-                        opt->blank = blank_args[c][0];
+                if ((c = receive_expected_string(optarg, target_files_reprs, TARGETS_NUM, 2)) >= 0){
+                    if (c){
+                        opt->target = target_files_reprs[c][0];
                         break;
                     }
-                    valid_args = "- 'ignore'\n  - 'preserve'\n  - 'squeeze'\n";
+                    xperror_target_file("limited to one");
                 }
+                valid_args = target_files_reprs;
+                size = TARGETS_NUM;
+                goto err_exit;
+            case 3:
+                if ((c = receive_expected_string(optarg, blank_args, BLANKS_NUM, 2)) >= 0){
+                    opt->blank = blank_args[c][0];
+                    break;
+                }
+                valid_args = blank_args;
+                size = BLANKS_NUM;
             default:
                 goto err_exit;
         }
     }
-    return 0;
+    if (opt->target)
+        return 0;
+
+    xperror_target_file(NULL);
 
 err_exit:
     if (valid_args){
-        if (c <= 0)
-            fprintf(stderr, "reflect: invalid argument '%s' for '--%s'\n", optarg, long_opts[i].name);
-        fprintf(stderr, "Valid arguments are:\n  %s", valid_args);
+        if (c < 0)
+            INVALID_OPTARG(c, long_opts[i].name, optarg);
+        xperror_valid_args(valid_args, size);
     }
-    fputs("Try 'dit reflect --help' for more information.\n", stderr);
     return -1;
 }

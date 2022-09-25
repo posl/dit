@@ -2,7 +2,7 @@
 
 
 #
-# define alias of the tool-specific commands
+# define aliases of the tool-specific commands
 #
 
 alias \
@@ -40,7 +40,7 @@ PROMPT_REFLECT(){
     : > /dit/tmp/convert-result.dock
     : > /dit/tmp/convert-result.hist
 
-    if ( ( history 1 | awk -f /dit/src/parse_history.awk ) && dit convert ); then
+    if ( ( history 1 | awk -f /dit/etc/dit_update.awk ) && dit convert ); then
         dit reflect -d /dit/tmp/convert-result.dock
         dit reflect -h /dit/tmp/convert-result.hist
     fi
@@ -80,8 +80,10 @@ export PS1
 # if necessary, reproducing the environment under construction
 #
 
-if [ ! -s /dit/etc/current-status.dit ]; then
-    . /dit/usr/.cmd_history > /dev/null
-    history -r /dit/usr/.cmd_history
-    echo 'under development' > /dit/etc/current-status.dit
+DIT_VERSION='1.0.0'
+
+if [ ! -s /dit/etc/dit_version ]; then
+    . /dit/mnt/.dit_history > /dev/null
+    history -r /dit/mnt/.dit_history
+    echo "${DIT_VERSION:-?.?.?}" > /dit/etc/dit_version
 fi

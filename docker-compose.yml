@@ -21,4 +21,4 @@ services:
     volumes:
       - type: bind
         source: *SHARED_DIR
-        target: /dit/usr
+        target: /dit/mnt

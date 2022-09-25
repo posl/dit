@@ -2,8 +2,8 @@ ARG BASE_IMAGE=debian
 ARG BASE_VERSION=latest
 FROM ${BASE_IMAGE}:${BASE_VERSION} as builder
 
-ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
+RUN DEBIAN_FRONTEND=noninteractive \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
         libc-dev \
@@ -25,7 +25,7 @@ FROM ${BASE_IMAGE}:${BASE_VERSION} as product
 
 # load the dit command and the script files
 COPY --from=builder /usr/local/sbin/dit /usr/local/sbin/
-COPY ./script /dit/src/
+COPY ./script /dit/etc/
 
 ARG BASE_IMAGE=debian
 ARG BASE_VERSION=latest
@@ -33,4 +33,4 @@ ENV BASE_IMAGE=${BASE_IMAGE}
 ENV BASE_VERSION=${BASE_VERSION}
 
 USER root
-ENTRYPOINT [ "/bin/bash", "/dit/src/dit_entry.sh" ]
+ENTRYPOINT [ "/bin/bash", "/dit/etc/dit_entry.sh" ]

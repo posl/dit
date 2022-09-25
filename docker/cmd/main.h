@@ -16,11 +16,19 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+
 #define CMDS_NUM 13
+#define DISPLAYS_NUM 3
+#define RESPONSES_NUM 2
+#define TARGETS_NUM 3
 
-#define DOCKERFILE "/dit/usr/Dockerfile.draft"
-#define HISTORY_FILE "/dit/usr/.cmd_history"
+#define DOCKER_FILE "/dit/mnt/Dockerfile.draft"
+#define HISTORY_FILE "/dit/mnt/.dit_history"
+#define VERSION_FILE "/dit/etc/dit_version"
 
+#define INVALID_CMDARG(c, desc, arg)  xperror_invalid_arg(c, -1, desc, arg)
+#define INVALID_OPTARG(c, name, arg)  xperror_invalid_arg(c, 0, arg, name)
+#define INVALID_NUMBER(desc, arg)  xperror_invalid_arg(1, 1, desc, arg)
 
 
 /******************************************************************************
@@ -42,9 +50,8 @@ int reflect(int argc, char **argv);
 int setcmd(int argc, char **argv);
 
 
-
 /******************************************************************************
-    * Help Functions for each dit command
+    * Help Functions that display each Manual
 ******************************************************************************/
 
 void config_manual();
@@ -52,6 +59,7 @@ void convert_manual();
 void cp_manual();
 void erase_manual();
 void healthcheck_manual();
+void help_manual();
 void ignore_manual();
 void inspect_manual();
 void label_manual();
@@ -60,6 +68,17 @@ void optimize_manual();
 void reflect_manual();
 void setcmd_manual();
 
+
+/******************************************************************************
+    * Error Handling Functions
+******************************************************************************/
+
+void xperror_suggestion(bool individual_flag);
+void xperror_standards();
+void xperror_numofarg(unsigned int limit);
+void xperror_invalid_arg(int type, int code, ...);
+void xperror_valid_args(const char * const expected[], int size);
+void xperror_target_file(const char *require);
 
 
 /******************************************************************************
@@ -70,16 +89,12 @@ char *xstrndup(const char *src, size_t n);
 int strcmp_upper_case(const char *target, const char *expected);
 
 
-
 /******************************************************************************
-    * Argument Parsers
+    * String Recognizers
 ******************************************************************************/
 
 int receive_positive_integer(const char *target);
 int receive_expected_string(const char *target, const char * const expected[], int size, int mode);
-int receive_yes_or_no(const char *target);
-int receive_target_file(const char *target);
-
 
 
 /******************************************************************************

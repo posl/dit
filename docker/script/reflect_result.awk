@@ -3,7 +3,7 @@ BEGIN {
     EXPECTED_STRINGS[0] = "Docker"
     EXPECTED_STRINGS[1] = "history-"
     OUTPUT_FILES[1] = "Dockerfile.draft"
-    OUTPUT_FILES[2] = ".cmd_history"
+    OUTPUT_FILES[2] = ".dit_history"
     ACT_CHANGES[1] = 0
     ACT_CHANGES[2] = 0
 }
