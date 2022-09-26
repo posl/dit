@@ -156,10 +156,9 @@ void xperror_standards(){
  * @attention if limit is 2 or more, it does not work as expected.
  */
 void xperror_numofarg(unsigned int limit){
-    fprintf(stderr, " %s: doesn't allow ", program_name);
-    if (limit)
-        fputs("two or more ", stderr);
-    fputs("arguments\n", stderr);
+    const char *adj;
+    adj = limit ? "two or more" : "any";
+    fprintf(stderr, " %s: doesn't allow %s arguments\n", program_name, adj);
 }
 
 
@@ -210,12 +209,9 @@ void xperror_valid_args(const char * const expected[], int size){
 /**
  * @brief print an error message about the target file specification to stderr.
  *
- * @param[in]  require  requirements for the target file or NULL
  */
-void xperror_target_file(const char *require){
-    if (! require)
-        require = "specified by '-d', '-h' or '--target'";
-    fprintf(stderr, " %s: target file must be %s\n", program_name, require);
+void xperror_target_file(){
+    fprintf(stderr, " %s: target file must be specified by '-d', '-h' or '--target'\n", program_name);
 }
 
 
@@ -344,11 +340,10 @@ int receive_expected_string(const char *target, const char * const expected[], i
         const char *A[size];
         memcpy(A, expected, size * sizeof(const char *));
 
-        int min, max, mid, tmp;
+        int c, min, max, mid, tmp;
         min = 0;
         max = size - 1;
 
-        char c;
         if ((c = *target)){
             if (mode & 1)
                 c = toupper(c);

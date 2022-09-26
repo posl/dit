@@ -24,9 +24,11 @@
 
 #define VERSION_FILE "/dit/etc/dit_version"
 
-#define INVALID_CMDARG(c, desc, arg)  xperror_invalid_arg(c, -1, desc, arg)
-#define INVALID_OPTARG(c, name, arg)  xperror_invalid_arg(c, 0, arg, name)
-#define INVALID_NUMBER(desc, arg)  xperror_invalid_arg(1, 1, desc, arg)
+#define assign_both_or_either(target, a, b, c)  (target = (target == a) ? b : c)
+
+#define xperror_invalid_cmdarg(c, desc, arg)  xperror_invalid_arg(c, -1, desc, arg)
+#define xperror_invalid_optarg(c, name, arg)  xperror_invalid_arg(c, 0, arg, name)
+#define xperror_invalid_number(desc, arg)  xperror_invalid_arg(1, 1, desc, arg)
 
 
 /******************************************************************************
@@ -76,7 +78,7 @@ void xperror_standards();
 void xperror_numofarg(unsigned int limit);
 void xperror_invalid_arg(int type, int code, ...);
 void xperror_valid_args(const char * const expected[], int size);
-void xperror_target_file(const char *require);
+void xperror_target_file();
 
 
 /******************************************************************************

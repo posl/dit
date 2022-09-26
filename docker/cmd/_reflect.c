@@ -70,11 +70,12 @@ int reflect(int argc, char **argv){
 static int __parse_opts(int argc, char **argv, refl_opts *opt){
     const char *short_opts = "dhps";
 
+    int flag;
     const struct option long_opts[] = {
-        { "help",   no_argument,       NULL, 1 },
-        { "target", required_argument, NULL, 2 },
-        { "blank",  required_argument, NULL, 3 },
-        {  0,        0,                 0,   0 }
+        { "help",   no_argument,        NULL,  1    },
+        { "blank",  required_argument, &flag, true  },
+        { "target", required_argument, &flag, false },
+        {  0,        0,                  0,    0    }
     };
 
     const char * const blank_args[BLANKS_NUM] = {
@@ -86,14 +87,16 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
     opt->target = '\0';
     opt->blank = 'i';
 
-    int c, i, size;
+    int c, i, *ptr;
     const char * const *valid_args = NULL;
 
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
         switch (c){
             case 'd':
+                assign_both_or_either(opt->target, 'h', 'b', 'd');
+                break;
             case 'h':
-                opt->target = c;
+                assign_both_or_either(opt->target, 'd', 'b', 'h');
                 break;
             case 'p':
             case 's':
@@ -102,38 +105,33 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
             case 1:
                 erase_manual();
                 return 1;
-            case 2:
-                if ((c = receive_expected_string(optarg, target_files_reprs, TARGETS_NUM, 2)) >= 0){
-                    if (c){
-                        opt->target = target_files_reprs[c][0];
-                        break;
-                    }
-                    xperror_target_file("limited to one");
+
+#if (BLANKS_NUM != TARGETS_NUM)
+    #error "inconsistent with the definition of the macros"
+#endif
+            case 0:
+                if (flag){
+                    ptr = &(opt->blank);
+                    valid_args = blank_args;
                 }
-                valid_args = target_files_reprs;
-                size = TARGETS_NUM;
-                goto err_exit;
-            case 3:
-                if ((c = receive_expected_string(optarg, blank_args, BLANKS_NUM, 2)) >= 0){
-                    opt->blank = blank_args[c][0];
+                else {
+                    ptr = &(opt->target);
+                    valid_args = target_files_reprs;
+                }
+                if ((c = receive_expected_string(optarg, valid_args, BLANKS_NUM, 2)) >= 0){
+                    *ptr = valid_args[c][0];
                     break;
                 }
-                valid_args = blank_args;
-                size = BLANKS_NUM;
+                xperror_invalid_optarg(c, long_opts[i].name, optarg);
+                xperror_valid_args(valid_args, TARGETS_NUM);
             default:
-                goto err_exit;
+                return -1;
         }
     }
+
     if (opt->target)
         return 0;
 
-    xperror_target_file(NULL);
-
-err_exit:
-    if (valid_args){
-        if (c < 0)
-            INVALID_OPTARG(c, long_opts[i].name, optarg);
-        xperror_valid_args(valid_args, size);
-    }
+    xperror_target_file();
     return -1;
 }

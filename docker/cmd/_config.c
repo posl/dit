@@ -12,13 +12,13 @@
 
 #include "main.h"
 
-#define CONFIG_FILE "/dit/var/config.stat"
 #define CONFIGS_NUM 5
+#define CONFIG_FILE "/dit/var/config.stat"
 #define DEFAULT_MODE 2
 
-#define MODES_TO_CHAR(mode2d, mode2h)  (CONFIGS_NUM * mode2d + mode2h)
-#define INITIAL_CHAR  MODES_TO_CHAR(DEFAULT_MODE, DEFAULT_MODE)
-#define EXCEED_CHAR  (CONFIGS_NUM * CONFIGS_NUM)
+#define modes2stat(mode2d, mode2h)  (CONFIGS_NUM * mode2d + mode2h)
+#define INITIAL_STAT  modes2stat(DEFAULT_MODE, DEFAULT_MODE)
+#define EXCEED_STAT  (CONFIGS_NUM * CONFIGS_NUM)
 
 
 /** Data type that collects serial numbers of the contents that handle the config-file */
@@ -89,7 +89,7 @@ int config(int argc, char **argv){
         if (! (i = __config_contents((reset_flag ? set : update), config_arg)))
             return 0;
         if (i < 0)
-            INVALID_CMDARG(0, "mode", config_arg);
+            xperror_invalid_cmdarg(0, "mode", config_arg);
     }
     else if (argc > 0)
         xperror_numofarg(1);
@@ -143,7 +143,7 @@ static int __parse_opts(int argc, char **argv, bool *opt){
  */
 static int __config_contents(contents code, ...){
     FILE *fp;
-    signed char c = INITIAL_CHAR;
+    signed char c = INITIAL_STAT;
     bool write_flag = true;
 
     if (code != reset){
@@ -151,7 +151,7 @@ static int __config_contents(contents code, ...){
 
         if (code != set){
             if ((fp = fopen(CONFIG_FILE, "rb"))){
-                if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < EXCEED_CHAR)){
+                if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < EXCEED_STAT)){
                     write_flag = false;
 
                     div_t tmp;
@@ -160,7 +160,7 @@ static int __config_contents(contents code, ...){
                     mode2h = tmp.rem;
                 }
                 else
-                    c = INITIAL_CHAR;
+                    c = INITIAL_STAT;
 
                 fclose(fp);
             }
@@ -180,7 +180,7 @@ static int __config_contents(contents code, ...){
             if ((success_flag = __receive_config(va_arg(sp, const char *), &mode2d, &mode2h))){
                 if (code != get){
                     signed char d;
-                    if (c != (d = MODES_TO_CHAR(mode2d, mode2h))){
+                    if (c != (d = modes2stat(mode2d, mode2h))){
                         c = d;
                         write_flag = true;
                     }
@@ -242,6 +242,7 @@ static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2
     char *S;
     if ((S = xstrndup(config_arg, strlen(config_arg)))){
         const char *token;
+
         if ((token = strtok(S, ","))){
             int mode2d, mode2h, mode, offset, target, i;
             mode2d = *p_mode2d;

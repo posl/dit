@@ -162,7 +162,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
         { "classify",        no_argument,       NULL, 'F' },
         { "numeric-uid-gid", no_argument,       NULL, 'n' },
         { "help",            no_argument,       NULL,  1  },
-        { "sort",            required_argument, NULL,  2  },
+        { "sort",            required_argument, NULL,  0  },
         {  0,                 0,                 0,    0  }
     };
 
@@ -198,12 +198,12 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
             case 1:
                 inspect_manual();
                 return 1;
-            case 2:
+            case 0:
                 if ((c = receive_expected_string(optarg, sort_args, SORTS_NUM, 2)) >= 0){
                     opt->comp = (c ? ((c == 1) ? comp(name) : comp(size)) : comp(extension));
                     break;
                 }
-                INVALID_OPTARG(c, long_opts[i].name, optarg);
+                xperror_invalid_optarg(c, long_opts[i].name, optarg);
                 xperror_valid_args(sort_args, SORTS_NUM);
             default:
                 return -1;
@@ -489,8 +489,9 @@ static int __comp_func_extension(const void *a, const void *b){
  * @return int  comparison result
  */
 static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_node *, file_node *)){
-    file_node *file1 = *((file_node **) a);
-    file_node *file2 = *((file_node **) b);
+    file_node *file1, *file2;
+    file1 = *((file_node **) a);
+    file2 = *((file_node **) b);
 
     int i;
     return (addition && (i = addition(file1, file2))) ? i : strcmp(file1->name, file2->name);
@@ -785,7 +786,7 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
         fputs(name, stdout);
 
     if (classify){
-        char indicator;
+        int indicator;
         indicator =
             (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
             S_ISDIR(mode) ? '/' :

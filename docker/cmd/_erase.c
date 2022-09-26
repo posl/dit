@@ -79,17 +79,18 @@ int erase(int argc, char **argv){
 static int __parse_opts(int argc, char **argv, erase_opts *opt){
     const char *short_opts = "dhrvyB:C:L:N:";
 
+    int size;
     const struct option long_opts[] = {
-                { "reset",       no_argument,       NULL, 'r' },
-                { "verbose",     no_argument,       NULL, 'v' },
-                { "begin-with",  required_argument, NULL, 'B' },
-                { "contain",     required_argument, NULL, 'C' },
-        [LID] = { "lines",       required_argument, NULL, 'L' },
-        [NID] = { "times",       required_argument, NULL, 'N' },
-                { "help",        no_argument,       NULL,  1  },
-                { "target",      required_argument, NULL,  2  },
-                { "response",    required_argument, NULL,  3  },
-                {  0,             0,                 0,    0  }
+                { "reset",       no_argument,        NULL,  'r'          },
+                { "verbose",     no_argument,        NULL,  'v'          },
+                { "begin-with",  required_argument,  NULL,  'B'          },
+                { "contain",     required_argument,  NULL,  'C'          },
+        [LID] = { "lines",       required_argument,  NULL,  'L'          },
+        [NID] = { "times",       required_argument,  NULL,  'N'          },
+                { "help",        no_argument,        NULL,   1           },
+                { "response",    required_argument, &size, RESPONSES_NUM },
+                { "target",      required_argument, &size, TARGETS_NUM   },
+                {  0,             0,                  0,     0           }
     };
 
     opt->target = '\0';
@@ -102,15 +103,16 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
     opt->lines = -1;
     opt->times = 0;
 
-    int c, i, size;
-    int *ptr = NULL;
+    int c, i, *ptr = NULL;
     const char * const *valid_args = NULL;
 
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
         switch (c){
             case 'd':
+                assign_both_or_either(opt->target, 'h', 'b', 'd');
+                break;
             case 'h':
-                opt->target = c;
+                assign_both_or_either(opt->target, 'd', 'b', 'h');
                 break;
             case 'r':
                 opt->reset = true;
@@ -140,26 +142,32 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                     ptr = NULL;
                     break;
                 }
-                INVALID_NUMBER(long_opts[i].name, optarg);
+                xperror_invalid_number(long_opts[i].name, optarg);
                 return -1;
             case 1:
                 erase_manual();
                 return 1;
-            case 2:
-                ptr = &(opt->target);
-                valid_args = target_files_reprs;
-            case 3:
-                if (! ptr){
+
+#if ((RESPONSES_NUM != 2) || (TARGETS_NUM != 3))
+    #error "inconsistent with the definition of the macros"
+#endif
+            case 0:
+                if (size == RESPONSES_NUM){
                     ptr = &(opt->response);
                     valid_args = response_reprs;
+                    // mode = 3;  (mode = size ^ 1)
                 }
-                size = c ^ 1;
-                if ((c = receive_expected_string(optarg, valid_args, size, c)) >= 0){
+                else /* if (size == TARGETS_NUM) */ {
+                    ptr = &(opt->target);
+                    valid_args = target_files_reprs;
+                    // mode = 2;  (mode = size ^ 1)
+                }
+                if ((c = receive_expected_string(optarg, valid_args, size, size ^ 1)) >= 0){
                     *ptr = valid_args[c][0];
                     ptr = NULL;
                     break;
                 }
-                INVALID_OPTARG(c, long_opts[i].name, optarg);
+                xperror_invalid_optarg(c, long_opts[i].name, optarg);
                 xperror_valid_args(valid_args, size);
             default:
                 return -1;
@@ -176,6 +184,6 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
         }
         return 0;
     }
-    xperror_target_file(NULL);
+    xperror_target_file();
     return -1;
 }

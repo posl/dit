@@ -283,7 +283,7 @@ static int __display_help(contents code, const char *target){
             help_func = cmd_helps[code][i];
         }
         else {
-            INVALID_CMDARG(i, "dit command", target);
+            xperror_invalid_cmdarg(i, "dit command", target);
             xperror_suggestion(false);
             return 1;
         }
