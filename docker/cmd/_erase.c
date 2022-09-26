@@ -184,6 +184,6 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
         }
         return 0;
     }
-    xperror_target_file();
+    xperror_target_files();
     return -1;
 }

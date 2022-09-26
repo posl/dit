@@ -29,6 +29,7 @@
 #define xperror_invalid_cmdarg(c, desc, arg)  xperror_invalid_arg(c, -1, desc, arg)
 #define xperror_invalid_optarg(c, name, arg)  xperror_invalid_arg(c, 0, arg, name)
 #define xperror_invalid_number(desc, arg)  xperror_invalid_arg(1, 1, desc, arg)
+#define xperror_target_files()  xperror_missing_args(NULL, NULL)
 
 
 /******************************************************************************
@@ -73,12 +74,14 @@ void setcmd_manual();
     * Error Handling Functions
 ******************************************************************************/
 
-void xperror_suggestion(bool individual_flag);
-void xperror_standards();
-void xperror_numofarg(unsigned int limit);
 void xperror_invalid_arg(int type, int code, ...);
 void xperror_valid_args(const char * const expected[], int size);
-void xperror_target_file();
+
+void xperror_missing_args(const char *desc, const char *before_arg);
+void xperror_too_many_args(unsigned int limit);
+
+void xperror_standards();
+void xperror_suggestion(bool individual_flag);
 
 
 /******************************************************************************

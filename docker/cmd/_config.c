@@ -92,7 +92,7 @@ int config(int argc, char **argv){
             xperror_invalid_cmdarg(0, "mode", config_arg);
     }
     else if (argc > 0)
-        xperror_numofarg(1);
+        xperror_too_many_args(1);
 
     xperror_suggestion(true);
     return 1;

@@ -132,6 +132,6 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
     if (opt->target)
         return 0;
 
-    xperror_target_file();
+    xperror_target_files();
     return -1;
 }

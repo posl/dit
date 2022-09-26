@@ -126,43 +126,6 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
 
 
 /**
- * @brief print a suggenstion message to stderr.
- *
- * @param[in]  individual_flag  whether to suggest displaying the manual of each dit command
- */
-void xperror_suggestion(bool individual_flag){
-    fputs(" Try 'dit ", stderr);
-    if (individual_flag)
-        fprintf(stderr, "%s --", program_name);
-    fputs("help' for more information.\n", stderr);
-}
-
-
-/**
- * @brief print the error message corresponding to errno to stderr, along with the program name.
- *
- */
-void xperror_standards(){
-    fputc(' ', stderr);
-    perror(program_name);
-}
-
-
-/**
- * @brief print an error message about the number of arguments to stderr.
- *
- * @param[in]  limit  the maximum number of arguments
- *
- * @attention if limit is 2 or more, it does not work as expected.
- */
-void xperror_numofarg(unsigned int limit){
-    const char *adj;
-    adj = limit ? "two or more" : "any";
-    fprintf(stderr, " %s: doesn't allow %s arguments\n", program_name, adj);
-}
-
-
-/**
  * @brief print an error message about invalid argument to stderr.
  *
  * @param[in]  type  error type (0 (unrecognized), -1 (ambiguous) or others (invalid))
@@ -206,12 +169,61 @@ void xperror_valid_args(const char * const expected[], int size){
 }
 
 
+
+
 /**
- * @brief print an error message about the target file specification to stderr.
+ * @brief print an error message to stderr that some arguments are missing.
+ *
+ * @param[in]  desc  a description for the arguments
+ * @param[in]  before_arg  the string previously specified as an argument, if any
+ */
+void xperror_missing_args(const char *desc, const char *before_arg){
+    if (! desc)
+        desc = "'-d', '-h' or '--target' option";
+    fprintf(stderr, " %s: missing %s", program_name, desc);
+
+    if (before_arg)
+        fprintf(stderr, " after '%s'", before_arg);
+    fputc('\n', stderr);
+}
+
+
+/**
+ * @brief print an error message to stderr that the number of arguments is too many.
+ *
+ * @param[in]  limit  the maximum number of arguments
+ *
+ * @attention if limit is 2 or more, it does not work as expected.
+ */
+void xperror_too_many_args(unsigned int limit){
+    const char *adj;
+    adj = limit ? "two or more" : "any";
+    fprintf(stderr, " %s: doesn't allow %s arguments\n", program_name, adj);
+}
+
+
+
+
+/**
+ * @brief print the error message corresponding to errno to stderr, along with the program name.
  *
  */
-void xperror_target_file(){
-    fprintf(stderr, " %s: target file must be specified by '-d', '-h' or '--target'\n", program_name);
+void xperror_standards(){
+    fputc(' ', stderr);
+    perror(program_name);
+}
+
+
+/**
+ * @brief print a suggenstion message to stderr.
+ *
+ * @param[in]  individual_flag  whether to suggest displaying the manual of each dit command
+ */
+void xperror_suggestion(bool individual_flag){
+    fputs(" Try 'dit ", stderr);
+    if (individual_flag)
+        fprintf(stderr, "%s --", program_name);
+    fputs("help' for more information.\n", stderr);
 }
 
 
