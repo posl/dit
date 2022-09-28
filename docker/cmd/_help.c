@@ -16,10 +16,13 @@
 #define OPTIONS " Options:\n"
 #define REMARKS " Remarks:\n"
 
-#define WHEN_REFLECTING "when reflecting a executed command line"
-#define CAN_BE_TRUNCATED "can be truncated as long as it is unique"
+#define DOCKER_OR_HISTORY  "Dockerfile or history-file"
+#define WHEN_REFLECTING  "when reflecting a executed command line"
 
-#define HELP_OPTION_DESC "display this help, and exit normally\n"
+#define EXIT_NORMALLY  ", and exit normally\n"
+#define HELP_OPTION_DESC  "display this help" EXIT_NORMALLY
+
+#define CAN_BE_TRUNCATED  "can be truncated as long as it is unique"
 
 
 /** Data type that collects serial numbers of the contents displayed by help function */
@@ -320,7 +323,7 @@ static void __dit_manual(){
         "\n"
         " Commands:\n"
         " main features of this tool:\n"
-        "   convert        show how a command line is reflected to Dockerfile and/or history-file\n"
+        "   convert        show how a command line is reflected to "DOCKER_OR_HISTORY"\n"
         "   optimize       do refactoring on Dockerfile based on its best practices\n"
         "\n"
         " customization of tool settings:\n"
@@ -335,8 +338,8 @@ static void __dit_manual(){
         "   onbuild        append ONBUILD instructions\n"
         "\n"
         " utilitys:\n"
-        "   reflect        append the contents of some files to Dockerfile or history-file\n"
-        "   erase          remove some lines from Dockerfile and/or history-file\n"
+        "   reflect        append the contents of some files to "DOCKER_OR_HISTORY"\n"
+        "   erase          remove some lines from "DOCKER_OR_HISTORY"\n"
         "   inspect        show some directory trees with details about each file\n"
         "   help           show information for some dit commands\n"
         "\n"
@@ -350,11 +353,11 @@ void config_manual(){
         USAGES
         "   dit config [OPTION]... [MODE[,MODE]...]\n"
         " Set the level at which commands that should not be reflected are ignored, used\n"
-        " "WHEN_REFLECTING" to Dockerfile or history-file, individually.\n"
+        " "WHEN_REFLECTING" to "DOCKER_OR_HISTORY", individually.\n"
         "\n"
         OPTIONS
         "   -r, --reset    reset each level with default value\n"
-        "       --help     "HELP_OPTION_DESC
+        "       --help     " HELP_OPTION_DESC
         "\n"
         " Modes:\n"
         "    0,  no-reflect    in the first place, do not reflect\n"
@@ -403,12 +406,12 @@ void help_manual(){
         " Show requested information for each specified dit COMMAND.\n"
         "\n"
         OPTIONS
-        "   -a, --all            list all dit commands available, and exit normally\n"
+        "   -a, --all            list all dit commands available" EXIT_NORMALLY
         "   -d, --description    show the short descriptions\n"
         "   -e, --example        show the examples of use\n"
         "   -m, --manual         show the detailed manuals\n"
-        "   -V, --version        display the version of this tool, and exit normally\n"
-        "       --help           "HELP_OPTION_DESC
+        "   -V, --version        display the version of this tool" EXIT_NORMALLY
+        "       --help           " HELP_OPTION_DESC
         "\n"
         REMARKS
         "   - If no COMMANDs are specified, show information about the main interface of dit commands.\n"
@@ -440,7 +443,7 @@ void inspect_manual(){
         "   -X                       sort by file extension, alphabetically\n"
         "       --sort=WORD          replace file sorting method:\n"
         "                              name (default), size (-S), extension (-X)\n"
-        "       --help               "HELP_OPTION_DESC
+        "       --help               " HELP_OPTION_DESC
         "\n"
         REMARKS
         "   - If no DIRECTORYs are specified, it operates as if the current directory is specified.\n"
@@ -493,11 +496,11 @@ static void __dit_description(){
 }
 
 static void __config_description(){
-    puts(" Set the level at which commands are reflected to Dockerfile or history-file, individually.");
+    puts(" Set the level at which commands are reflected to "DOCKER_OR_HISTORY", individually.");
 }
 
 static void __convert_description(){
-    puts(" Show how a command line is transformed for reflection to the Dockerfile and/or history-file.");
+    puts(" Show how a command line is transformed for reflection to the "DOCKER_OR_HISTORY".");
 }
 
 static void __cp_description(){
@@ -505,7 +508,7 @@ static void __cp_description(){
 }
 
 static void __erase_description(){
-    puts(" Remove the lines that match some conditions from Dockerfile and/or history-file.");
+    puts(" Remove the lines that match some conditions from "DOCKER_OR_HISTORY".");
 }
 
 static void __healthcheck_description(){
@@ -517,7 +520,7 @@ static void __help_description(){
 }
 
 static void __ignore_description(){
-    puts(" Edit set of commands that should not be reflected to Dockerfile or history-file, individually.");
+    puts(" Edit set of commands that should not be reflected to "DOCKER_OR_HISTORY", individually.");
 }
 
 static void __inspect_description(){
@@ -537,7 +540,7 @@ static void __optimize_description(){
 }
 
 static void __reflect_description(){
-    puts(" Append the contents of some files to Dockerfile or history-file.");
+    puts(" Append the contents of some files to "DOCKER_OR_HISTORY".");
 }
 
 static void __setcmd_description(){

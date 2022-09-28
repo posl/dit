@@ -29,6 +29,7 @@
 #define xperror_invalid_cmdarg(c, desc, arg)  xperror_invalid_arg(c, -1, desc, arg)
 #define xperror_invalid_optarg(c, name, arg)  xperror_invalid_arg(c, 0, arg, name)
 #define xperror_invalid_number(desc, arg)  xperror_invalid_arg(1, 1, desc, arg)
+
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
 
 

@@ -98,7 +98,7 @@ chmod a=rx \
 #
 
 dit config -r
-dit ignore -r
+dit ignore -dhr
 dit erase -dhr
 
 cp -f /dit/etc/dit_profile.sh /etc/profile.d/

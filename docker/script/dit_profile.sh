@@ -31,17 +31,17 @@ alias \
 
 
 #
-# set PS1, to be referred every time any command is executed
+# set shell variables that is referred every time any command is executed
 #
 
 PROMPT_REFLECT(){
     echo "$?" > /dit/tmp/last-exit-status
-    : > /dit/tmp/convert-result.dock
-    : > /dit/tmp/convert-result.hist
 
-    if ( ( history 1 | awk -f /dit/etc/dit_update.awk ) && dit convert ); then
+    if ( ( history 1 | awk -f /dit/etc/dit_update.awk ) && dit convert -qs ); then
         dit reflect -dh
     fi
+
+    : > /dit/tmp/reflect-report.bak
 }
 
 PROMPT_OPTION(){
@@ -52,24 +52,21 @@ PROMPT_REPORT(){
     if [ -s /dit/tmp/reflect-report.act ]; then
         cat /dit/tmp/reflect-report.act
     else
-        echo '[dock:+0 hist:+0] '
+        echo 'd:+0 h:+0'
     fi
-
-    : > /dit/tmp/reflect-report.bak
 }
 
 export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT 2> /dev/null || true
 
 
-PROMPT_STRING='\u@\h:\w \$ '
-export PROMPT_STRING
-
-
-if ( unset PS1 ); then
-    PS1='$( ( PROMPT_REFLECT && PROMPT_OPTION ) > /dev/null && PROMPT_REPORT )'"${PROMPT_STRING:-\\$ }"
-    readonly PS1
+if ( unset PROMPT_COMMAND 2> /dev/null ); then
+    PROMPT_COMMAND='( PROMPT_REFLECT && PROMPT_OPTION ) > /dev/null'
+    readonly PROMPT_COMMAND
 fi
 
+PS1='\[\e[1;32m\][\[\e[m\]''$( PROMPT_REPORT )''\[\e[1;32m\]]\[\e[m\]'' \u:\w \[\e[1;32m\]\$ \[\e[m\]'
+
+export PROMPT_COMMAND
 export PS1
 
 
