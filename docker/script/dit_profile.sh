@@ -35,13 +35,18 @@ alias \
 #
 
 PROMPT_REFLECT(){
-    echo "$?" > /dit/tmp/last-exit-status
+    LAST_EXIT_STATUS="$?"
 
-    if ( ( history 1 | awk -f /dit/etc/dit_update.awk ) && dit convert -qs ); then
-        dit reflect -dh
+    if ( history 1 | awk -f /dit/etc/dit_update.awk ); then
+        echo "${LAST_EXIT_STATUS:-0}" > /dit/tmp/last-exit-status
+
+        if ( dit convert -qs ); then
+            dit reflect -dh
+        fi
+
+        : > /dit/tmp/convert-result.dock
+        : > /dit/tmp/convert-result.hist
     fi
-
-    : > /dit/tmp/reflect-report.bak
 }
 
 PROMPT_OPTION(){
