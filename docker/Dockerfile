@@ -2,20 +2,15 @@ ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
 FROM ${BASE_NAME}:${BASE_VERSION} as builder
 
-RUN DEBIAN_FRONTEND=noninteractive \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        gcc \
-        libc-dev \
-    && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# install the gnu c-compiler
+WORKDIR /dit/etc
+COPY ./script/dit_install.sh ./
+RUN sh dit_install.sh gcc libc-dev
 
+# generate the dit command
 WORKDIR /dit/src
 COPY ./cmd ./
-
-# compile c-files and generate a executable file as dit
-RUN gcc *.c -o /usr/local/sbin/dit -march=native -O2
+RUN gcc *.c -o /usr/local/bin/dit -march=native -O2
 
 
 
@@ -23,14 +18,17 @@ ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
 FROM ${BASE_NAME}:${BASE_VERSION} as product
 
-# load the dit command and the script files
-COPY --from=builder /usr/local/sbin/dit /usr/local/sbin/
-COPY ./script /dit/etc/
-
 ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
 ENV BASE_NAME=${BASE_NAME}
 ENV BASE_VERSION=${BASE_VERSION}
+
+# load the dit command and several script files
+COPY --from=builder /usr/local/bin/dit /usr/local/bin/
+COPY ./script/ /dit/etc/
+
+# if there is no bash command, install it
+RUN /bin/bash --version > /dev/null 2>&1 || sh /dit/etc/dit_install.sh bash
 
 USER root
 ENTRYPOINT [ "/bin/bash", "/dit/etc/dit_entry.sh" ]

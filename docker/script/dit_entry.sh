@@ -6,7 +6,7 @@
 #
 
 if [ ! -e /dit/mnt ]; then
-    echo " dit: please check if you created or specified the directory to be bound." 1>&2
+    echo ' dit_entry.sh: no directory to be bound is specified' 1>&2
     exit 1
 fi
 
@@ -16,7 +16,7 @@ if [ ! -e /dit/mnt/.dit_history ]; then
 fi
 
 if [ ! -s /dit/mnt/.dockerignore ]; then
-    echo ".dit_history" > /dit/mnt/.dockerignore
+    echo '.dit_history' > /dit/mnt/.dockerignore
 fi
 
 
@@ -41,7 +41,7 @@ unset BASE_VERSION
 # set the permissions on several files specific to this tool
 #
 
-chmod a=x /usr/local/sbin/dit
+chmod a=x /usr/local/bin/dit
 
 chmod a=rw \
     /dit/mnt/.dit_history \

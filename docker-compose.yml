@@ -6,7 +6,7 @@ x-var0: &BASE_NAME
 x-var1: &BASE_VERSION
   latest
 x-var2: &IMAGE_NAME
-  dit-debian
+  debian-dit
 x-var3: &SHARED_DIR
   ./app
 
