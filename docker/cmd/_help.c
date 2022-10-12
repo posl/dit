@@ -10,11 +10,10 @@
 
 #include "main.h"
 
-#define CONTENTS_NUM 3
-
-#define USAGES " Usages:\n"
-#define OPTIONS " Options:\n"
-#define REMARKS " Remarks:\n"
+#define HELP_CONTS_NUM 3
+#define HELP_USAGES_STR " Usages:\n"
+#define HELP_OPTIONS_SYR " Options:\n"
+#define HELP_REMARKS_STR " Remarks:\n"
 
 #define DOCKER_OR_HISTORY  "Dockerfile or history-file"
 #define WHEN_REFLECTING  "when reflecting a executed command line"
@@ -30,14 +29,14 @@ typedef enum {
     manual,
     description,
     example
-} contents;
+} help_conts;
 
 
-static int __parse_opts(int argc, char **argv, contents *opt);
+static int __parse_opts(int argc, char **argv, help_conts *opt);
 static void __display_list();
 static void __display_version();
 
-static int __display_help(contents code, const char *target);
+static int __display_help(help_conts code, const char *target);
 static void __dit_manual();
 
 static void __dit_description();
@@ -92,7 +91,7 @@ extern const char * const cmd_reprs[3];
  */
 int help(int argc, char **argv){
     int i;
-    contents code;
+    help_conts code;
 
     if ((i = __parse_opts(argc, argv, &code))){
         if (i > 0)
@@ -141,7 +140,7 @@ int help(int argc, char **argv){
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_opts(int argc, char **argv, contents *opt){
+static int __parse_opts(int argc, char **argv, help_conts *opt){
     const char *short_opts = "ademV";
 
     const struct option long_opts[] = {
@@ -223,12 +222,12 @@ static void __display_version(){
  *
  * @note "cfg" and "hc", which are default aliases of 'config' and 'heatlthcheck', are supported.
  */
-static int __display_help(contents code, const char *target){
+static int __display_help(help_conts code, const char *target){
     const char *topic;
     void (* help_func)();
 
     if (target){
-        void (* const cmd_helps[CONTENTS_NUM][CMDS_NUM])() = {
+        void (* const cmd_helps[HELP_CONTS_NUM][CMDS_NUM])() = {
             {
                 config_manual,
                 convert_manual,
@@ -292,7 +291,7 @@ static int __display_help(contents code, const char *target){
         }
     }
     else {
-        void (* const dit_helps[CONTENTS_NUM])() = {
+        void (* const dit_helps[HELP_CONTS_NUM])() = {
             __dit_manual,
             __dit_description,
             __dit_example
@@ -317,7 +316,7 @@ static int __display_help(contents code, const char *target){
 
 static void __dit_manual(){
     fputs(
-        USAGES
+        HELP_USAGES_STR
         "   dit [COMMAND] [ARG]...\n"
         " Use the tool-specific functions corresponding to the specified COMMAND.\n"
         "\n"
@@ -350,12 +349,12 @@ static void __dit_manual(){
 
 void config_manual(){
     fputs(
-        USAGES
+        HELP_USAGES_STR
         "   dit config [OPTION]... [MODE[,MODE]...]\n"
         " Set the level at which commands that should not be reflected are ignored, used\n"
         " "WHEN_REFLECTING" to "DOCKER_OR_HISTORY", individually.\n"
         "\n"
-        OPTIONS
+        HELP_OPTIONS_SYR
         "   -r, --reset    reset each level with default value\n"
         "       --help     " HELP_OPTION_DESC
         "\n"
@@ -366,7 +365,7 @@ void config_manual(){
         "    3,  simple        ignore them only if the command line contains only one command\n"
         "    4,  no-ignore     ignore nothing\n"
         "\n"
-        REMARKS
+        HELP_REMARKS_STR
         "   - If neither OPTION nor MODE is specified, display the current settings.\n"
         "   - To specify a mode, you can use the above serial numbers and strings,\n"
         "     and any of the strings "CAN_BE_TRUNCATED".\n"
@@ -401,11 +400,11 @@ void healthcheck_manual(){
 
 void help_manual(){
     fputs(
-        USAGES
+        HELP_USAGES_STR
         "   dit help [OPTION]... [COMMAND]...\n"
         " Show requested information for each specified dit COMMAND.\n"
         "\n"
-        OPTIONS
+        HELP_OPTIONS_SYR
         "   -a, --all            list all dit commands available" EXIT_NORMALLY
         "   -d, --description    show the short descriptions\n"
         "   -e, --example        show the examples of use\n"
@@ -413,7 +412,7 @@ void help_manual(){
         "   -V, --version        display the version of this tool" EXIT_NORMALLY
         "       --help           " HELP_OPTION_DESC
         "\n"
-        REMARKS
+        HELP_REMARKS_STR
         "   - If no COMMANDs are specified, show information about the main interface of dit commands.\n"
         "   - Each COMMAND "CAN_BE_TRUNCATED", in addition\n"
         "     'config' and 'healthcheck' can be specified by 'cfg' and 'hc' respectively.\n"
@@ -430,11 +429,11 @@ void ignore_manual(){
 
 void inspect_manual(){
     fputs(
-        USAGES
+        HELP_USAGES_STR
         "   dit inspect [OPTION]... [DIRECTORY]...\n"
         " List information about the files under each specified DIRECTORY in a tree format.\n"
         "\n"
-        OPTIONS
+        HELP_OPTIONS_SYR
         "   -C, --color              colorize file name to distinguish file types\n"
         "   -F, --classify           append indicator (one of '*/=|') to each file name:\n"
         "                              to executable file, directory, socket or fifo, in order\n"
@@ -445,7 +444,7 @@ void inspect_manual(){
         "                              name (default), size (-S), extension (-X)\n"
         "       --help               " HELP_OPTION_DESC
         "\n"
-        REMARKS
+        HELP_REMARKS_STR
         "   - If no DIRECTORYs are specified, it operates as if the current directory is specified.\n"
         "   - The WORD argument for '--sort' "CAN_BE_TRUNCATED".\n"
         "   - User or group name longer than 8 characters are converted to the corresponding ID,\n"

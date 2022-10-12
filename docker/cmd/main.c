@@ -55,7 +55,7 @@ const char * const target_files_reprs[TARGETS_NUM] = {
 
 
 /** string representing a dit command invoked */
-const char *program_name;
+static const char *program_name;
 
 
 

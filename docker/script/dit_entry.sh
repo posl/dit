@@ -2,7 +2,7 @@
 
 
 #
-# initialize the files in shared directory
+# initialize the files in the shared directory
 #
 
 if [ ! -e /dit/mnt ]; then
@@ -26,13 +26,13 @@ fi
 
 if [ ! -s /dit/mnt/Dockerfile.draft ]; then
     cat <<EOF > /dit/mnt/Dockerfile.draft
-FROM ${BASE_IMAGE}:${BASE_VERSION}
+FROM ${BASE_NAME}:${BASE_VERSION}
 SHELL [ "${SHELL:-/bin/sh}", "-c" ]
 WORKDIR $(pwd)
 EOF
 fi
 
-unset BASE_IMAGE
+unset BASE_NAME
 unset BASE_VERSION
 
 

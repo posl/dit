@@ -12,13 +12,13 @@
 
 #include "main.h"
 
-#define CONFIGS_NUM 5
 #define CONFIG_FILE "/dit/var/config.stat"
-#define DEFAULT_MODE 2
 
-#define modes2stat(mode2d, mode2h)  (CONFIGS_NUM * mode2d + mode2h)
-#define INITIAL_STAT  modes2stat(DEFAULT_MODE, DEFAULT_MODE)
-#define EXCEED_STAT  (CONFIGS_NUM * CONFIGS_NUM)
+#define CONF_MODES_NUM 5
+#define CONF_DEFAULT_MODE 2
+#define CONF_STAT_FORMULA(mode2d, mode2h)  (CONF_MODES_NUM * mode2d + mode2h)
+#define CONF_INITIAL_STAT  CONF_STAT_FORMULA(CONF_DEFAULT_MODE, CONF_DEFAULT_MODE)
+#define CONF_EXCEED_STAT  (CONF_MODES_NUM * CONF_MODES_NUM)
 
 
 /** Data type that collects serial numbers of the contents that handle the config-file */
@@ -28,18 +28,18 @@ typedef enum {
     set,
     update,
     get
-} contents;
+} conf_conts;
 
 
 static int __parse_opts(int argc, char **argv, bool *opt);
-static int __config_contents(contents code, ...);
+static int __config_contents(conf_conts code, ...);
 
 static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2h);
 static int __receive_config_integer(int c, int spare);
 
 
 /** array of strings representing each mode in alphabetical order */
-const char * const config_reprs[CONFIGS_NUM] = {
+static const char * const config_reprs[CONF_MODES_NUM] = {
     [1] = "no-reflect",  // mode = 0
     [4] = "strict",      // mode = 1
     [2] = "normal",      // mode = 2
@@ -48,10 +48,10 @@ const char * const config_reprs[CONFIGS_NUM] = {
 };
 
 /** array for converting mode numbers to index numbers of above string array */
-const int mode2idx[CONFIGS_NUM] = {1, 4, 2, 3, 0};
+static const int mode2idx[CONF_MODES_NUM] = {1, 4, 2, 3, 0};
 
 /** array for converting index numbers of above string array to mode numbers */
-const int idx2mode[CONFIGS_NUM] = {4, 0, 2, 3, 1};
+static const int idx2mode[CONF_MODES_NUM] = {4, 0, 2, 3, 1};
 
 
 
@@ -141,26 +141,26 @@ static int __parse_opts(int argc, char **argv, bool *opt){
  * @param[in]  code  serial number identifying the operation content
  * @return int  0 (success), 1 (unexpected error) or -1 (argument recognition error)
  */
-static int __config_contents(contents code, ...){
+static int __config_contents(conf_conts code, ...){
     FILE *fp;
-    signed char c = INITIAL_STAT;
+    signed char c = CONF_INITIAL_STAT;
     bool write_flag = true;
 
     if (code != reset){
-        int mode2d = DEFAULT_MODE, mode2h = DEFAULT_MODE;
+        int mode2d = CONF_DEFAULT_MODE, mode2h = CONF_DEFAULT_MODE;
 
         if (code != set){
             if ((fp = fopen(CONFIG_FILE, "rb"))){
-                if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < EXCEED_STAT)){
+                if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < CONF_EXCEED_STAT)){
                     write_flag = false;
 
                     div_t tmp;
-                    tmp = div(c, CONFIGS_NUM);
+                    tmp = div(c, CONF_MODES_NUM);
                     mode2d = tmp.quot;
                     mode2h = tmp.rem;
                 }
                 else
-                    c = INITIAL_STAT;
+                    c = CONF_INITIAL_STAT;
 
                 fclose(fp);
             }
@@ -180,7 +180,7 @@ static int __config_contents(contents code, ...){
             if ((success_flag = __receive_config(va_arg(sp, const char *), &mode2d, &mode2h))){
                 if (code != get){
                     signed char d;
-                    if (c != (d = modes2stat(mode2d, mode2h))){
+                    if (c != (d = CONF_STAT_FORMULA(mode2d, mode2h))){
                         c = d;
                         write_flag = true;
                     }
@@ -279,7 +279,7 @@ static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2
                 token += offset;
                 if ((i < 0) && ((mode = __receive_config_integer(token[0], -2)) < -1))
                     continue;
-                if ((mode < 0) && ((i = receive_expected_string(token, config_reprs, CONFIGS_NUM, 2)) >= 0))
+                if ((mode < 0) && ((i = receive_expected_string(token, config_reprs, CONF_MODES_NUM, 2)) >= 0))
                     mode = idx2mode[i];
 
                 if (mode >= 0){
@@ -316,7 +316,7 @@ static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2
 static int __receive_config_integer(int c, int spare){
     int i;
     if ((i = c - '0') >= 0){
-        if (i < CONFIGS_NUM)
+        if (i < CONF_MODES_NUM)
             return i;
         if (c == '_')
             return spare;

@@ -11,14 +11,13 @@
 #include "main.h"
 
 #define SORTS_NUM 3
-#define comp(sort_style)  __comp_func_##sort_style
 
-#define HEADER_LEN 42
-#define EXCESS_STR " #EXCESS"
+#define INSP_HEADER_LEN 42
+#define INSP_EXCESS_STR " #EXCESS"
 
 
 /** Data type for storing comparison function used when qsort */
-typedef int (* comp_func)(const void *, const void *);
+typedef int (* qcmp)(const void *, const void *);
 
 
 /** Data type for storing the results of option parse */
@@ -26,7 +25,7 @@ typedef struct {
     bool color;         /** whether to colorize file name based on file mode */
     bool classify;      /** whether to append indicator to file name based on file mode */
     bool numeric_id;    /** whether to represent users and groups numerically */
-    comp_func comp;     /** comparison function used when qsort */
+    qcmp comp;          /** comparison function used when qsort */
 } insp_opts;
 
 
@@ -61,18 +60,18 @@ typedef struct {
 static int __parse_opts(int argc, char **argv, insp_opts *opt);
 
 static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt);
-static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp);
+static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, qcmp comp);
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
 static file_node *__new_file(char *path, char *name);
 static bool __append_file(file_node *tree, file_node *file);
 
-static int __comp_func_name(const void *a, const void *b);
-static int __comp_func_size(const void *a, const void *b);
-static int __comp_func_extension(const void *a, const void *b);
+static int __qcmp_name(const void *a, const void *b);
+static int __qcmp_size(const void *a, const void *b);
+static int __qcmp_ext(const void *a, const void *b);
 static int __fcmp_name(const void *a, const void *b, int (* const addition)(file_node *, file_node *));
 static int __fcmp_size(file_node *file1, file_node *file2);
-static int __fcmp_extension(file_node *file1, file_node *file2);
-static const char *__get_file_extension(const char *name);
+static int __fcmp_ext(file_node *file1, file_node *file2);
+static const char *__get_file_ext(const char *name);
 
 static void __display_dir_tree(file_node *tree, insp_opts *opt);
 static void __display_recursive(file_node *file, insp_opts *opt, unsigned int depth);
@@ -175,7 +174,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
     opt->color = false;
     opt->classify = false;
     opt->numeric_id = false;
-    opt->comp = comp(name);
+    opt->comp = __qcmp_name;
 
     int c, i;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
@@ -190,17 +189,17 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 opt->numeric_id = true;
                 break;
             case 'S':
-                opt->comp = comp(size);
+                opt->comp = __qcmp_size;
                 break;
             case 'X':
-                opt->comp = comp(extension);
+                opt->comp = __qcmp_ext;
                 break;
             case 1:
                 inspect_manual();
                 return 1;
             case 0:
                 if ((c = receive_expected_string(optarg, sort_args, SORTS_NUM, 2)) >= 0){
-                    opt->comp = (c ? ((c == 1) ? comp(name) : comp(size)) : comp(extension));
+                    opt->comp = (c ? ((c == 1) ? __qcmp_name : __qcmp_size) : __qcmp_ext);
                     break;
                 }
                 xperror_invalid_optarg(c, long_opts[i].name, optarg);
@@ -261,7 +260,7 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
  *
  * @note at the same time, sort files in directory.
  */
-static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, comp_func comp){
+static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, qcmp comp){
     file_node *file;
     file = __new_file(ipath->ptr, name);
 
@@ -449,7 +448,7 @@ static bool __append_file(file_node *tree, file_node *file){
  * @param[in]  b  pointer to file2
  * @return int  comparison result
  */
-static int __comp_func_name(const void *a, const void *b){
+static int __qcmp_name(const void *a, const void *b){
     return __fcmp_name(a, b, NULL);
 }
 
@@ -461,7 +460,7 @@ static int __comp_func_name(const void *a, const void *b){
  * @param[in]  b  pointer to file2
  * @return int  comparison result
  */
-static int __comp_func_size(const void *a, const void *b){
+static int __qcmp_size(const void *a, const void *b){
     return __fcmp_name(a, b, __fcmp_size);
 }
 
@@ -473,8 +472,8 @@ static int __comp_func_size(const void *a, const void *b){
  * @param[in]  b  pointer to file2
  * @return int  comparison result
  */
-static int __comp_func_extension(const void *a, const void *b){
-    return __fcmp_name(a, b, __fcmp_extension);
+static int __qcmp_ext(const void *a, const void *b){
+    return __fcmp_name(a, b, __fcmp_ext);
 }
 
 
@@ -517,10 +516,10 @@ static int __fcmp_size(file_node *file1, file_node *file2){
  * @param[in]  file2
  * @return int  comparison result
  */
-static int __fcmp_extension(file_node *file1, file_node *file2){
+static int __fcmp_ext(file_node *file1, file_node *file2){
     const char *ext1, *ext2;
-    ext1 = __get_file_extension(file1->name);
-    ext2 = __get_file_extension(file2->name);
+    ext1 = __get_file_ext(file1->name);
+    ext2 = __get_file_ext(file2->name);
     return strcmp(ext1, ext2);
 }
 
@@ -531,7 +530,7 @@ static int __fcmp_extension(file_node *file1, file_node *file2){
  * @param[in]  name  target file name
  * @return const char*  string representing the file extension
  */
-static const char *__get_file_extension(const char *name){
+static const char *__get_file_ext(const char *name){
     const char *ext;
     ext = name;
     while (*name)
@@ -555,10 +554,10 @@ static const char *__get_file_extension(const char *name){
  * @param[in]  opt  variable containing the result of option parse
  */
 static void __display_dir_tree(file_node *tree, insp_opts *opt){
-    const char header[HEADER_LEN] = " Permission      User     Group      Size";
+    const char header[INSP_HEADER_LEN] = " Permission      User     Group      Size";
     puts(header);
 
-    for (int i = HEADER_LEN; i--;)
+    for (int i = INSP_HEADER_LEN; i--;)
         putchar('=');
     putchar('\n');
 
@@ -676,7 +675,7 @@ static void __print_file_user(uid_t uid, bool numeric_id){
         if (uid < 100000000)
             printf("%8d", uid);
         else
-            fputs(EXCESS_STR, stdout);
+            fputs(INSP_EXCESS_STR, stdout);
     } while (0);
 
     fputs("  ", stdout);
@@ -703,7 +702,7 @@ static void __print_file_group(gid_t gid, bool numeric_id){
         if (gid < 100000000)
             printf("%8d", gid);
         else
-            fputs(EXCESS_STR, stdout);
+            fputs(INSP_EXCESS_STR, stdout);
     } while (0);
 
     fputs("  ", stdout);
@@ -735,7 +734,7 @@ static void __print_file_size(off_t size){
             printf("%3d.%1d %cB", (int) size, rem, units[i]);
         }
         else
-            fputs(EXCESS_STR, stdout);
+            fputs(INSP_EXCESS_STR, stdout);
     }
 }
 

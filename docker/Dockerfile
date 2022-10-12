@@ -1,6 +1,6 @@
-ARG BASE_IMAGE=debian
+ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
-FROM ${BASE_IMAGE}:${BASE_VERSION} as builder
+FROM ${BASE_NAME}:${BASE_VERSION} as builder
 
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && \
@@ -19,17 +19,17 @@ RUN gcc *.c -o /usr/local/sbin/dit -march=native -O2
 
 
 
-ARG BASE_IMAGE=debian
+ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
-FROM ${BASE_IMAGE}:${BASE_VERSION} as product
+FROM ${BASE_NAME}:${BASE_VERSION} as product
 
 # load the dit command and the script files
 COPY --from=builder /usr/local/sbin/dit /usr/local/sbin/
 COPY ./script /dit/etc/
 
-ARG BASE_IMAGE=debian
+ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
-ENV BASE_IMAGE=${BASE_IMAGE}
+ENV BASE_NAME=${BASE_NAME}
 ENV BASE_VERSION=${BASE_VERSION}
 
 USER root
