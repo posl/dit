@@ -24,15 +24,15 @@ typedef struct {
     int times;         /** option argument for '-N' */
     bool reset;        /** whether to reset log-file */
     bool verbose;      /** whether to display deleted lines on screen */
-    int response;      /** the response to confirmation that it is okay to remove the hit lines */
+    int assume;        /** the response to confirmation that it is okay to remove the hit lines */
 } erase_opts;
 
 
 static int __parse_opts(int argc, char **argv, erase_opts *opt);
 
 
-extern const char * const response_reprs[RESPONSES_NUM];
-extern const char * const target_files_reprs[TARGETS_NUM];
+extern const char * const assume_args[ASSUMES_NUM];
+extern const char * const target_args[TARGETS_NUM];
 
 
 
@@ -88,7 +88,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                 { "reset",       no_argument,        NULL,  'r'          },
                 { "verbose",     no_argument,        NULL,  'v'          },
                 { "help",        no_argument,        NULL,   1           },
-                { "response",    required_argument, &size, RESPONSES_NUM },
+                { "assume",      required_argument, &size, ASSUMES_NUM   },
                 { "target",      required_argument, &size, TARGETS_NUM   },
                 {  0,             0,                  0,     0           }
     };
@@ -101,7 +101,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
     opt->times = 0;
     opt->reset = false;
     opt->verbose = false;
-    opt->response = '\0';
+    opt->assume = '\0';
 
     int c, i, *ptr = NULL;
     const char * const *valid_args = NULL;
@@ -142,24 +142,24 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                 opt->verbose = true;
                 break;
             case 'y':
-                opt->response = 'Y';
+                opt->assume = 'Y';
                 break;
             case 1:
                 erase_manual();
                 return 1;
 
-#if ((RESPONSES_NUM != 2) || (TARGETS_NUM != 3))
+#if ((ASSUMES_NUM != 2) || (TARGETS_NUM != 3))
     #error "inconsistent with the definition of the macros"
 #endif
             case 0:
-                if (size == RESPONSES_NUM){
-                    ptr = &(opt->response);
-                    valid_args = response_reprs;
+                if (size == ASSUMES_NUM){
+                    ptr = &(opt->assume);
+                    valid_args = assume_args;
                     // mode = 3;  (mode = size ^ 1)
                 }
                 else /* if (size == TARGETS_NUM) */ {
                     ptr = &(opt->target);
-                    valid_args = target_files_reprs;
+                    valid_args = target_args;
                     // mode = 2;  (mode = size ^ 1)
                 }
                 if ((c = receive_expected_string(optarg, valid_args, size, size ^ 1)) >= 0){

@@ -23,7 +23,7 @@ typedef struct {
 static int __parse_opts(int argc, char **argv, refl_opts *opt);
 
 
-extern const char * const target_files_reprs[TARGETS_NUM];
+extern const char * const target_args[TARGETS_NUM];
 
 
 
@@ -116,7 +116,7 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
                 }
                 else {
                     ptr = &(opt->target);
-                    valid_args = target_files_reprs;
+                    valid_args = target_args;
                 }
                 if ((c = receive_expected_string(optarg, valid_args, BLANKS_NUM, 2)) >= 0){
                     *ptr = valid_args[c][0];

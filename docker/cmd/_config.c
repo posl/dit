@@ -34,12 +34,12 @@ typedef enum {
 static int __parse_opts(int argc, char **argv, bool *opt);
 static int __config_contents(conf_conts code, ...);
 
-static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2h);
-static int __receive_config_integer(int c, int spare);
+static bool __receive_mode(const char *config_arg, int *p_mode2d, int *p_mode2h);
+static int __receive_mode_integer(int c, int spare);
 
 
 /** array of strings representing each mode in alphabetical order */
-static const char * const config_reprs[CONF_MODES_NUM] = {
+static const char * const mode_reprs[CONF_MODES_NUM] = {
     [1] = "no-reflect",  // mode = 0
     [4] = "strict",      // mode = 1
     [2] = "normal",      // mode = 2
@@ -169,15 +169,15 @@ static int __config_contents(conf_conts code, ...){
         }
 
         if (code == display){
-            printf(" d=%s\n", config_reprs[mode2idx[mode2d]]);
-            printf(" h=%s\n", config_reprs[mode2idx[mode2h]]);
+            printf(" d=%s\n", mode_reprs[mode2idx[mode2d]]);
+            printf(" h=%s\n", mode_reprs[mode2idx[mode2h]]);
         }
         else {
             va_list sp;
             va_start(sp, code);
 
             bool success_flag;
-            if ((success_flag = __receive_config(va_arg(sp, const char *), &mode2d, &mode2h))){
+            if ((success_flag = __receive_mode(va_arg(sp, const char *), &mode2d, &mode2h))){
                 if (code != get){
                     signed char d;
                     if (c != (d = CONF_STAT_FORMULA(mode2d, mode2h))){
@@ -238,7 +238,7 @@ int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h){
  * @param[out] p_mode2h  variable to store the setting used when reflecting to history-file
  * @return bool  successful or not
  */
-static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2h){
+static bool __receive_mode(const char *config_arg, int *p_mode2d, int *p_mode2h){
     char *S;
     if ((S = xstrndup(config_arg, strlen(config_arg)))){
         const char *token;
@@ -254,8 +254,8 @@ static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2
                 target = 'b';
 
                 if (! (i = strlen(token) - 2)){
-                    if ((i = __receive_config_integer(token[0], mode2d)) >= 0){
-                        if ((mode = __receive_config_integer(token[1], mode2h)) >= 0){
+                    if ((i = __receive_mode_integer(token[0], mode2d)) >= 0){
+                        if ((mode = __receive_mode_integer(token[1], mode2h)) >= 0){
                             mode2d = i;
                             mode2h = mode;
                             continue;
@@ -277,9 +277,9 @@ static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2
                 }
 
                 token += offset;
-                if ((i < 0) && ((mode = __receive_config_integer(token[0], -2)) < -1))
+                if ((i < 0) && ((mode = __receive_mode_integer(token[0], -2)) < -1))
                     continue;
-                if ((mode < 0) && ((i = receive_expected_string(token, config_reprs, CONF_MODES_NUM, 2)) >= 0))
+                if ((mode < 0) && ((i = receive_expected_string(token, mode_reprs, CONF_MODES_NUM, 2)) >= 0))
                     mode = idx2mode[i];
 
                 if (mode >= 0){
@@ -313,7 +313,7 @@ static bool __receive_config(const char *config_arg, int *p_mode2d, int *p_mode2
  * @param[in]  spare  integer to return if a underscore is passed
  * @return int  the resulting integer, arbitrary integer, or -1
  */
-static int __receive_config_integer(int c, int spare){
+static int __receive_mode_integer(int c, int spare){
     int i;
     if ((i = c - '0') >= 0){
         if (i < CONF_MODES_NUM)

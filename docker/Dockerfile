@@ -31,4 +31,4 @@ COPY ./script/ /dit/etc/
 RUN /bin/bash --version > /dev/null 2>&1 || sh /dit/etc/dit_install.sh bash
 
 USER root
-ENTRYPOINT [ "/bin/bash", "/dit/etc/dit_entry.sh" ]
+ENTRYPOINT [ "/bin/sh", "/dit/etc/dit_entry.sh" ]

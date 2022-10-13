@@ -18,8 +18,9 @@
 
 
 #define CMDS_NUM 13
+
+#define ASSUMES_NUM 2
 #define DISPLAYS_NUM 3
-#define RESPONSES_NUM 2
 #define TARGETS_NUM 3
 
 #define VERSION_FILE "/dit/etc/dit_version"

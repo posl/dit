@@ -194,7 +194,7 @@ static void __display_list(){
     const int cmd_rearange[CMDS_NUM] = {5, 7, 3, 11, 9, 4, 12, 8, 2, 6, 0, 10, 1};
 
     for (int i = CMDS_NUM; i--;)
-        puts(cmd_reprs[cmd_rearange[i]]);
+        printf(" %s\n", cmd_reprs[cmd_rearange[i]]);
 }
 
 
@@ -205,9 +205,13 @@ static void __display_list(){
 static void __display_version(){
     FILE *fp;
     if ((fp = fopen(VERSION_FILE, "r"))){
-        char S[16];
-        while (fgets(S, sizeof(S), fp))
-            fputs(S, stdout);
+        putchar(' ');
+
+        int c;
+        while (((c = fgetc(fp)) != EOF) && isprint(c))
+            putchar(c);
+
+        putchar('\n');
         fclose(fp);
     }
 }

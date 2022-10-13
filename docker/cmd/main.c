@@ -33,21 +33,22 @@ const char * const cmd_reprs[CMDS_NUM] = {
     "setcmd"
 };
 
+
+/** array of strings representing each response to the Y/n question in alphabetical order */
+const char * const assume_args[ASSUMES_NUM] = {
+    "NO",
+    "YES"
+};
+
 /** array of strings representing each argument for '--display' in alphabetical order */
-const char * const display_contents_reprs[DISPLAYS_NUM] = {
+const char * const display_args[DISPLAYS_NUM] = {
     "BOTH",
     "IN",
     "OUT"
 };
 
-/** array of strings representing each response to the Y/n question in alphabetical order */
-const char * const response_reprs[RESPONSES_NUM] = {
-    "NO",
-    "YES"
-};
-
 /** array of strings representing each argument for '--target' in alphabetical order */
-const char * const target_files_reprs[TARGETS_NUM] = {
+const char * const target_args[TARGETS_NUM] = {
     "both",
     "dockerfile",
     "history-file"

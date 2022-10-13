@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 
 #
@@ -61,7 +61,7 @@ PROMPT_REPORT(){
     fi
 }
 
-export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT 2> /dev/null || true
+export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT 2> /dev/null
 
 
 if ( unset PROMPT_COMMAND 2> /dev/null ); then
