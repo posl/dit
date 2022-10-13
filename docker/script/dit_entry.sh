@@ -97,9 +97,15 @@ chmod a=rx \
 # perform other necessary initializations, and enter a login shell
 #
 
+echo '0' > /dit/tmp/last-exit-status
+echo '0' > /dit/tmp/last-history-number
+echo 'd:+0 h:+0' > /dit/tmp/reflect-report.act
+
 dit config -r
 dit ignore -dhr
+dit optimize -r
 dit erase -dhr
+
 
 cp -f /dit/etc/dit_profile.sh /etc/profile.d/
 

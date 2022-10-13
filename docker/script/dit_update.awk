@@ -12,8 +12,10 @@ NR == 1 {
         sub(/[ \t]*/, "", $0)
         print $0 > "/dit/tmp/last-command-line"
     }
-    else
+    else {
+        print " dit: invalid number of history" > "/dev/stderr"
         exit 1
+    }
 }
 
 NR != 1 {

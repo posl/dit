@@ -44,8 +44,8 @@ PROMPT_REFLECT(){
             dit reflect -dh
         fi
 
-        : > /dit/tmp/convert-result.dock
-        : > /dit/tmp/convert-result.hist
+        : > /dit/tmp/reflect-report.act
+        dit reflect
     fi
 }
 
