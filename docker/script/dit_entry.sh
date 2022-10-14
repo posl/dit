@@ -75,11 +75,11 @@ touch \
     /dit/tmp/reflect-report.bak \
     \
     /dit/var/config.stat \
+    /dit/var/erase.log.dock \
+    /dit/var/erase.log.hist \
     /dit/var/ignore.list.dock \
     /dit/var/ignore.list.hist \
     /dit/var/optimize.stat \
-    /dit/var/reflect.log.dock \
-    /dit/var/reflect.log.hist \
     /dit/var/setcmd.log
 
 umask "${DEFAULT_UMASK_VALUE}"
@@ -100,11 +100,12 @@ chmod a=rx \
 echo '0' > /dit/tmp/last-exit-status
 echo '0' > /dit/tmp/last-history-number
 echo 'd:+0 h:+0' > /dit/tmp/reflect-report.act
+echo '0 0' > /dit/tmp/reflect-report.bak
 
 dit config -r
+dit erase -dhr
 dit ignore -dhr
 dit optimize -r
-dit erase -dhr
 
 
 cp -f /dit/etc/dit_profile.sh /etc/profile.d/

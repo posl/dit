@@ -57,7 +57,7 @@ PROMPT_REPORT(){
     if [ -s /dit/tmp/reflect-report.act ]; then
         cat /dit/tmp/reflect-report.act
     else
-        echo 'd:+0 h:+0'
+        echo 'd:?? h:??'
     fi
 }
 
