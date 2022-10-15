@@ -34,7 +34,8 @@ typedef enum {
 
 static int __parse_opts(int argc, char **argv, help_conts *opt);
 static void __display_list();
-static void __display_version();
+static int __display_exit_status();
+static int __display_version();
 
 static int __display_help(help_conts code, const char *target);
 static void __dit_manual();
@@ -93,13 +94,8 @@ int help(int argc, char **argv){
     int i;
     help_conts code;
 
-    if ((i = __parse_opts(argc, argv, &code))){
-        if (i > 0)
-            return 0;
-
-        xperror_suggestion(true);
-        return 1;
-    }
+    if ((i = __parse_opts(argc, argv, &code)))
+        return (i < 0);
 
     setvbuf(stdout, NULL, _IOFBF, 0);
 
@@ -107,16 +103,15 @@ int help(int argc, char **argv){
     if ((argc -= optind) > 0){
         argv += optind;
 
+        char A[4] = "\n\n\n";
         do {
             if (__display_help(code, *argv))
                 exit_status = 1;
 
             if (--argc){
                 argv++;
-                if (code != manual)
-                    putchar('\n');
-                else
-                    puts("\n\n");
+                A[1] = (code != manual) ? '\0' : '\n';
+                fputs(A, stdout);
                 fflush(stdout);
             }
             else
@@ -141,16 +136,17 @@ int help(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int __parse_opts(int argc, char **argv, help_conts *opt){
-    const char *short_opts = "ademV";
+    const char *short_opts = "ademPV";
 
     const struct option long_opts[] = {
-        { "all",         no_argument, NULL, 'a' },
-        { "description", no_argument, NULL, 'd' },
-        { "example",     no_argument, NULL, 'e' },
-        { "manual",      no_argument, NULL, 'm' },
-        { "version",     no_argument, NULL, 'V' },
-        { "help",        no_argument, NULL,  1  },
-        {  0,             0,           0,    0  }
+        { "all",              no_argument, NULL, 'a' },
+        { "description",      no_argument, NULL, 'd' },
+        { "example",          no_argument, NULL, 'e' },
+        { "manual",           no_argument, NULL, 'm' },
+        { "last-exit-status", no_argument, NULL, 'P' },
+        { "version",          no_argument, NULL, 'V' },
+        { "help",             no_argument, NULL,  1  },
+        {  0,                  0,           0,    0  }
     };
 
     *opt = manual;
@@ -170,13 +166,15 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
             case 'm':
                 *opt = manual;
                 break;
+            case 'P':
+                return __display_exit_status();
             case 'V':
-                __display_version();
-                return 1;
+                return __display_version();
             case 1:
                 help_manual();
                 return 1;
             default:
+                xperror_suggestion(true);
                 return -1;
         }
     }
@@ -194,26 +192,64 @@ static void __display_list(){
     const int cmd_rearange[CMDS_NUM] = {5, 7, 3, 11, 9, 4, 12, 8, 2, 6, 0, 10, 1};
 
     for (int i = CMDS_NUM; i--;)
-        printf(" %s\n", cmd_reprs[cmd_rearange[i]]);
+        fprintf(stdout, " %s\n", cmd_reprs[cmd_rearange[i]]);
+}
+
+
+/**
+ * @brief display the exit status of last executed command line.
+ *
+ * @return int  return value that can be used as the return value of '__parse_opts'
+ */
+static int __display_exit_status(){
+    int exit_status;
+    if ((exit_status = check_last_exit_status()) != -1){
+        fprintf(stdout, " %d\n", exit_status);
+        exit_status = 1;
+    }
+    else
+        xperror_internal_file();
+
+    return exit_status;
 }
 
 
 /**
  * @brief display the version of this tool.
  *
+ * @return int  return value that can be used as the return value of '__parse_opts'
+ *
+ * @note this implementation is devised so that the beginning of the line is a space character.
+ * @attention the version file must end with a newline character.
  */
-static void __display_version(){
+static int __display_version(){
     FILE *fp;
+    int i = -1;
+
     if ((fp = fopen(VERSION_FILE, "r"))){
-        putchar(' ');
+        char A[128] = " ", c;
 
-        int c;
-        while (((c = fgetc(fp)) != EOF) && isprint(c))
-            putchar(c);
+        do {
+            if (fscanf(fp, "%125[^\n]%n%c", (A + 1), &i, &c) == 2){
+                if (c == '\n'){
+                    A[++i] = '\n';
+                    A[++i] = '\0';
+                    c = ' ';
+                }
+                fputs(A, stdout);
+                *A = c;
+            }
+            else
+                break;
+        } while (1);
 
-        putchar('\n');
         fclose(fp);
+        i = 1;
     }
+    else
+        xperror_internal_file();
+
+    return i;
 }
 
 
@@ -305,7 +341,7 @@ static int __display_help(help_conts code, const char *target){
     }
 
     if (code != manual)
-        printf("  < %s >\n", topic);
+        fprintf(stdout, "  < %s >\n", topic);
     help_func();
     return 0;
 }
@@ -383,22 +419,22 @@ void config_manual(){
 
 
 void convert_manual(){
-    puts(" convert manual");
+    fputs(" convert manual\n", stdout);
 }
 
 
 void cp_manual(){
-    puts(" cp manual");
+    fputs(" cp manual\n", stdout);
 }
 
 
 void erase_manual(){
-    puts(" erase manual");
+    fputs(" erase manual\n", stdout);
 }
 
 
 void healthcheck_manual(){
-    puts(" healthcheck manual");
+    fputs(" healthcheck manual\n", stdout);
 }
 
 
@@ -409,12 +445,13 @@ void help_manual(){
         " Show requested information for each specified dit COMMAND.\n"
         "\n"
         HELP_OPTIONS_SYR
-        "   -a, --all            list all dit commands available" EXIT_NORMALLY
-        "   -d, --description    show the short descriptions\n"
-        "   -e, --example        show the examples of use\n"
-        "   -m, --manual         show the detailed manuals\n"
-        "   -V, --version        display the version of this tool" EXIT_NORMALLY
-        "       --help           " HELP_OPTION_DESC
+        "   -a, --all                 list all dit commands available" EXIT_NORMALLY
+        "   -d, --description         show the short descriptions\n"
+        "   -e, --example             show the examples of use\n"
+        "   -m, --manual              show the detailed manuals\n"
+        "   -P, --last-exit-status    display the exit status of last executed command line" EXIT_NORMALLY
+        "   -V, --version             display the version of this tool" EXIT_NORMALLY
+        "       --help                " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
         "   - If no COMMANDs are specified, show information about the main interface of dit commands.\n"
@@ -427,7 +464,7 @@ void help_manual(){
 
 
 void ignore_manual(){
-    puts(" ignore manual");
+    fputs(" ignore manual\n", stdout);
 }
 
 
@@ -463,27 +500,27 @@ void inspect_manual(){
 
 
 void label_manual(){
-    puts(" label manual");
+    fputs(" label manual\n", stdout);
 }
 
 
 void onbuild_manual(){
-    puts(" onbuild manual");
+    fputs(" onbuild manual\n", stdout);
 }
 
 
 void optimize_manual(){
-    puts(" optimize manual");
+    fputs(" optimize manual\n", stdout);
 }
 
 
 void reflect_manual(){
-    puts(" reflect manual");
+    fputs(" reflect manual\n", stdout);
 }
 
 
 void setcmd_manual(){
-    puts(" setcmd manual");
+    fputs(" setcmd manual\n", stdout);
 }
 
 
@@ -495,59 +532,87 @@ void setcmd_manual(){
 
 
 static void __dit_description(){
-    puts(" Use the tool-specific functions as the subcommand.");
+    fputs(
+        " Use the tool-specific functions as the subcommand.\n"
+    , stdout);
 }
 
 static void __config_description(){
-    puts(" Set the level at which commands are reflected to "DOCKER_OR_HISTORY", individually.");
+    fputs(
+        " Set the level at which commands are reflected to "DOCKER_OR_HISTORY", individually.\n"
+    , stdout);
 }
 
 static void __convert_description(){
-    puts(" Show how a command line is transformed for reflection to the "DOCKER_OR_HISTORY".");
+    fputs(
+        " Show how a command line is transformed for reflection to the "DOCKER_OR_HISTORY".\n"
+    , stdout);
 }
 
 static void __cp_description(){
-    puts(" Perform processing equivalent to COPY/ADD instructions, and reflect this to Dockerfile.");
+    fputs(
+        " Perform processing equivalent to COPY/ADD instructions, and reflect this to Dockerfile.\n"
+    , stdout);
 }
 
 static void __erase_description(){
-    puts(" Remove the lines that match some conditions from "DOCKER_OR_HISTORY".");
+    fputs(
+        " Remove the lines that match some conditions from "DOCKER_OR_HISTORY".\n"
+    , stdout);
 }
 
 static void __healthcheck_description(){
-    puts(" Set HEALTHCHECK instruction in Dockerfile.");
+    fputs(
+        " Set HEALTHCHECK instruction in Dockerfile.\n"
+    , stdout);
 }
 
 static void __help_description(){
-    puts(" Show requested information for some dit commands.");
+    fputs(
+        " Show requested information for some dit commands.\n"
+    , stdout);
 }
 
 static void __ignore_description(){
-    puts(" Edit set of commands that should not be reflected to "DOCKER_OR_HISTORY", individually.");
+    fputs(
+        " Edit set of commands that should not be reflected to "DOCKER_OR_HISTORY", individually.\n"
+    , stdout);
 }
 
 static void __inspect_description(){
-    puts(" List information about the files under some directories in a tree format.");
+    fputs(
+        " List information about the files under some directories in a tree format.\n"
+    , stdout);
 }
 
 static void __label_description(){
-    puts(" Edit list of LABEL/EXPOSE instructions in Dockerfile.");
+    fputs(
+        " Edit list of LABEL/EXPOSE instructions in Dockerfile.\n"
+    , stdout);
 }
 
 static void __onbuild_description(){
-    puts(" Append ONBUILD instructions in Dockerfile.");
+    fputs(
+        " Append ONBUILD instructions in Dockerfile.\n"
+    , stdout);
 }
 
 static void __optimize_description(){
-    puts(" Generate Dockerfile as the result of refactoring based on its best practices.");
+    fputs(
+        " Generate Dockerfile as the result of refactoring based on its best practices.\n"
+    , stdout);
 }
 
 static void __reflect_description(){
-    puts(" Append the contents of some files to "DOCKER_OR_HISTORY".");
+    fputs(
+        " Append the contents of some files to "DOCKER_OR_HISTORY".\n"
+    , stdout);
 }
 
 static void __setcmd_description(){
-    puts(" Set CMD/ENTRYPOINT instruction in Dockerfile.");
+    fputs(
+        " Set CMD/ENTRYPOINT instruction in Dockerfile.\n"
+    , stdout);
 }
 
 
@@ -559,7 +624,7 @@ static void __setcmd_description(){
 
 
 static void __dit_example(){
-    puts(" dit example");
+    fputs(" dit example\n", stdout);
 }
 
 
@@ -574,22 +639,22 @@ static void __config_example(){
 
 
 static void __convert_example(){
-    puts(" convert example");
+    fputs(" convert example\n", stdout);
 }
 
 
 static void __cp_example(){
-    puts(" cp example");
+    fputs(" cp example\n", stdout);
 }
 
 
 static void __erase_example(){
-    puts(" erase example");
+    fputs(" erase example\n", stdout);
 }
 
 
 static void __healthcheck_example(){
-    puts(" healthcheck example");
+    fputs(" healthcheck example\n", stdout);
 }
 
 
@@ -604,7 +669,7 @@ static void __help_example(){
 
 
 static void __ignore_example(){
-    puts(" ignore example");
+    fputs(" ignore example\n", stdout);
 }
 
 
@@ -619,25 +684,25 @@ static void __inspect_example(){
 
 
 static void __label_example(){
-    puts(" label example");
+    fputs(" label example\n", stdout);
 }
 
 
 static void __onbuild_example(){
-    puts(" onbuild example");
+    fputs(" onbuild example\n", stdout);
 }
 
 
 static void __optimize_example(){
-    puts(" optimize example");
+    fputs(" optimize example\n", stdout);
 }
 
 
 static void __reflect_example(){
-    puts(" reflect example");
+    fputs(" reflect example\n", stdout);
 }
 
 
 static void __setcmd_example(){
-    puts(" setcmd example");
+    fputs(" setcmd example\n", stdout);
 }

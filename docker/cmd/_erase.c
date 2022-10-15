@@ -6,12 +6,17 @@
  * @brief Described the dit command 'erase', that 
  * @author Tsukasa Inada
  * @date 2022/09/09
+ *
+ * @note 
  */
 
 #include "main.h"
 
 #define LID 2
 #define NID 3
+
+#define ERASE_FILE_D "/dit/var/erase.log.dock"
+#define ERASE_FILE_H "/dit/var/erase.log.hist"
 
 
 /** Data type for storing the results of option parse */
@@ -55,12 +60,8 @@ int erase(int argc, char **argv){
     int i;
     erase_opts opt;
 
-    if ((i = __parse_opts(argc, argv, &opt))){
-        if (i > 0)
-            return 0;
-
-        xperror_suggestion(true);
-    }
+    if ((i = __parse_opts(argc, argv, &opt)))
+        return (i < 0);
 
     return 0;
 }
@@ -170,6 +171,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                 xperror_invalid_optarg(c, long_opts[i].name, optarg);
                 xperror_valid_args(valid_args, size);
             default:
+                xperror_suggestion(true);
                 return -1;
         }
     }

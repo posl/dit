@@ -3,6 +3,6 @@
 
 
 int optimize(int argc, char **argv){
-    puts("optimize");
+    fputs("optimize\n", stdout);
     return 0;
 }

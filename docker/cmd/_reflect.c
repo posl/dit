@@ -6,11 +6,17 @@
  * @brief Described the dit command 'reflect', 
  * @author Tsukasa Inada
  * @date 2022/09/21
+ *
+ * @note 
+ * @note 
  */
 
 #include "main.h"
 
 #define BLANKS_NUM 3
+
+#define REFLECT_FILE_P "/dit/tmp/reflect-report.prov"
+#define REFLECT_FILE_R "/dit/tmp/reflect-report.real"
 
 
 /** Data type for storing the results of option parse */
@@ -21,6 +27,7 @@ typedef struct {
 
 
 static int __parse_opts(int argc, char **argv, refl_opts *opt);
+static int __determine_reflect();
 
 
 extern const char * const target_args[TARGETS_NUM];
@@ -43,15 +50,15 @@ extern const char * const target_args[TARGETS_NUM];
  * @note treated like a normal main function.
  */
 int reflect(int argc, char **argv){
-    int i;
-    refl_opts opt;
+    if (! ((argc == 1) && check_file_isempty(REFLECT_FILE_R))){
+        int i;
+        refl_opts opt;
 
-    if ((i = __parse_opts(argc, argv, &opt))){
-        if (i > 0)
-            return 0;
-
-        xperror_suggestion(true);
+        if ((i = __parse_opts(argc, argv, &opt)))
+            return (i < 0);
     }
+    else
+        __determine_reflect();
 
     return 0;
 }
@@ -125,6 +132,7 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
                 xperror_invalid_optarg(c, long_opts[i].name, optarg);
                 xperror_valid_args(valid_args, TARGETS_NUM);
             default:
+                xperror_suggestion(true);
                 return -1;
         }
     }
@@ -135,3 +143,32 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
     xperror_target_files();
     return -1;
 }
+
+
+
+
+
+static int __determine_reflect(){
+
+}
+
+
+
+
+/******************************************************************************
+    * Functions that operate File-by-File
+******************************************************************************/
+
+
+int read_temporary_report(){
+
+}
+
+
+
+
+/******************************************************************************
+    * Functions that operate Line-by-Line
+******************************************************************************/
+
+

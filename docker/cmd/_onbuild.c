@@ -3,6 +3,6 @@
 
 
 int onbuild(int argc, char **argv){
-    puts("onbuild");
+    fputs("onbuild\n", stdout);
     return 0;
 }

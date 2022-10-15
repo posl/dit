@@ -3,6 +3,6 @@
 
 
 int ignore(int argc, char **argv){
-    puts("ignore");
+    fputs("ignore\n", stdout);
     return 0;
 }

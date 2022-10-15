@@ -3,6 +3,6 @@
 
 
 int healthcheck(int argc, char **argv){
-    puts("healthcheck");
+    fputs("healthcheck\n", stdout);
     return 0;
 }

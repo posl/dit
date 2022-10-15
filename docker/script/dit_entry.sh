@@ -71,8 +71,8 @@ touch \
     /dit/tmp/last-command-line \
     /dit/tmp/last-exit-status \
     /dit/tmp/last-history-number \
-    /dit/tmp/reflect-report.act \
-    /dit/tmp/reflect-report.bak \
+    /dit/tmp/reflect-report.prov \
+    /dit/tmp/reflect-report.real \
     \
     /dit/var/config.stat \
     /dit/var/erase.log.dock \
@@ -99,8 +99,8 @@ chmod a=rx \
 
 echo '0' > /dit/tmp/last-exit-status
 echo '0' > /dit/tmp/last-history-number
-echo 'd:+0 h:+0' > /dit/tmp/reflect-report.act
-echo '0 0' > /dit/tmp/reflect-report.bak
+echo '0 0' > /dit/tmp/reflect-report.prov
+echo 'd:+0 h:+0' > /dit/tmp/reflect-report.real
 
 dit config -r
 dit erase -dhr

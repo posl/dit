@@ -3,6 +3,6 @@
 
 
 int setcmd(int argc, char **argv){
-    puts("setcmd");
+    fputs("setcmd\n", stdout);
     return 0;
 }

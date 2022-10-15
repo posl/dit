@@ -10,6 +10,8 @@
 
 #include "main.h"
 
+#define EXIT_STATUS_FILE "/dit/tmp/last-exit-status"
+
 
 static int (* const __get_dit_cmd(const char *target))(int, char **);
 
@@ -206,12 +208,12 @@ void xperror_too_many_args(unsigned int limit){
 
 
 /**
- * @brief print the error message corresponding to errno to stderr, along with the program name.
+ * @brief print the specified error message to stderr, along with the program name.
  *
+ * @param[in]  msg  the error message
  */
-void xperror_standards(){
-    fputc(' ', stderr);
-    perror(program_name);
+void xperror_individually(const char *msg){
+    fprintf(stderr, " %s: %s", program_name, msg);
 }
 
 
@@ -342,7 +344,7 @@ int receive_positive_integer(const char *target){
  * @param[in]  target  target string
  * @param[in]  expected  array of expected string
  * @param[in]  size  array size
- * @param[in]  mode  mode of compare (bit 1: perform uppercase conversion, bit 2: allow forward match)
+ * @param[in]  mode  mode of comparison (bit 1: perform uppercase conversion, bit 2: accept forward match)
  * @return int  index number of the corresponding string, -1 (ambiguous) or others (invalid)
  *
  * @note make efficient by applying binary search sequentially from the first character of target string.
@@ -407,4 +409,49 @@ int receive_expected_string(const char *target, const char * const expected[], i
         return -2;
     }
     return -3;
+}
+
+
+
+
+/******************************************************************************
+    * Check Functions
+******************************************************************************/
+
+
+/**
+ * @brief check if the specified file is empty.
+ *
+ * @param[in]  file_name  target file name
+ * @return bool  isempty or not
+ */
+bool check_file_isempty(const char *file_name){
+    struct stat file_stat;
+    if (! lstat(file_name, &file_stat)){
+        if (! file_stat.st_size)
+            return true;
+    }
+    else
+        xperror_standards();
+    return false;
+}
+
+
+/**
+ * @brief check the exit status of last executed command line.
+ *
+ * @return int  the resulting integer or -1
+ */
+int check_last_exit_status(){
+    FILE *fp;
+    int i = -1;
+
+    if ((fp = fopen(EXIT_STATUS_FILE, "r"))){
+        fscanf(fp, "%u", &i);
+        fclose(fp);
+
+        if (i > 255)
+            i = -1;
+    }
+    return i;
 }

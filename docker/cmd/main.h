@@ -24,6 +24,9 @@
 #define TARGETS_NUM 3
 
 #define VERSION_FILE "/dit/etc/dit_version"
+#define CONVERT_FILE_D "/dit/tmp/convert-result.dock"
+#define CONVERT_FILE_H "/dit/tmp/convert-result.hist"
+#define SETCMD_FILE "/dit/var/setcmd.log"
 
 #define assign_both_or_either(target, a, b, c)  (target = (target == a) ? b : c)
 
@@ -32,6 +35,8 @@
 #define xperror_invalid_number(desc, arg)  xperror_invalid_arg(1, 1, desc, arg)
 
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
+#define xperror_standards()  xperror_individually(strerror(errno))
+#define xperror_internal_file() xperror_individually("unexpected error while manipulating an internal file")
 
 
 /******************************************************************************
@@ -82,7 +87,7 @@ void xperror_valid_args(const char * const expected[], int size);
 void xperror_missing_args(const char *desc, const char *before_arg);
 void xperror_too_many_args(unsigned int limit);
 
-void xperror_standards();
+void xperror_individually(const char *msg);
 void xperror_suggestion(bool individual_flag);
 
 
@@ -103,10 +108,18 @@ int receive_expected_string(const char *target, const char * const expected[], i
 
 
 /******************************************************************************
+    * Check Functions
+******************************************************************************/
+
+bool check_file_isempty(const char *file_name);
+int check_last_exit_status();
+
+
+/******************************************************************************
     * Functions used in separate files
 ******************************************************************************/
 
-int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h);
+inline int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h);
 
 
 #endif

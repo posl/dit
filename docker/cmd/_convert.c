@@ -21,7 +21,7 @@ int convert(int argc, char **argv){
 
     while (1){
         if ((fp = fopen(files[i], "w"))){
-            printf(" < %s >\n%s\n", targets[i], outputs[i]);
+            fprintf(stdout, " < %s >\n%s\n", targets[i], outputs[i]);
             fprintf(fp, "%s\n", outputs[i]);
             fclose(fp);
         }
@@ -31,7 +31,7 @@ int convert(int argc, char **argv){
         }
 
         if (++i < 2)
-            putchar('\n');
+            fputc('\n', stdout);
         else
             break;
     }

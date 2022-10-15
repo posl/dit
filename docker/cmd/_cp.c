@@ -3,6 +3,6 @@
 
 
 int cp(int argc, char **argv){
-    puts("cp");
+    fputs("cp\n", stdout);
     return 0;
 }

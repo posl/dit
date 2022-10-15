@@ -44,7 +44,7 @@ PROMPT_REFLECT(){
             dit reflect -dh
         fi
 
-        : > /dit/tmp/reflect-report.act
+        : > /dit/tmp/reflect-report.real
         dit reflect
     fi
 }
@@ -54,8 +54,8 @@ PROMPT_OPTION(){
 }
 
 PROMPT_REPORT(){
-    if [ -s /dit/tmp/reflect-report.act ]; then
-        cat /dit/tmp/reflect-report.act
+    if [ -s /dit/tmp/reflect-report.real ]; then
+        cat /dit/tmp/reflect-report.real
     else
         echo 'd:?? h:??'
     fi
@@ -85,5 +85,5 @@ DIT_VERSION='1.0.0'
 if [ ! -s /dit/etc/dit_version ]; then
     . /dit/mnt/.dit_history > /dev/null
     history -r /dit/mnt/.dit_history
-    echo "${DIT_VERSION:-?.?.?}" > /dit/etc/dit_version
+    echo "dit version ${DIT_VERSION:-?.?.?}" > /dit/etc/dit_version
 fi

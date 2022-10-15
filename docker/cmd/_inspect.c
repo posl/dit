@@ -12,7 +12,6 @@
 
 #define SORTS_NUM 3
 
-#define INSP_HEADER_LEN 42
 #define INSP_EXCESS_STR " #EXCESS"
 
 
@@ -103,13 +102,8 @@ int inspect(int argc, char **argv){
     int i;
     insp_opts opt;
 
-    if ((i = __parse_opts(argc, argv, &opt))){
-        if (i > 0)
-            return 0;
-
-        xperror_suggestion(true);
-        return 1;
-    }
+    if ((i = __parse_opts(argc, argv, &opt)))
+        return (i < 0);
 
     setvbuf(stdout, NULL, _IOFBF, 0);
 
@@ -135,7 +129,7 @@ int inspect(int argc, char **argv){
 
         if (--argc){
             path = *(++argv);
-            putchar('\n');
+            fputc('\n', stdout);
         }
         else
             return exit_status;
@@ -205,6 +199,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 xperror_invalid_optarg(c, long_opts[i].name, optarg);
                 xperror_valid_args(sort_args, SORTS_NUM);
             default:
+                xperror_suggestion(true);
                 return -1;
         }
     }
@@ -554,13 +549,10 @@ static const char *__get_file_ext(const char *name){
  * @param[in]  opt  variable containing the result of option parse
  */
 static void __display_dir_tree(file_node *tree, insp_opts *opt){
-    const char header[INSP_HEADER_LEN] = " Permission      User     Group      Size";
-    puts(header);
-
-    for (int i = INSP_HEADER_LEN; i--;)
-        putchar('=');
-    putchar('\n');
-
+    fputs(
+        " Permission      User     Group      Size\n"
+        "==========================================\n"
+    , stdout);
     __display_recursive(tree, opt, 0);
 }
 
@@ -583,12 +575,8 @@ static void __display_recursive(file_node *file, insp_opts *opt, unsigned int de
         __print_file_group(file->gid, opt->numeric_id);
         __print_file_size(file->size);
     }
-    else {
-        putchar(' ');
-        for (i = 4; i--;)
-            fputs("       ???", stdout);
-    }
-    fputs("    ", stdout);
+    else
+        fputs("        ???       ???       ???       ???    ", stdout);
 
     if (depth){
         for (i = depth; --i;)
@@ -605,9 +593,9 @@ static void __display_recursive(file_node *file, insp_opts *opt, unsigned int de
         free(file->link_path);
     }
     else if (file->err_id)
-        printf("  (%s)", strerror(file->err_id));
+        fprintf(stdout, "  (%s)", strerror(file->err_id));
 
-    putchar('\n');
+    fputc('\n', stdout);
 
     if (file->children){
         i = 0;
@@ -651,7 +639,7 @@ static void __print_file_mode(mode_t mode){
     S[9] = (mode & S_ISVTX) ? ((mode & S_IXOTH) ? 't' : 'T') : ((mode & S_IXOTH) ? 'x' : '-');
     S[10] = '\0';
 
-    printf(" %s  ", S);
+    fprintf(stdout, " %s  ", S);
 }
 
 
@@ -668,17 +656,15 @@ static void __print_file_user(uid_t uid, bool numeric_id){
         if (! numeric_id){
             struct passwd *passwd;
             if ((passwd = getpwuid(uid)) && (strlen(passwd->pw_name) <= 8)){
-                printf("%8s", passwd->pw_name);
+                fprintf(stdout, "%8s  ", passwd->pw_name);
                 break;
             }
         }
         if (uid < 100000000)
-            printf("%8d", uid);
+            fprintf(stdout, "%8d  ", uid);
         else
-            fputs(INSP_EXCESS_STR, stdout);
+            fputs(INSP_EXCESS_STR "  ", stdout);
     } while (0);
-
-    fputs("  ", stdout);
 }
 
 
@@ -695,17 +681,15 @@ static void __print_file_group(gid_t gid, bool numeric_id){
         if (! numeric_id){
             struct group *group;
             if ((group = getgrgid(gid)) && (strlen(group->gr_name) <= 8)){
-                printf("%8s", group->gr_name);
+                fprintf(stdout, "%8s  ", group->gr_name);
                 break;
             }
         }
         if (gid < 100000000)
-            printf("%8d", gid);
+            fprintf(stdout, "%8d  ", gid);
         else
-            fputs(INSP_EXCESS_STR, stdout);
+            fputs(INSP_EXCESS_STR "  ", stdout);
     } while (0);
-
-    fputs("  ", stdout);
 }
 
 
@@ -718,7 +702,7 @@ static void __print_file_group(gid_t gid, bool numeric_id){
  */
 static void __print_file_size(off_t size){
     if (size < 1000)
-        printf("%6d B", (int) size);
+        fprintf(stdout, "%6d B    ", (int) size);
     else {
         int i = -1, rem;
         char *units = "kMGTPEZ";
@@ -731,10 +715,10 @@ static void __print_file_size(off_t size){
 
         if (i <= 6){
             rem /= 100;
-            printf("%3d.%1d %cB", (int) size, rem, units[i]);
+            fprintf(stdout, "%3d.%1d %cB    ", (int) size, rem, units[i]);
         }
         else
-            fputs(INSP_EXCESS_STR, stdout);
+            fputs(INSP_EXCESS_STR "    ", stdout);
     }
 }
 
@@ -750,6 +734,8 @@ static void __print_file_size(off_t size){
  */
 static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool color, bool classify){
     char *tmp;
+    char format[13] = "\033[%sm%s\033[0m ";
+
     tmp = name;
     while (*tmp){
         if (iscntrl(*tmp))
@@ -757,8 +743,8 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
         tmp++;
     }
 
-    if (color){
-        tmp =
+    tmp =
+        color ? (
             link_invalid ? "31" :
             S_ISREG(mode) ? (
                 (mode & S_ISUID) ? "37;41" :
@@ -778,21 +764,19 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
             S_ISFIFO(mode) ? "33" :
             S_ISLNK(mode) ? "1;36" :
             S_ISSOCK(mode) ? "1;35" :
-            "0";
-        printf("\033[%sm%s\033[0m", tmp, name);
-    }
-    else
-        fputs(name, stdout);
+            "0"
+        ) :
+        "0";
 
-    if (classify){
-        int indicator;
-        indicator =
+    format[11] =
+        classify ? (
             (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
             S_ISDIR(mode) ? '/' :
             S_ISFIFO(mode) ? '|' :
             S_ISSOCK(mode) ? '=' :
-            '\0';
-        if (indicator)
-            putchar(indicator);
-    }
+            '\0'
+        ) :
+        '\0';
+
+    fprintf(stdout, format, tmp, name);
 }

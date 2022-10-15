@@ -3,6 +3,6 @@
 
 
 int label(int argc, char **argv){
-    puts("label");
+    fputs("label\n", stdout);
     return 0;
 }
