@@ -169,7 +169,7 @@ static int __config_contents(int code, ...){
             }
 
             if (! has_arg)
-                fprintf(stdout, " d=%s\n h=%s\n", mode_reprs[mode2idx[mode2d]], mode_reprs[mode2idx[mode2h]]);
+                fprintf(stdout, "d=%s\nh=%s\n", mode_reprs[mode2idx[mode2d]], mode_reprs[mode2idx[mode2h]]);
         }
 
         if (has_arg){

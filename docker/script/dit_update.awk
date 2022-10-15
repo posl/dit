@@ -1,30 +1,31 @@
 BEGIN {
-    X = -1
+    N = 0
+    HNF = "/dit/tmp/last-history-number"
+    CLF = "/dit/tmp/last-command-line"
 }
 
 NR == 1 {
-    X = (((getline N < "/dit/tmp/last-history-number") > 0) && (N ~ /^[0-9]+$/) && (N < $1)) ? 0 : 1
+    N = $1
 
-    print $1 > "/dit/tmp/last-history-number"
-
-    if (X == 0){
-        $1 = ""
-        sub(/[ \t]*/, "", $0)
-        print $0 > "/dit/tmp/last-command-line"
+    if (((getline M < HNF) > 0) && (M ~ /^[0-9]+$/)){
+        if (M < N){
+            $1 = ""
+            sub(/[ \t]*/, "", $0)
+            print $0 > CLF
+            next
+        }
     }
-    else {
-        print " dit: invalid number of history" > "/dev/stderr"
-        exit 1
-    }
+    else
+        print "dit: cannot get the valid history number" > "/dev/stderr"
+    exit 1
 }
 
 NR != 1 {
-    print $0 >> "/dit/tmp/last-command-line"
+    print $0 >> CLF
 }
 
 END {
-    if (X < 0){
-        print 0 > "/dit/tmp/last-history-number"
+    print N > HNF
+    if (N == 0)
         exit 1
-    }
 }

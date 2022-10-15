@@ -139,7 +139,7 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
 void xperror_invalid_arg(int type, int code, ...){
     const char *adj;
     adj = (type ? ((type == -1) ? "ambiguous" : "invalid") : "unrecognized");
-    fprintf(stderr, " %s: %s ", program_name, adj);
+    fprintf(stderr, "%s: %s ", program_name, adj);
 
     const char *format;
     if (code){
@@ -166,7 +166,7 @@ void xperror_invalid_arg(int type, int code, ...){
  * @param[in]  size  array size
  */
 void xperror_valid_args(const char * const expected[], int size){
-    fputs(" Valid arguments are:\n", stderr);
+    fputs("Valid arguments are:\n", stderr);
     for (int i = 0; i < size; i++)
         fprintf(stderr, "   - '%s'\n", expected[i]);
 }
@@ -183,7 +183,7 @@ void xperror_valid_args(const char * const expected[], int size){
 void xperror_missing_args(const char *desc, const char *before_arg){
     if (! desc)
         desc = "'-d', '-h' or '--target' option";
-    fprintf(stderr, " %s: missing %s", program_name, desc);
+    fprintf(stderr, "%s: missing %s", program_name, desc);
 
     if (before_arg)
         fprintf(stderr, " after '%s'", before_arg);
@@ -201,7 +201,7 @@ void xperror_missing_args(const char *desc, const char *before_arg){
 void xperror_too_many_args(unsigned int limit){
     const char *adj;
     adj = limit ? "two or more" : "any";
-    fprintf(stderr, " %s: doesn't allow %s arguments\n", program_name, adj);
+    fprintf(stderr, "%s: doesn't allow %s arguments\n", program_name, adj);
 }
 
 
@@ -213,7 +213,7 @@ void xperror_too_many_args(unsigned int limit){
  * @param[in]  msg  the error message
  */
 void xperror_individually(const char *msg){
-    fprintf(stderr, " %s: %s", program_name, msg);
+    fprintf(stderr, "%s: %s", program_name, msg);
 }
 
 
@@ -223,7 +223,7 @@ void xperror_individually(const char *msg){
  * @param[in]  individual_flag  whether to suggest displaying the manual of each dit command
  */
 void xperror_suggestion(bool individual_flag){
-    fputs(" Try 'dit ", stderr);
+    fputs("Try 'dit ", stderr);
     if (individual_flag)
         fprintf(stderr, "%s --", program_name);
     fputs("help' for more information.\n", stderr);
@@ -447,11 +447,10 @@ int check_last_exit_status(){
     int i = -1;
 
     if ((fp = fopen(EXIT_STATUS_FILE, "r"))){
-        fscanf(fp, "%u", &i);
+        unsigned int u;
+        if ((fscanf(fp, "%u", &u) == 1) && (u < 256))
+            i = u;
         fclose(fp);
-
-        if (i > 255)
-            i = -1;
     }
     return i;
 }

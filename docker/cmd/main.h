@@ -39,6 +39,9 @@
 #define xperror_internal_file() xperror_individually("unexpected error while manipulating an internal file")
 
 
+typedef size_t (* fwork)(void *, size_t, size_t, FILE *);
+
+
 /******************************************************************************
     * Tool-specific Functions
 ******************************************************************************/

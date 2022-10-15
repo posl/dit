@@ -11,9 +11,9 @@
 #include "main.h"
 
 #define HELP_CONTS_NUM 3
-#define HELP_USAGES_STR " Usages:\n"
-#define HELP_OPTIONS_SYR " Options:\n"
-#define HELP_REMARKS_STR " Remarks:\n"
+#define HELP_USAGES_STR "Usages:\n"
+#define HELP_OPTIONS_SYR "Options:\n"
+#define HELP_REMARKS_STR "Remarks:\n"
 
 #define DOCKER_OR_HISTORY  "Dockerfile or history-file"
 #define WHEN_REFLECTING  "when reflecting a executed command line"
@@ -32,7 +32,14 @@ typedef enum {
 } help_conts;
 
 
-static int __parse_opts(int argc, char **argv, help_conts *opt);
+/** Data type for storing the results of option parse */
+typedef struct {
+    help_conts code;        /** serial number of the content displayed by help function */
+    int (* side_func)();    /** side function that may be executed by specifying certain options */
+} help_opts;
+
+
+static int __parse_opts(int argc, char **argv, help_opts *opt);
 static void __display_list();
 static int __display_exit_status();
 static int __display_version();
@@ -92,36 +99,41 @@ extern const char * const cmd_reprs[3];
  */
 int help(int argc, char **argv){
     int i;
-    help_conts code;
+    help_opts opt;
 
-    if ((i = __parse_opts(argc, argv, &code)))
-        return (i < 0);
+    if ((i = __parse_opts(argc, argv, &opt))){
+        if (! opt.side_func)
+            i = (i < 0);
+        else if ((i = (opt.side_func() < 0)))
+            xperror_internal_file();
+        return i;
+    }
 
     setvbuf(stdout, NULL, _IOFBF, 0);
 
-    int exit_status = 0;
+    const char *target = NULL;
     if ((argc -= optind) > 0){
         argv += optind;
-
-        char A[4] = "\n\n\n";
-        do {
-            if (__display_help(code, *argv))
-                exit_status = 1;
-
-            if (--argc){
-                argv++;
-                A[1] = (code != manual) ? '\0' : '\n';
-                fputs(A, stdout);
-                fflush(stdout);
-            }
-            else
-                break;
-        } while(1);
+        target = *argv;
     }
     else
-        __display_help(code, NULL);
+        argc = 1;
 
-    return exit_status;
+    int exit_status = 0;
+    char S[4] = "\n\n\n";
+
+    do {
+        exit_status |= __display_help(opt.code, target);
+
+        if (--argc){
+            target = *(++argv);
+            S[1] = (opt.code != manual) ? '\0' : '\n';
+            fputs(S, stdout);
+            fflush(stdout);
+        }
+        else
+            return exit_status;
+    } while (1);
 }
 
 
@@ -130,12 +142,12 @@ int help(int argc, char **argv){
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
- * @param[out] opt  variable to store serial number identifying the display content
+ * @param[out] opt  variable to store the results of option parse
  * @return int  0 (parse success), 1 (normally exit) or -1 (error exit)
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_opts(int argc, char **argv, help_conts *opt){
+static int __parse_opts(int argc, char **argv, help_opts *opt){
     const char *short_opts = "ademPV";
 
     const struct option long_opts[] = {
@@ -149,7 +161,8 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
         {  0,                  0,           0,    0  }
     };
 
-    *opt = manual;
+    opt->code = manual;
+    opt->side_func = NULL;
 
     int c;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0){
@@ -158,18 +171,20 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
                 __display_list();
                 return 1;
             case 'd':
-                *opt = description;
+                opt->code = description;
                 break;
             case 'e':
-                *opt = example;
+                opt->code = example;
                 break;
             case 'm':
-                *opt = manual;
+                opt->code = manual;
                 break;
             case 'P':
-                return __display_exit_status();
+                opt->side_func = __display_exit_status;
+                return 1;
             case 'V':
-                return __display_version();
+                opt->side_func = __display_version;
+                return 1;
             case 1:
                 help_manual();
                 return 1;
@@ -192,24 +207,19 @@ static void __display_list(){
     const int cmd_rearange[CMDS_NUM] = {5, 7, 3, 11, 9, 4, 12, 8, 2, 6, 0, 10, 1};
 
     for (int i = CMDS_NUM; i--;)
-        fprintf(stdout, " %s\n", cmd_reprs[cmd_rearange[i]]);
+        fprintf(stdout, "%s\n", cmd_reprs[cmd_rearange[i]]);
 }
 
 
 /**
  * @brief display the exit status of last executed command line.
  *
- * @return int  return value that can be used as the return value of '__parse_opts'
+ * @return int  positive integer (success) or -1 (unexpected error)
  */
 static int __display_exit_status(){
     int exit_status;
-    if ((exit_status = check_last_exit_status()) != -1){
-        fprintf(stdout, " %d\n", exit_status);
-        exit_status = 1;
-    }
-    else
-        xperror_internal_file();
-
+    if ((exit_status = check_last_exit_status()) >= 0)
+        fprintf(stdout, "%d\n", exit_status);
     return exit_status;
 }
 
@@ -217,7 +227,7 @@ static int __display_exit_status(){
 /**
  * @brief display the version of this tool.
  *
- * @return int  return value that can be used as the return value of '__parse_opts'
+ * @return int  0 (success) or -1 (unexpected error)
  *
  * @note this implementation is devised so that the beginning of the line is a space character.
  * @attention the version file must end with a newline character.
@@ -227,28 +237,13 @@ static int __display_version(){
     int i = -1;
 
     if ((fp = fopen(VERSION_FILE, "r"))){
-        char A[128] = " ", c;
-
-        do {
-            if (fscanf(fp, "%125[^\n]%n%c", (A + 1), &i, &c) == 2){
-                if (c == '\n'){
-                    A[++i] = '\n';
-                    A[++i] = '\0';
-                    c = ' ';
-                }
-                fputs(A, stdout);
-                *A = c;
-            }
-            else
-                break;
-        } while (1);
+        char S[128];
+        while (fgets(S, 128, fp))
+            fputs(S, stdout);
 
         fclose(fp);
-        i = 1;
+        i = 0;
     }
-    else
-        xperror_internal_file();
-
     return i;
 }
 
@@ -341,7 +336,7 @@ static int __display_help(help_conts code, const char *target){
     }
 
     if (code != manual)
-        fprintf(stdout, "  < %s >\n", topic);
+        fprintf(stdout, " < %s >\n", topic);
     help_func();
     return 0;
 }
@@ -357,32 +352,32 @@ static int __display_help(help_conts code, const char *target){
 static void __dit_manual(){
     fputs(
         HELP_USAGES_STR
-        "   dit [COMMAND] [ARG]...\n"
-        " Use the tool-specific functions corresponding to the specified COMMAND.\n"
+        "  dit [COMMAND] [ARG]...\n"
+        "Use the tool-specific functions corresponding to the specified COMMAND.\n"
         "\n"
-        " Commands:\n"
-        " main features of this tool:\n"
-        "   convert        show how a command line is reflected to "DOCKER_OR_HISTORY"\n"
-        "   optimize       do refactoring on Dockerfile based on its best practices\n"
+        "Commands:\n"
+        "main features of this tool:\n"
+        "  convert        show how a command line is reflected to "DOCKER_OR_HISTORY"\n"
+        "  optimize       do refactoring on Dockerfile based on its best practices\n"
         "\n"
-        " customization of tool settings:\n"
-        "   config         set the level of ignoring commands "WHEN_REFLECTING"\n"
-        "   ignore         edit set of commands that are ignored "WHEN_REFLECTING"\n"
+        "customization of tool settings:\n"
+        "  config         set the level of ignoring commands "WHEN_REFLECTING"\n"
+        "  ignore         edit set of commands that are ignored "WHEN_REFLECTING"\n"
         "\n"
-        " editing your Dockerfile:\n"
-        "   cp             copy files from the host environment, and reflect this as COPY/ADD instructions\n"
-        "   label          edit list of LABEL/EXPOSE instructions\n"
-        "   setcmd         set CMD/ENTRYPOINT instruction\n"
-        "   healthcheck    set HEALTHCHECK instruction\n"
-        "   onbuild        append ONBUILD instructions\n"
+        "editing your Dockerfile:\n"
+        "  cp             copy files from the host environment, and reflect this as COPY/ADD instructions\n"
+        "  label          edit list of LABEL/EXPOSE instructions\n"
+        "  setcmd         set CMD/ENTRYPOINT instruction\n"
+        "  healthcheck    set HEALTHCHECK instruction\n"
+        "  onbuild        append ONBUILD instructions\n"
         "\n"
-        " utilitys:\n"
-        "   reflect        append the contents of some files to "DOCKER_OR_HISTORY"\n"
-        "   erase          remove some lines from "DOCKER_OR_HISTORY"\n"
-        "   inspect        show some directory trees with details about each file\n"
-        "   help           show information for some dit commands\n"
+        "utilitys:\n"
+        "  reflect        append the contents of some files to "DOCKER_OR_HISTORY"\n"
+        "  erase          remove some lines from "DOCKER_OR_HISTORY"\n"
+        "  inspect        show some directory trees with details about each file\n"
+        "  help           show information for some dit commands\n"
         "\n"
-        " See 'dit help [OPTION]... [COMMAND]...' for details.\n"
+        "See 'dit help [OPTION]... [COMMAND]...' for details.\n"
     , stdout);
 }
 
@@ -390,137 +385,137 @@ static void __dit_manual(){
 void config_manual(){
     fputs(
         HELP_USAGES_STR
-        "   dit config [OPTION]... [MODE[,MODE]...]\n"
-        " Set the level at which commands that should not be reflected are ignored, used\n"
-        " "WHEN_REFLECTING" to "DOCKER_OR_HISTORY", individually.\n"
+        "  dit config [OPTION]... [MODE[,MODE]...]\n"
+        "Set the level at which commands that should not be reflected are ignored, used\n"
+        WHEN_REFLECTING" to "DOCKER_OR_HISTORY", individually.\n"
         "\n"
         HELP_OPTIONS_SYR
-        "   -r, --reset    reset each level with default value\n"
-        "       --help     " HELP_OPTION_DESC
+        "  -r, --reset    reset each level with default value\n"
+        "      --help     " HELP_OPTION_DESC
         "\n"
-        " Modes:\n"
-        "    0,  no-reflect    in the first place, do not reflect\n"
-        "    1,  strict        ignore all of them, strictly\n"
-        "    2,  normal        ignore them while respecting the dependencies between commands (default)\n"
-        "    3,  simple        ignore them only if the command line contains only one command\n"
-        "    4,  no-ignore     ignore nothing\n"
+        "Modes:\n"
+        "   0,  no-reflect    in the first place, do not reflect\n"
+        "   1,  strict        ignore all of them, strictly\n"
+        "   2,  normal        ignore them while respecting the dependencies between commands (default)\n"
+        "   3,  simple        ignore them only if the command line contains only one command\n"
+        "   4,  no-ignore     ignore nothing\n"
         "\n"
         HELP_REMARKS_STR
-        "   - If neither OPTION nor MODE is specified, display the current settings.\n"
-        "   - To specify a mode, you can use the above serial numbers and strings,\n"
-        "     and any of the strings "CAN_BE_TRUNCATED".\n"
-        "   - If you specify an underscore instead of a mode, the current settings is inherited.\n"
-        "   - Each MODE is one of the following formats, and targets the files listed on the right.\n"
-        "       <mode>           both files\n"
-        "       [bdh]=<mode>     'b' (both files), 'd' (Dockerfile), 'h' (history-file)\n"
-        "       [0-4_][0-4_]     first character (Dockerfile), second character (history-file)\n"
+        "  - If neither OPTION nor MODE is specified, display the current settings.\n"
+        "  - To specify a mode, you can use the above serial numbers and strings,\n"
+        "    and any of the strings "CAN_BE_TRUNCATED".\n"
+        "  - If you specify an underscore instead of a mode, the current settings is inherited.\n"
+        "  - Each MODE is one of the following formats, and targets the files listed on the right.\n"
+        "      <mode>           both files\n"
+        "      [bdh]=<mode>     'b' (both files), 'd' (Dockerfile), 'h' (history-file)\n"
+        "      [0-4_][0-4_]     first character (Dockerfile), second character (history-file)\n"
     , stdout);
 }
 
 
 void convert_manual(){
-    fputs(" convert manual\n", stdout);
+    fputs("convert manual\n", stdout);
 }
 
 
 void cp_manual(){
-    fputs(" cp manual\n", stdout);
+    fputs("cp manual\n", stdout);
 }
 
 
 void erase_manual(){
-    fputs(" erase manual\n", stdout);
+    fputs("erase manual\n", stdout);
 }
 
 
 void healthcheck_manual(){
-    fputs(" healthcheck manual\n", stdout);
+    fputs("healthcheck manual\n", stdout);
 }
 
 
 void help_manual(){
     fputs(
         HELP_USAGES_STR
-        "   dit help [OPTION]... [COMMAND]...\n"
-        " Show requested information for each specified dit COMMAND.\n"
+        "  dit help [OPTION]... [COMMAND]...\n"
+        "Show requested information for each specified dit COMMAND.\n"
         "\n"
         HELP_OPTIONS_SYR
-        "   -a, --all                 list all dit commands available" EXIT_NORMALLY
-        "   -d, --description         show the short descriptions\n"
-        "   -e, --example             show the examples of use\n"
-        "   -m, --manual              show the detailed manuals\n"
-        "   -P, --last-exit-status    display the exit status of last executed command line" EXIT_NORMALLY
-        "   -V, --version             display the version of this tool" EXIT_NORMALLY
-        "       --help                " HELP_OPTION_DESC
+        "  -a, --all                 list all dit commands available" EXIT_NORMALLY
+        "  -d, --description         show the short descriptions\n"
+        "  -e, --example             show the examples of use\n"
+        "  -m, --manual              show the detailed manuals\n"
+        "  -P, --last-exit-status    display the recorded exit status" EXIT_NORMALLY
+        "  -V, --version             display the version of this tool" EXIT_NORMALLY
+        "      --help                " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
-        "   - If no COMMANDs are specified, show information about the main interface of dit commands.\n"
-        "   - Each COMMAND "CAN_BE_TRUNCATED", in addition\n"
-        "     'config' and 'healthcheck' can be specified by 'cfg' and 'hc' respectively.\n"
-        "   - If neither '-dem' is specified, it operates as if '-m' is specified.\n"
-        "   - Each occurrence of '-dem' overrides the previous occurrence.\n"
+        "  - If no COMMANDs are specified, show information about the main interface of dit commands.\n"
+        "  - Each COMMAND "CAN_BE_TRUNCATED", in addition\n"
+        "    'config' and 'healthcheck' can be specified by 'cfg' and 'hc' respectively.\n"
+        "  - If neither '-dem' is specified, it operates as if '-m' is specified.\n"
+        "  - Each occurrence of '-dem' overrides the previous occurrence.\n"
     , stdout);
 }
 
 
 void ignore_manual(){
-    fputs(" ignore manual\n", stdout);
+    fputs("ignore manual\n", stdout);
 }
 
 
 void inspect_manual(){
     fputs(
         HELP_USAGES_STR
-        "   dit inspect [OPTION]... [DIRECTORY]...\n"
-        " List information about the files under each specified DIRECTORY in a tree format.\n"
+        "  dit inspect [OPTION]... [DIRECTORY]...\n"
+        "List information about the files under each specified DIRECTORY in a tree format.\n"
         "\n"
         HELP_OPTIONS_SYR
-        "   -C, --color              colorize file name to distinguish file types\n"
-        "   -F, --classify           append indicator (one of '*/=|') to each file name:\n"
-        "                              to executable file, directory, socket or fifo, in order\n"
-        "   -n, --numeric-uid-gid    list the corresponding IDs instead of user or group name\n"
-        "   -S                       sort by file size, largest first\n"
-        "   -X                       sort by file extension, alphabetically\n"
-        "       --sort=WORD          replace file sorting method:\n"
-        "                              name (default), size (-S), extension (-X)\n"
-        "       --help               " HELP_OPTION_DESC
+        "  -C, --color              colorize file name to distinguish file types\n"
+        "  -F, --classify           append indicator (one of '*/=|') to each file name:\n"
+        "                             to executable file, directory, socket or fifo, in order\n"
+        "  -n, --numeric-uid-gid    list the corresponding IDs instead of user or group name\n"
+        "  -S                       sort by file size, largest first\n"
+        "  -X                       sort by file extension, alphabetically\n"
+        "      --sort=WORD          replace file sorting method:\n"
+        "                             name (default), size (-S), extension (-X)\n"
+        "      --help               " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
-        "   - If no DIRECTORYs are specified, it operates as if the current directory is specified.\n"
-        "   - The WORD argument for '--sort' "CAN_BE_TRUNCATED".\n"
-        "   - User or group name longer than 8 characters are converted to the corresponding ID,\n"
-        "     and the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
-        "   - The units of file size are 'k,M,G,T,P,E,Z', which is powers of 1000.\n"
-        "   - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n"
+        "  - If no DIRECTORYs are specified, it operates as if the current directory is specified.\n"
+        "  - The WORD argument for '--sort' "CAN_BE_TRUNCATED".\n"
+        "  - User or group name longer than 8 characters are converted to the corresponding ID,\n"
+        "    and the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
+        "  - The units of file size are 'k,M,G,T,P,E,Z', which is powers of 1000.\n"
+        "  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n"
         "\n"
-        " The above options are similar to the 'ls' command which is a GNU one.\n"
-        " See that man page for details.\n"
+        "The above options are similar to the 'ls' command which is a GNU one.\n"
+        "See that man page for details.\n"
     , stdout);
 }
 
 
 void label_manual(){
-    fputs(" label manual\n", stdout);
+    fputs("label manual\n", stdout);
 }
 
 
 void onbuild_manual(){
-    fputs(" onbuild manual\n", stdout);
+    fputs("onbuild manual\n", stdout);
 }
 
 
 void optimize_manual(){
-    fputs(" optimize manual\n", stdout);
+    fputs("optimize manual\n", stdout);
 }
 
 
 void reflect_manual(){
-    fputs(" reflect manual\n", stdout);
+    fputs("reflect manual\n", stdout);
 }
 
 
 void setcmd_manual(){
-    fputs(" setcmd manual\n", stdout);
+    fputs("setcmd manual\n", stdout);
 }
 
 
@@ -533,85 +528,85 @@ void setcmd_manual(){
 
 static void __dit_description(){
     fputs(
-        " Use the tool-specific functions as the subcommand.\n"
+        "Use the tool-specific functions as the subcommand.\n"
     , stdout);
 }
 
 static void __config_description(){
     fputs(
-        " Set the level at which commands are reflected to "DOCKER_OR_HISTORY", individually.\n"
+        "Set the level at which commands are reflected to "DOCKER_OR_HISTORY", individually.\n"
     , stdout);
 }
 
 static void __convert_description(){
     fputs(
-        " Show how a command line is transformed for reflection to the "DOCKER_OR_HISTORY".\n"
+        "Show how a command line is transformed for reflection to the "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
 static void __cp_description(){
     fputs(
-        " Perform processing equivalent to COPY/ADD instructions, and reflect this to Dockerfile.\n"
+        "Perform processing equivalent to COPY/ADD instructions, and reflect this to Dockerfile.\n"
     , stdout);
 }
 
 static void __erase_description(){
     fputs(
-        " Remove the lines that match some conditions from "DOCKER_OR_HISTORY".\n"
+        "Remove the lines that match some conditions from "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
 static void __healthcheck_description(){
     fputs(
-        " Set HEALTHCHECK instruction in Dockerfile.\n"
+        "Set HEALTHCHECK instruction in Dockerfile.\n"
     , stdout);
 }
 
 static void __help_description(){
     fputs(
-        " Show requested information for some dit commands.\n"
+        "Show requested information for some dit commands.\n"
     , stdout);
 }
 
 static void __ignore_description(){
     fputs(
-        " Edit set of commands that should not be reflected to "DOCKER_OR_HISTORY", individually.\n"
+        "Edit set of commands that should not be reflected to "DOCKER_OR_HISTORY", individually.\n"
     , stdout);
 }
 
 static void __inspect_description(){
     fputs(
-        " List information about the files under some directories in a tree format.\n"
+        "List information about the files under some directories in a tree format.\n"
     , stdout);
 }
 
 static void __label_description(){
     fputs(
-        " Edit list of LABEL/EXPOSE instructions in Dockerfile.\n"
+        "Edit list of LABEL/EXPOSE instructions in Dockerfile.\n"
     , stdout);
 }
 
 static void __onbuild_description(){
     fputs(
-        " Append ONBUILD instructions in Dockerfile.\n"
+        "Append ONBUILD instructions in Dockerfile.\n"
     , stdout);
 }
 
 static void __optimize_description(){
     fputs(
-        " Generate Dockerfile as the result of refactoring based on its best practices.\n"
+        "Generate Dockerfile as the result of refactoring based on its best practices.\n"
     , stdout);
 }
 
 static void __reflect_description(){
     fputs(
-        " Append the contents of some files to "DOCKER_OR_HISTORY".\n"
+        "Append the contents of some files to "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
 static void __setcmd_description(){
     fputs(
-        " Set CMD/ENTRYPOINT instruction in Dockerfile.\n"
+        "Set CMD/ENTRYPOINT instruction in Dockerfile.\n"
     , stdout);
 }
 
@@ -624,85 +619,85 @@ static void __setcmd_description(){
 
 
 static void __dit_example(){
-    fputs(" dit example\n", stdout);
+    fputs("dit example\n", stdout);
 }
 
 
 static void __config_example(){
     fputs(
-        " dit config                 Display the current settings.\n"
-        " dit config no-reflect      Replace the settings with 'd=no-reflect h=no-reflect'.\n"
-        " dit config d=st,h=no-ig    Replace the settings with 'd=strict h=no-ignore'.\n"
-        " dit config -r _3           Reset the settings, and replace the setting of 'h' with 'simple'.\n"
+        "dit config                 Display the current settings.\n"
+        "dit config no-reflect      Replace the settings with 'd=no-reflect h=no-reflect'.\n"
+        "dit config d=st,h=no-ig    Replace the settings with 'd=strict h=no-ignore'.\n"
+        "dit config -r _3           Reset the settings, and replace the setting of 'h' with 'simple'.\n"
     , stdout);
 }
 
 
 static void __convert_example(){
-    fputs(" convert example\n", stdout);
+    fputs("convert example\n", stdout);
 }
 
 
 static void __cp_example(){
-    fputs(" cp example\n", stdout);
+    fputs("cp example\n", stdout);
 }
 
 
 static void __erase_example(){
-    fputs(" erase example\n", stdout);
+    fputs("erase example\n", stdout);
 }
 
 
 static void __healthcheck_example(){
-    fputs(" healthcheck example\n", stdout);
+    fputs("healthcheck example\n", stdout);
 }
 
 
 static void __help_example(){
     fputs(
-        " dit help              Display the detailed manual for the main interface of dit commands.\n"
-        " dit help -e inspect   Display the example of use for 'inspect'.\n"
-        " dit help -d cfg ig    Display the short description for 'config' and 'ignore' respectively.\n"
-        " dit help -a           List all dit commands available.\n"
+        "dit help              Display the detailed manual for the main interface of dit commands.\n"
+        "dit help -e inspect   Display the example of use for 'inspect'.\n"
+        "dit help -d cfg ig    Display the short description for 'config' and 'ignore' respectively.\n"
+        "dit help -a           List all dit commands available.\n"
     , stdout);
 }
 
 
 static void __ignore_example(){
-    fputs(" ignore example\n", stdout);
+    fputs("ignore example\n", stdout);
 }
 
 
 static void __inspect_example(){
     fputs(
-        " dit inspect -S                 List files under the current directory sorted by their size.\n"
-        " dit inspect --sort=ext /dit    List files under '/dit' sorted by their extension.\n"
-        " dit inspect -CF /dev           List files under '/dev', decorating their name.\n"
-        " dit inspect /bin /sbin         List files under '/bin' and '/sbin' respectively.\n"
+        "dit inspect -S                 List files under the current directory sorted by their size.\n"
+        "dit inspect --sort=ext /dit    List files under '/dit' sorted by their extension.\n"
+        "dit inspect -CF /dev           List files under '/dev', decorating their name.\n"
+        "dit inspect /bin /sbin         List files under '/bin' and '/sbin' respectively.\n"
     , stdout);
 }
 
 
 static void __label_example(){
-    fputs(" label example\n", stdout);
+    fputs("label example\n", stdout);
 }
 
 
 static void __onbuild_example(){
-    fputs(" onbuild example\n", stdout);
+    fputs("onbuild example\n", stdout);
 }
 
 
 static void __optimize_example(){
-    fputs(" optimize example\n", stdout);
+    fputs("optimize example\n", stdout);
 }
 
 
 static void __reflect_example(){
-    fputs(" reflect example\n", stdout);
+    fputs("reflect example\n", stdout);
 }
 
 
 static void __setcmd_example(){
-    fputs(" setcmd example\n", stdout);
+    fputs("setcmd example\n", stdout);
 }

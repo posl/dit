@@ -107,16 +107,13 @@ int inspect(int argc, char **argv){
 
     setvbuf(stdout, NULL, _IOFBF, 0);
 
-    const char *path;
-    if (argc <= optind){
-        argc = 1;
-        path = ".";
-    }
-    else {
-        argc -= optind;
+    const char *path = ".";
+    if ((argc -= optind) > 0){
         argv += optind;
         path = *argv;
     }
+    else
+        argc = 1;
 
     file_node *tree;
     int exit_status = 0;
@@ -133,7 +130,7 @@ int inspect(int argc, char **argv){
         }
         else
             return exit_status;
-    } while(1);
+    } while (1);
 }
 
 
@@ -550,8 +547,8 @@ static const char *__get_file_ext(const char *name){
  */
 static void __display_dir_tree(file_node *tree, insp_opts *opt){
     fputs(
-        " Permission      User     Group      Size\n"
-        "==========================================\n"
+        "Permission      User     Group      Size\n"
+        "=========================================\n"
     , stdout);
     __display_recursive(tree, opt, 0);
 }
@@ -576,7 +573,7 @@ static void __display_recursive(file_node *file, insp_opts *opt, unsigned int de
         __print_file_size(file->size);
     }
     else
-        fputs("        ???       ???       ???       ???    ", stdout);
+        fputs("       ???       ???       ???       ???    ", stdout);
 
     if (depth){
         for (i = depth; --i;)
@@ -639,7 +636,7 @@ static void __print_file_mode(mode_t mode){
     S[9] = (mode & S_ISVTX) ? ((mode & S_IXOTH) ? 't' : 'T') : ((mode & S_IXOTH) ? 'x' : '-');
     S[10] = '\0';
 
-    fprintf(stdout, " %s  ", S);
+    fprintf(stdout, "%s  ", S);
 }
 
 

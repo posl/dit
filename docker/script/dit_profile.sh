@@ -69,7 +69,9 @@ if ( unset PROMPT_COMMAND 2> /dev/null ); then
     readonly PROMPT_COMMAND
 fi
 
-PS1='\[\e[1;32m\][\[\e[m\]''$( PROMPT_REPORT )''\[\e[1;32m\]]\[\e[m\]'' \u:\w \[\e[1;32m\]\$ \[\e[m\]'
+CB='\[\e[1;32m\]'
+CE='\[\e[m\]'
+PS1="${CB}"' ['"${CE}"'$( PROMPT_REPORT )'"${CB}"'] '"${CE}"'\u:\w '"${CB}"'\$ '"${CE}"
 
 export PROMPT_COMMAND
 export PS1

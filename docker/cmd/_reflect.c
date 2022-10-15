@@ -160,7 +160,17 @@ static int __determine_reflect(){
 ******************************************************************************/
 
 
-int read_temporary_report(){
+
+int manage_provisional_report(unsigned short *ABC){
+    static FILE *fp = NULL;
+    if (fp || (fp = fopen(REFLECT_FILE_P, "rb"))){
+        fread(ABC, sizeof(unsigned short), 2, fp);
+    }
+}
+
+
+
+int write_temporary_report(){
 
 }
 
