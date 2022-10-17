@@ -15,8 +15,6 @@
 
 static int (* const __get_dit_cmd(const char *target))(int, char **);
 
-static int __strcmp_forward_match(const char *target, const char *expected, int upper_flag);
-
 
 /** array of strings representing each dit command in alphabetical order */
 const char * const cmd_reprs[CMDS_NUM] = {
@@ -76,6 +74,8 @@ static const char *program_name;
  * @return int  command's exit status
  */
 int main(int argc, char **argv){
+    const char *desc = "command";
+
     if (--argc > 0){
         program_name = *(++argv);
 
@@ -83,11 +83,15 @@ int main(int argc, char **argv){
         if ((cmd = __get_dit_cmd(program_name)))
             return cmd(argc, argv);
 
-        fprintf(stderr, " dit: '%s' is not a dit command\n", program_name);
+        const char *arg;
+        arg = program_name;
+        program_name = *(--argv);
+        xperror_invalid_arg('C', 1, desc, arg);
     }
-    else
-        fputs(" dit: requires a dit command\n", stderr);
-
+    else {
+        program_name = *argv;
+        xperror_missing_args(desc, NULL);
+    }
     xperror_suggestion(false);
     return 1;
 }
@@ -96,7 +100,7 @@ int main(int argc, char **argv){
 /**
  * @brief extract the corresponding dit command.
  *
- * @param[in]  target  string that is the first argument passed on the command line
+ * @param[in]  target  target string
  * @return int(* const)(int, char**)  function of the desired dit command or NULL
  */
 static int (* const __get_dit_cmd(const char *target))(int, char **){
@@ -131,31 +135,30 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
 /**
  * @brief print an error message about invalid argument to stderr.
  *
- * @param[in]  type  error type (0 (unrecognized), -1 (ambiguous) or others (invalid))
- * @param[in]  code  error code (0 (for optarg), positive (for number) or negative (for cmdarg))
+ * @param[in]  code  error code ('O' (for optarg), 'N' (for number) or 'C' (for cmdarg))
+ * @param[in]  state  error state (0 (unrecognized), -1 (ambiguous) or others (invalid))
+ * @param[in]  desc  the description for the argument
+ * @param[in]  arg  actual argument passed on the command line
  *
- * @note the return value of 'receive_expected_string' can be used as it is for the error code.
+ * @note the return value of 'receive_expected_string' can be used as it is for 'state'.
  */
-void xperror_invalid_arg(int type, int code, ...){
-    const char *adj;
-    adj = (type ? ((type == -1) ? "ambiguous" : "invalid") : "unrecognized");
-    fprintf(stderr, "%s: %s ", program_name, adj);
+void xperror_invalid_arg(int code, int state, const char * restrict desc, const char * restrict arg){
+    const char *format = "", *addition = "", *adjective;
 
-    const char *format;
-    if (code){
-        if (code > 0)
-            fputs("number of ", stderr);
-        format = "%s: '%s'";
+    switch (code){
+        case 'O':
+            format = "%s: %s argument '%s' for '--%s'\n";
+            addition = arg;
+            break;
+        case 'N':
+            addition = " number of";
+        case 'C':
+            format = "%s: %s%s %s: '%s'\n";
+            break;
     }
-    else
-        format = "argument '%s' for '--%s'";
+    adjective = (state ? ((state == -1) ? "ambiguous" : "invalid") : "unrecognized");
 
-    va_list sp;
-    va_start(sp, code);
-    vfprintf(stderr, format, sp);
-    va_end(sp);
-
-    fputc('\n', stderr);
+    fprintf(stderr, format, program_name, adjective, addition, desc, arg);
 }
 
 
@@ -165,10 +168,10 @@ void xperror_invalid_arg(int type, int code, ...){
  * @param[in]  expected  array of expected string
  * @param[in]  size  array size
  */
-void xperror_valid_args(const char * const expected[], int size){
+void xperror_valid_args(const char * const expected[], size_t size){
     fputs("Valid arguments are:\n", stderr);
     for (int i = 0; i < size; i++)
-        fprintf(stderr, "   - '%s'\n", expected[i]);
+        fprintf(stderr, "  - '%s'\n", expected[i]);
 }
 
 
@@ -177,17 +180,27 @@ void xperror_valid_args(const char * const expected[], int size){
 /**
  * @brief print an error message to stderr that some arguments are missing.
  *
- * @param[in]  desc  a description for the arguments
- * @param[in]  before_arg  the string previously specified as an argument, if any
+ * @param[in]  desc  the description for the arguments or NULL
+ * @param[in]  before_arg  the immediately preceding argument, if any
+ *
+ * @note if 'desc' is NULL, print an error message about specifying the target file.
  */
-void xperror_missing_args(const char *desc, const char *before_arg){
-    if (! desc)
-        desc = "'-d', '-h' or '--target' option";
-    fprintf(stderr, "%s: missing %s", program_name, desc);
+void xperror_missing_args(const char * restrict desc, const char * restrict before_arg){
+    char format[] = "%s: missing %s operand after '%s'\n";
+    int offset = 0;
 
-    if (before_arg)
-        fprintf(stderr, " after '%s'", before_arg);
-    fputc('\n', stderr);
+    if (! desc){
+        desc = "'-d', '-h' or '--target' option";
+        offset = 14;
+    }
+    else if (! before_arg)
+        offset = 22;
+
+    if (offset){
+        format[offset++] = '\n';
+        format[offset] = '\0';
+    }
+    fprintf(stderr, format, program_name, desc, before_arg);
 }
 
 
@@ -199,34 +212,42 @@ void xperror_missing_args(const char *desc, const char *before_arg){
  * @attention if limit is 2 or more, it does not work as expected.
  */
 void xperror_too_many_args(unsigned int limit){
-    const char *adj;
-    adj = limit ? "two or more" : "any";
-    fprintf(stderr, "%s: doesn't allow %s arguments\n", program_name, adj);
+    const char *adjective;
+    adjective = limit ? "two or more" : "any";
+    fprintf(stderr, "%s: doesn't allow %s arguments\n", program_name, adjective);
 }
 
 
 
 
 /**
- * @brief print the specified error message to stderr, along with the program name.
+ * @brief print the specified error message to stderr.
  *
  * @param[in]  msg  the error message
+ * @param[in]  addition  additional information, if any
  */
-void xperror_individually(const char *msg){
-    fprintf(stderr, "%s: %s", program_name, msg);
+void xperror_message(const char * restrict msg, const char * restrict addition){
+    const char *format = "%s: %s: %s\n";
+    if (! addition){
+        format += 4;
+        addition = msg;
+    }
+    fprintf(stderr, format, program_name, addition, msg);
 }
 
 
 /**
  * @brief print a suggenstion message to stderr.
  *
- * @param[in]  individual_flag  whether to suggest displaying the manual of each dit command
+ * @param[in]  cmd_flag  whether to suggest displaying the manual of each dit command
  */
-void xperror_suggestion(bool individual_flag){
-    fputs("Try 'dit ", stderr);
-    if (individual_flag)
-        fprintf(stderr, "%s --", program_name);
-    fputs("help' for more information.\n", stderr);
+void xperror_suggestion(bool cmd_flag){
+    const char *tmp1 = "", *tmp2 = "";
+    if (cmd_flag){
+        tmp1 = program_name;
+        tmp2 = " --";
+    }
+    fprintf(stderr, "Try 'dit %s%shelp' for more information.\n", tmp1, tmp2);
 }
 
 
@@ -243,12 +264,10 @@ void xperror_suggestion(bool individual_flag){
  * @param[in]  src  string you want to make a copy of in the heap area
  * @param[in]  n  the length of string
  * @return char*  string copied in the heap area or NULL
- *
- * @note considering the possibility that 'size_t' is not unsigned type.
  */
 char *xstrndup(const char *src, size_t n){
-    char *dest = NULL;
-    if ((n >= 0) && (dest = (char *) malloc(sizeof(char) * (n + 1)))){
+    char *dest;
+    if ((dest = (char *) malloc(sizeof(char) * (n + 1)))){
         char *tmp;
         tmp = dest;
 
@@ -269,36 +288,11 @@ char *xstrndup(const char *src, size_t n){
  *
  * @attention expected string must not contain lowercase letters.
  */
-int strcmp_upper_case(const char *target, const char *expected){
+int strcmp_upper_case(const char * restrict target, const char * restrict expected){
     int c;
     while (! (c = toupper(*target) - *(expected++)))
         if (! *(target++))
             return 0;
-
-    return c;
-}
-
-
-/**
- * @brief determine if the first string forwardly matches the second string.
- *
- * @param[in]  target  target string
- * @param[in]  expected  expected string
- * @param[in]  upper_flag  whether to capitalize all of the characters in target string
- * @return int  comparison result
- */
-static int __strcmp_forward_match(const char *target, const char *expected, int upper_flag){
-    int c;
-    do {
-        if (! *target)
-            return 0;
-        if (! *expected)
-            return 1;
-
-        c = *(target++);
-        if (upper_flag)
-            c = toupper(c);
-    } while (! (c -= *(expected++)));
 
     return c;
 }
@@ -350,63 +344,64 @@ int receive_positive_integer(const char *target){
  * @note make efficient by applying binary search sequentially from the first character of target string.
  * @attention array of expected string must be pre-sorted alphabetically.
  */
-int receive_expected_string(const char *target, const char * const expected[], int size, int mode){
-    if (target){
+int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode){
+    if (target && (size > 0)){
         const char *A[size];
         memcpy(A, expected, size * sizeof(const char *));
 
+        bool bin_search = true, break_flag = false;
         int c, min, max, mid, tmp;
+
         min = 0;
         max = size - 1;
+        tmp = -max;
 
-        if ((c = *target)){
+        while ((c = *(target++))){
             if (mode & 1)
                 c = toupper(c);
 
-            while (min < max){
-                mid = (min + max) / 2;
+            while (bin_search){
+                if (tmp){
+                    if (tmp < 0){
+                        mid = (min + max) / 2;
 
-                if ((tmp = *(A[mid]++))){
-                    tmp -= c;
-                    if (tmp){
-                        if (tmp < 0)
-                            min = mid + 1;
-                        else
-                            max = mid - 1;
-                    }
-                    else {
-                        tmp = mid;
-                        while ((--tmp >= min) && (c == *(A[tmp]++)));
-                        min = tmp + 1;
+                        tmp = *(A[mid]++) - c;
+                        if (tmp){
+                            if (tmp < 0)
+                                min = mid + 1;
+                            else
+                                max = mid - 1;
+                        }
+                        else {
+                            tmp = mid;
+                            while ((--tmp >= min) && (c == *(A[tmp]++)));
+                            min = ++tmp;
 
-                        tmp = mid;
-                        while ((++tmp <= max) && (c == *(A[tmp]++)));
-                        max = tmp - 1;
+                            tmp = mid;
+                            while ((++tmp <= max) && (c == *(A[tmp]++)));
+                            max = --tmp;
 
-                        if (! (c = *(++target)))
+                            break_flag = true;
+                        }
+
+                        tmp = min - max;
+                        if (break_flag)
                             break;
-                        if (mode & 1)
-                            c = toupper(c);
                     }
+                    else
+                        return -2;
                 }
                 else
-                    min = mid + 1;
+                    bin_search = false;
             }
+
+            if (break_flag)
+                break_flag = false;
+            else if (c != *(A[min]++))
+                return -2;
         }
 
-        if (min == max){
-            tmp =
-                (mode & 2) ? __strcmp_forward_match(target, A[min], (mode & 1)) :
-                (mode & 1) ? strcmp_upper_case(target, A[min]) :
-                strcmp(target, A[min]);
-
-            if (! tmp)
-                return min;
-        }
-        else if (min < max)
-            return -1;
-
-        return -2;
+        return (! tmp) ? (((mode & 2) || (! *(A[min]))) ? min : -2) : -1;
     }
     return -3;
 }
@@ -420,20 +415,14 @@ int receive_expected_string(const char *target, const char * const expected[], i
 
 
 /**
- * @brief check if the specified file is empty.
+ * @brief check if the specified file is not empty.
  *
  * @param[in]  file_name  target file name
- * @return bool  isempty or not
+ * @return int  0 (is empty), 1 (is not empty) or -1 (unexpected error)
  */
-bool check_file_isempty(const char *file_name){
+int check_file_size(const char *file_name){
     struct stat file_stat;
-    if (! lstat(file_name, &file_stat)){
-        if (! file_stat.st_size)
-            return true;
-    }
-    else
-        xperror_standards();
-    return false;
+    return (! lstat(file_name, &file_stat)) ? (!! file_stat.st_size) : -1;
 }
 
 
@@ -448,7 +437,7 @@ int check_last_exit_status(){
 
     if ((fp = fopen(EXIT_STATUS_FILE, "r"))){
         unsigned int u;
-        if ((fscanf(fp, "%u", &u) == 1) && (u < 256))
+        if ((fscanf(fp, "%u", &u) == 1) && (! (u >> 8)))
             i = u;
         fclose(fp);
     }

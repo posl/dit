@@ -61,7 +61,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt);
 static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt);
 static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, qcmp comp);
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
-static file_node *__new_file(char *path, char *name);
+static file_node *__new_file(char * restrict path, char * restrict name);
 static bool __append_file(file_node *tree, file_node *file);
 
 static int __qcmp_name(const void *a, const void *b);
@@ -75,10 +75,9 @@ static const char *__get_file_ext(const char *name);
 static void __display_dir_tree(file_node *tree, insp_opts *opt);
 static void __display_recursive(file_node *file, insp_opts *opt, unsigned int depth);
 static void __print_file_mode(mode_t mode);
-static void __print_file_user(uid_t uid, bool numeric_id);
-static void __print_file_group(gid_t gid, bool numeric_id);
+static void __print_file_owner(file_node *file, bool numeric_id);
 static void __print_file_size(off_t size);
-static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool color, bool classify);
+static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag);
 
 
 
@@ -193,7 +192,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                     opt->comp = (c ? ((c == 1) ? __qcmp_name : __qcmp_size) : __qcmp_ext);
                     break;
                 }
-                xperror_invalid_optarg(c, long_opts[i].name, optarg);
+                xperror_invalid_arg('O', c, long_opts[i].name, optarg);
                 xperror_valid_args(sort_args, SORTS_NUM);
             default:
                 xperror_suggestion(true);
@@ -222,7 +221,7 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
     file_node *tree = NULL;
 
     size_t path_len;
-    if ((path_len = strlen(base_path)) > 0){
+    if (base_path && ((path_len = strlen(base_path)) > 0)){
         inf_path ipath;
         ipath.max = 1024;
 
@@ -337,7 +336,7 @@ static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
  * @param[in]  name  name of the file we are currently looking at
  * @return file_node*  new element that makes up the directory tree
  */
-static file_node *__new_file(char *path, char *name){
+static file_node *__new_file(char * restrict path, char * restrict name){
     file_node *file;
     if ((file = (file_node *) malloc(sizeof(file_node)))){
         file->name = name;
@@ -362,7 +361,7 @@ static file_node *__new_file(char *path, char *name){
             file->mode = file_stat.st_mode;
             file->uid = file_stat.st_uid;
             file->gid = file_stat.st_gid;
-            file->size = file_stat.st_size;
+            file->size = (file_stat.st_size > 0) ? file_stat.st_size : 0;
 
             if (S_ISLNK(file->mode)){
                 char *link_path;
@@ -568,8 +567,7 @@ static void __display_recursive(file_node *file, insp_opts *opt, unsigned int de
 
     if (! (file->err_id && file->noinfo)){
         __print_file_mode(file->mode);
-        __print_file_user(file->uid, opt->numeric_id);
-        __print_file_group(file->gid, opt->numeric_id);
+        __print_file_owner(file, opt->numeric_id);
         __print_file_size(file->size);
     }
     else
@@ -581,12 +579,11 @@ static void __display_recursive(file_node *file, insp_opts *opt, unsigned int de
         fputs("|-- ", stdout);
     }
 
-    __print_file_name(file->name, file->mode, file->link_invalid, opt->color, opt->classify);
+    __print_file_name(file, opt, false);
     free(file->name);
 
     if (file->link_path){
-        fputs(" -> ", stdout);
-        __print_file_name(file->link_path, file->link_mode, file->link_invalid, opt->color, opt->classify);
+        __print_file_name(file, opt, true);
         free(file->link_path);
     }
     else if (file->err_id)
@@ -641,52 +638,41 @@ static void __print_file_mode(mode_t mode){
 
 
 /**
- * @brief display file user on screen.
+ * @brief display file owner on screen.
  *
- * @param[in]  uid  file uid
+ * @param[in]  file the file we are currently trying to display
  * @param[in]  numeric_id  whether to represent users and groups numerically
  *
- * @attention if the uid exceeds 8 digits, print a string that represents a numeric excess.
+ * @attention if the id exceeds 8 digits, print a string that represents a numeric excess.
  */
-static void __print_file_user(uid_t uid, bool numeric_id){
-    do {
-        if (! numeric_id){
-            struct passwd *passwd;
-            if ((passwd = getpwuid(uid)) && (strlen(passwd->pw_name) <= 8)){
-                fprintf(stdout, "%8s  ", passwd->pw_name);
-                break;
-            }
-        }
-        if (uid < 100000000)
-            fprintf(stdout, "%8d  ", uid);
-        else
-            fputs(INSP_EXCESS_STR "  ", stdout);
-    } while (0);
-}
+static void __print_file_owner(file_node *file, bool numeric_id){
+    int i = 1;
+    unsigned int id;
+    struct passwd *passwd;
+    struct group *group;
+    const char *tmp = NULL;
 
-
-/**
- * @brief display file group on screen.
- *
- * @param[in]  gid  file gid
- * @param[in]  numeric_id  whether to represent users and groups numerically
- *
- * @attention if the gid exceeds 8 digits, print a string that represents a numeric excess.
- */
-static void __print_file_group(gid_t gid, bool numeric_id){
     do {
-        if (! numeric_id){
-            struct group *group;
-            if ((group = getgrgid(gid)) && (strlen(group->gr_name) <= 8)){
-                fprintf(stdout, "%8s  ", group->gr_name);
-                break;
-            }
+        if (i){
+            id = file->uid;
+            if ((! numeric_id) && (passwd = getpwuid(id)))
+                tmp = passwd->pw_name;
         }
-        if (gid < 100000000)
-            fprintf(stdout, "%8d  ", gid);
-        else
-            fputs(INSP_EXCESS_STR "  ", stdout);
-    } while (0);
+        else {
+            id = file->gid;
+            if ((! numeric_id) && (group = getgrgid(id)))
+                tmp = group->gr_name;
+        }
+
+        if (! (tmp && (strlen(tmp) <= 8))){
+            if (id < 100000000){
+                fprintf(stdout, "%8u  ", id);
+                continue;
+            }
+            tmp = INSP_EXCESS_STR;
+        }
+        fprintf(stdout, "%8s  ", tmp);
+    } while (i--);
 }
 
 
@@ -723,15 +709,24 @@ static void __print_file_size(off_t size){
 /**
  * @brief display file name on screen.
  *
- * @param[out] name  file name
- * @param[in]  mode  file mode
- * @param[in]  link_invalid  whether file name is relative to a file that is an invalid symlink
- * @param[in]  color  whether to colorize file name based on file mode
- * @param[in]  classify  whether to append indicator to file name based on file mode
+ * @param[in]  file  the file we are currently trying to display
+ * @param[in]  opt  variable containing the result of option parse
+ * @param[in]  link_flag  whether or not to display the information of the link destination
  */
-static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool color, bool classify){
-    char *tmp;
-    char format[13] = "\033[%sm%s\033[0m ";
+static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag){
+    char *name, *tmp, format[] = " -> \033[%sm%s\033[0m ";
+    mode_t mode;
+    int offset = 0;
+
+    if (! link_flag){
+        name = file->name;
+        mode = file->mode;
+        offset = 4;
+    }
+    else {
+        name = file->link_path;
+        mode = file->link_mode;
+    }
 
     tmp = name;
     while (*tmp){
@@ -741,8 +736,8 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
     }
 
     tmp =
-        color ? (
-            link_invalid ? "31" :
+        opt->color ? (
+            file->link_invalid ? "31" :
             S_ISREG(mode) ? (
                 (mode & S_ISUID) ? "37;41" :
                 (mode & S_ISGID) ? "30;43" :
@@ -765,8 +760,8 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
         ) :
         "0";
 
-    format[11] =
-        classify ? (
+    format[15] =
+        opt->classify ? (
             (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
             S_ISDIR(mode) ? '/' :
             S_ISFIFO(mode) ? '|' :
@@ -775,5 +770,5 @@ static void __print_file_name(char *name, mode_t mode, bool link_invalid, bool c
         ) :
         '\0';
 
-    fprintf(stdout, format, tmp, name);
+    fprintf(stdout, (format + offset), tmp, name);
 }

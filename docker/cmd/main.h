@@ -28,18 +28,13 @@
 #define CONVERT_FILE_H "/dit/tmp/convert-result.hist"
 #define SETCMD_FILE "/dit/var/setcmd.log"
 
-#define assign_both_or_either(target, a, b, c)  (target = (target == a) ? b : c)
-
-#define xperror_invalid_cmdarg(c, desc, arg)  xperror_invalid_arg(c, -1, desc, arg)
-#define xperror_invalid_optarg(c, name, arg)  xperror_invalid_arg(c, 0, arg, name)
-#define xperror_invalid_number(desc, arg)  xperror_invalid_arg(1, 1, desc, arg)
+#define assign_both_or_either(target, a, b, c)  (target = (target == (a)) ? (b) : (c))
 
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
-#define xperror_standards()  xperror_individually(strerror(errno))
-#define xperror_internal_file() xperror_individually("unexpected error while manipulating an internal file")
 
-
-typedef size_t (* fwork)(void *, size_t, size_t, FILE *);
+#define xperror_standards(addition)  xperror_message(strerror(errno), addition)
+#define xperror_individually(msg)  xperror_message(msg, NULL)
+#define xperror_internal_file()  xperror_individually("unexpected error while manipulating an internal file")
 
 
 /******************************************************************************
@@ -84,14 +79,14 @@ void setcmd_manual();
     * Error Handling Functions
 ******************************************************************************/
 
-void xperror_invalid_arg(int type, int code, ...);
-void xperror_valid_args(const char * const expected[], int size);
+void xperror_invalid_arg(int code, int state, const char * restrict desc, const char * restrict arg);
+void xperror_valid_args(const char * const expected[], size_t size);
 
-void xperror_missing_args(const char *desc, const char *before_arg);
+void xperror_missing_args(const char * restrict desc, const char * restrict before_arg);
 void xperror_too_many_args(unsigned int limit);
 
-void xperror_individually(const char *msg);
-void xperror_suggestion(bool individual_flag);
+void xperror_message(const char * restrict msg, const char * restrict addition);
+void xperror_suggestion(bool cmd_flag);
 
 
 /******************************************************************************
@@ -99,7 +94,7 @@ void xperror_suggestion(bool individual_flag);
 ******************************************************************************/
 
 char *xstrndup(const char *src, size_t n);
-int strcmp_upper_case(const char *target, const char *expected);
+int strcmp_upper_case(const char * restrict target, const char * restrict expected);
 
 
 /******************************************************************************
@@ -107,14 +102,14 @@ int strcmp_upper_case(const char *target, const char *expected);
 ******************************************************************************/
 
 int receive_positive_integer(const char *target);
-int receive_expected_string(const char *target, const char * const expected[], int size, int mode);
+int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode);
 
 
 /******************************************************************************
     * Check Functions
 ******************************************************************************/
 
-bool check_file_isempty(const char *file_name);
+int check_file_isempty(const char *file_name);
 int check_last_exit_status();
 
 
@@ -122,7 +117,9 @@ int check_last_exit_status();
     * Functions used in separate files
 ******************************************************************************/
 
-inline int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h);
+int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
+
+int manage_provisional_report(unsigned short *prov_reflects, int mode_c, int keep_c);
 
 
 #endif
