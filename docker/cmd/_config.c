@@ -18,13 +18,13 @@
 #define CONF_ISWRTFLG 2
 #define CONF_ISHASARG 4
 
-#define CONF_RESET_OR_SHOW(reset_flag)  ((reset_flag << 1) | reset_flag)
-#define CONF_SET_OR_UPDATE(reset_flag)  (CONF_ISWRTFLG | CONF_ISHASARG | reset_flag)
+#define CONF_RESET_OR_SHOW(reset_flag)  (((reset_flag) << 1) | (reset_flag))
+#define CONF_SET_OR_UPDATE(reset_flag)  (CONF_ISWRTFLG | CONF_ISHASARG | (reset_flag))
 #define CONF_GET_FROM_CONVERT  (CONF_ISHASARG)
 
 #define CONF_MODES_NUM 5
 #define CONF_DEFAULT_MODE 2
-#define CONF_STAT_FORMULA(mode2d, mode2h)  (CONF_MODES_NUM * mode2d + mode2h)
+#define CONF_STAT_FORMULA(mode2d, mode2h)  (CONF_MODES_NUM * (mode2d) + (mode2h))
 #define CONF_INITIAL_STAT  CONF_STAT_FORMULA(CONF_DEFAULT_MODE, CONF_DEFAULT_MODE)
 #define CONF_EXCEED_STAT  (CONF_MODES_NUM * CONF_MODES_NUM)
 
@@ -32,7 +32,7 @@
 static int __parse_opts(int argc, char **argv, int *opt);
 static int __config_contents(int code, ...);
 
-static bool __receive_mode(const char *config_arg, int *p_mode2d, int *p_mode2h);
+static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
 static int __receive_mode_integer(int c, int spare);
 
 
@@ -80,7 +80,7 @@ int config(int argc, char **argv){
             break;
         case 1:
             if ((i = __config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) < 0)
-                xperror_invalid_cmdarg(0, "mode", argv[optind]);
+                xperror_invalid_arg('C', 0, "mode", argv[optind]);
             break;
         default:
             i = -1;
@@ -222,7 +222,7 @@ static int __config_contents(int code, ...){
  * @param[out] p_mode2h  variable to store the mode used when reflecting to history-file
  * @return int  0 (success), 1 (unexpected error) or -1 (argument recognition error)
  */
-inline int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h){
+int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
     return __config_contents(CONF_GET_FROM_CONVERT, config_arg, p_mode2d, p_mode2h);
 }
 
@@ -242,7 +242,7 @@ inline int get_config(const char *config_arg, int *p_mode2d, int *p_mode2h){
  * @param[out] p_mode2h  variable to store the mode used when reflecting to history-file
  * @return bool  successful or not
  */
-static bool __receive_mode(const char *config_arg, int *p_mode2d, int *p_mode2h){
+static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
     char *S;
     if ((S = xstrndup(config_arg, strlen(config_arg)))){
         const char *token;

@@ -18,7 +18,7 @@ elif ( apk --version > /dev/null 2>&1 ); then
     apk add --no-cache "$@"
 
 else
-    echo "install.sh: no package manager is available" 1>&2
+    echo "dit: no package manager is available" 1>&2
     exit 1
 
 fi

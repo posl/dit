@@ -60,8 +60,11 @@ int erase(int argc, char **argv){
     int i;
     erase_opts opt;
 
-    if ((i = __parse_opts(argc, argv, &opt)))
+    if ((i = __parse_opts(argc, argv, &opt))){
+        if (i < 0)
+            xperror_suggestion(true);
         return (i < 0);
+    }
 
     return 0;
 }
@@ -134,7 +137,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                     ptr = NULL;
                     break;
                 }
-                xperror_invalid_number(long_opts[i].name, optarg);
+                xperror_invalid_arg('N', 1, long_opts[i].name, optarg);
                 return -1;
             case 'r':
                 opt->reset = true;
@@ -168,10 +171,9 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                     ptr = NULL;
                     break;
                 }
-                xperror_invalid_optarg(c, long_opts[i].name, optarg);
+                xperror_invalid_arg('O', c, long_opts[i].name, optarg);
                 xperror_valid_args(valid_args, size);
             default:
-                xperror_suggestion(true);
                 return -1;
         }
     }

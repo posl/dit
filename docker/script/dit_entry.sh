@@ -6,7 +6,7 @@
 #
 
 if [ ! -e /dit/mnt ]; then
-    echo 'dit_entry.sh: the directory to be bound is not specified' 1>&2
+    echo 'dit: the directory to be bound is not specified' 1>&2
     exit 1
 fi
 

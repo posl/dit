@@ -120,7 +120,7 @@ int help(int argc, char **argv){
         argc = 1;
 
     int exit_status = 0;
-    char S[4] = "\n\n\n";
+    char S[] = "\n\n\n";
 
     do {
         exit_status |= __display_help(opt.code, target);
@@ -228,23 +228,18 @@ static int __display_exit_status(){
  * @brief display the version of this tool.
  *
  * @return int  0 (success) or -1 (unexpected error)
- *
- * @note this implementation is devised so that the beginning of the line is a space character.
- * @attention the version file must end with a newline character.
  */
 static int __display_version(){
     FILE *fp;
-    int i = -1;
-
     if ((fp = fopen(VERSION_FILE, "r"))){
         char S[128];
         while (fgets(S, 128, fp))
             fputs(S, stdout);
 
         fclose(fp);
-        i = 0;
+        return 0;
     }
-    return i;
+    return -1;
 }
 
 
@@ -320,7 +315,7 @@ static int __display_help(help_conts code, const char *target){
             help_func = cmd_helps[code][i];
         }
         else {
-            xperror_invalid_cmdarg(i, "dit command", target);
+            xperror_invalid_arg('C', i, "dit command", target);
             xperror_suggestion(false);
             return 1;
         }
