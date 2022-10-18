@@ -44,7 +44,7 @@ typedef struct file_node{
     size_t children_num;            /** the current number of the children */
     size_t children_max;            /** the current maximum length of the array */
 
-    int err_id;                     /** serial number of the error encountered */
+    int errid;                      /** serial number of the error encountered */
     bool noinfo;                    /** whether the file information could not be obtained */
 } file_node;
 
@@ -104,8 +104,6 @@ int inspect(int argc, char **argv){
     if ((i = __parse_opts(argc, argv, &opt)))
         return (i < 0);
 
-    setvbuf(stdout, NULL, _IOFBF, 0);
-
     const char *path = ".";
     if ((argc -= optind) > 0){
         argv += optind;
@@ -115,20 +113,18 @@ int inspect(int argc, char **argv){
         argc = 1;
 
     file_node *tree;
-    int exit_status = 0;
-
     do {
         if ((tree = __construct_dir_tree(path, &opt)))
             __display_dir_tree(tree, &opt);
         else
-            exit_status = 1;
+            i = 1;
 
         if (--argc){
             path = *(++argv);
             fputc('\n', stdout);
         }
         else
-            return exit_status;
+            return i;
     } while (1);
 }
 
@@ -223,15 +219,14 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
     size_t path_len;
     if (base_path && ((path_len = strlen(base_path)) > 0)){
         inf_path ipath;
-        ipath.max = 1024;
+        ipath.ptr = NULL;
+        ipath.max = 0;
 
-        if ((ipath.ptr = (char *) malloc(sizeof(char) * ipath.max))){
-            if (__concat_inf_path(&ipath, 0, base_path, path_len)){
-                char *name;
-                if ((name = xstrndup(base_path, path_len))){
-                    if (! (tree = __construct_recursive(&ipath, path_len, name, opt->comp)))
-                        free(name);
-                }
+        if (__concat_inf_path(&ipath, 0, base_path, path_len)){
+            char *name;
+            if ((name = xstrndup(base_path, path_len))){
+                if (! (tree = __construct_recursive(&ipath, path_len, name, opt->comp)))
+                    free(name);
             }
             free(ipath.ptr);
         }
@@ -274,6 +269,8 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
                             if ((tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp))){
                                 if (__append_file(file, tmp))
                                     continue;
+                                if (tmp->link_path)
+                                    free(tmp->link_path);
                                 free(tmp);
                             }
                         }
@@ -288,7 +285,7 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
             closedir(dir);
         }
         else
-            file->err_id = errno;
+            file->errid = errno;
     }
     return file;
 }
@@ -308,14 +305,28 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
  * @note path string of arbitrary length can be achieved.
  */
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len){
-    size_t needed_len;
+    size_t current_max, needed_len;
+    current_max = ipath->max;
     needed_len = ipath_len + suf_len + 1;
-    if (ipath->max < needed_len){
-        do
-            ipath->max *= 2;
-        while (ipath->max < needed_len);
 
-        if (! (ipath->ptr = (char *) realloc(ipath->ptr, sizeof(char) * ipath->max)))
+    if (current_max < needed_len){
+        if (! current_max)
+            current_max = 1024;
+
+        size_t previous_max;
+        while (current_max < needed_len){
+            previous_max = current_max;
+            current_max *= 2;
+            if (previous_max >= current_max)
+                return false;
+        }
+
+        void *ptr;
+        if ((ptr = realloc(ipath->ptr, sizeof(char) * current_max))){
+            ipath->ptr = (char *) ptr;
+            ipath->max = current_max;
+        }
+        else
             return false;
     }
 
@@ -353,7 +364,7 @@ static file_node *__new_file(char * restrict path, char * restrict name){
         file->children_num = 0;
         file->children_max = 0;
 
-        file->err_id = 0;
+        file->errid = 0;
         file->noinfo = false;
 
         struct stat file_stat;
@@ -366,25 +377,29 @@ static file_node *__new_file(char * restrict path, char * restrict name){
             if (S_ISLNK(file->mode)){
                 char *link_path;
                 if ((link_path = (char *) malloc(sizeof(char) * (file->size + 1)))){
-                    size_t link_len;
-                    if ((link_len = readlink(path, link_path, file->size)) > 0){
-                        link_path[link_len] = '\0';
-                        file->link_path = link_path;
+                    ssize_t link_len;
+                    link_len = readlink(path, link_path, file->size);
 
+                    if (link_len > 0){
                         if (! stat(path, &file_stat)){
                             file->link_mode = file_stat.st_mode;
                             file->link_invalid = false;
                         }
+                        else
+                            file->errid = errno;
                     }
                     else
-                        free(link_path);
+                        link_len = 0;
+
+                    link_path[link_len] = '\0';
+                    file->link_path = link_path;
                 }
             }
             else
                 file->link_invalid = false;
         }
         else {
-            file->err_id = errno;
+            file->errid = errno;
             file->noinfo = true;
         }
     }
@@ -403,18 +418,15 @@ static file_node *__new_file(char * restrict path, char * restrict name){
  */
 static bool __append_file(file_node *tree, file_node *file){
     if (tree->children_num == tree->children_max){
-        void *ptr;
-        if (! tree->children){
-            tree->children_max = 128;
-            ptr = malloc(sizeof(file_node *) * tree->children_max);
-        }
-        else {
-            tree->children_max *= 2;
-            ptr = realloc(tree->children, sizeof(file_node *) * tree->children_max);
-        }
+        size_t old_size, new_size;
+        old_size = tree->children_max;
+        new_size = old_size ? (old_size * 2) : 128;
 
-        if (ptr)
+        void *ptr;
+        if ((old_size < new_size) && (ptr = realloc(tree->children, sizeof(file_node *) * new_size))){
             tree->children = (file_node **) ptr;
+            tree->children_max = new_size;
+        }
         else
             return false;
     }
@@ -565,7 +577,7 @@ static void __display_dir_tree(file_node *tree, insp_opts *opt){
 static void __display_recursive(file_node *file, insp_opts *opt, unsigned int depth){
     int i;
 
-    if (! (file->err_id && file->noinfo)){
+    if (! (file->errid && file->noinfo)){
         __print_file_mode(file->mode);
         __print_file_owner(file, opt->numeric_id);
         __print_file_size(file->size);
@@ -583,11 +595,12 @@ static void __display_recursive(file_node *file, insp_opts *opt, unsigned int de
     free(file->name);
 
     if (file->link_path){
-        __print_file_name(file, opt, true);
+        if (*(file->link_path))
+            __print_file_name(file, opt, true);
         free(file->link_path);
     }
-    else if (file->err_id)
-        fprintf(stdout, "  (%s)", strerror(file->err_id));
+    if (file->errid)
+        fprintf(stdout, " (%s)", strerror(file->errid));
 
     fputc('\n', stdout);
 

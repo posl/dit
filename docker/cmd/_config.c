@@ -88,10 +88,9 @@ int config(int argc, char **argv){
     }
 
     if (i){
-        if (i < 0)
-            i = 1;
-        else
+        if (i > 0)
             xperror_internal_file();
+        i = 1;
         xperror_suggestion(true);
     }
     return i;
@@ -132,6 +131,8 @@ static int __parse_opts(int argc, char **argv, int *opt){
     }
     return 0;
 }
+
+
 
 
 /**
@@ -202,8 +203,7 @@ static int __config_contents(int code, ...){
             case 1:
                 if (! reset_flag)
                     fseek(fp, 0, SEEK_SET);
-
-                exit_status |= (fwrite(&c, sizeof(c), 1, fp) != 1);
+                fwrite(&c, sizeof(c), 1, fp);
         }
         fclose(fp);
     }
@@ -244,69 +244,80 @@ int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p
  */
 static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
     char *S;
-    if ((S = xstrndup(config_arg, strlen(config_arg)))){
-        const char *token;
+    bool success_flag = true;
 
-        if ((token = strtok(S, ","))){
-            int mode2d, mode2h, mode, offset, target, i;
-            mode2d = *p_mode2d;
-            mode2h = *p_mode2h;
+    if (config_arg && (S = xstrndup(config_arg, strlen(config_arg)))){
+        char *tmp, *token;
+        int mode2d, mode2h, mode, offset, target_c, i;
 
-            do {
-                mode = -1;
-                offset = 0;
-                target = 'b';
+        tmp = S;
+        mode2d = *p_mode2d;
+        mode2h = *p_mode2h;
 
-                if (! (i = strlen(token) - 2)){
-                    if ((i = __receive_mode_integer(token[0], mode2d)) >= 0){
-                        if ((mode = __receive_mode_integer(token[1], mode2h)) >= 0){
-                            mode2d = i;
-                            mode2h = mode;
-                            continue;
-                        }
-                    }
-                    else
-                        i = 0;
-                }
-                else if (i > 0){
-                    if (token[1] == '='){
-                        if (! strchr("bdh", token[0]))
-                            return false;
-                        if (token[3] == '\0')
-                            i = -1;
+        while ((token = strtok(tmp, ","))){
+            tmp = NULL;
+            mode = -1;
+            offset = 0;
+            target_c = 'b';
 
-                        offset = 2;
-                        target = token[0];
-                    }
-                }
-
-                token += offset;
-                if ((i < 0) && ((mode = __receive_mode_integer(token[0], -2)) < -1))
-                    continue;
-                if ((mode < 0) && ((i = receive_expected_string(token, mode_reprs, CONF_MODES_NUM, 2)) >= 0))
-                    mode = idx2mode[i];
-
-                if (mode >= 0){
-                    switch (target){
-                        case 'b':
-                            mode2h = mode;
-                        case 'd':
-                            mode2d = mode;
-                            break;
-                        case 'h':
-                            mode2h = mode;
+            if (! (i = strlen(token) - 2)){
+                if ((i = __receive_mode_integer(token[0], mode2d)) >= 0){
+                    if ((mode = __receive_mode_integer(token[1], mode2h)) >= 0){
+                        mode2d = i;
+                        mode2h = mode;
+                        continue;
                     }
                 }
                 else
-                    return false;
-            } while ((token = strtok(NULL, ",")));
+                    i = 0;
+            }
+            else if (i > 0){
+                if (token[1] == '='){
+                    if (! strchr("bdh", token[0])){
+                        success_flag = false;
+                        break;
+                    }
+                    if (token[3] == '\0')
+                        i = -1;
 
+                    offset = 2;
+                    target_c = token[0];
+                }
+            }
+
+            token += offset;
+            if ((i < 0) && ((mode = __receive_mode_integer(token[0], -2)) < -1))
+                continue;
+            if ((mode < 0) && ((i = receive_expected_string(token, mode_reprs, CONF_MODES_NUM, 2)) >= 0))
+                mode = idx2mode[i];
+
+            if (mode >= 0){
+                switch (target_c){
+                    case 'b':
+                        mode2h = mode;
+                    case 'd':
+                        mode2d = mode;
+                        break;
+                    case 'h':
+                        mode2h = mode;
+                }
+            }
+            else {
+                success_flag = false;
+                break;
+            }
+        }
+
+        if (success_flag){
             *p_mode2d = mode2d;
             *p_mode2h = mode2h;
         }
-        return true;
+        free(S);
     }
-    return false;
+    else
+        success_flag = false;
+
+    return success_flag;
 }
 
 
