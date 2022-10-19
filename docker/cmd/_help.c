@@ -40,7 +40,7 @@ typedef struct {
 
 
 static int __parse_opts(int argc, char **argv, help_opts *opt);
-static void __display_list();
+static void __display_cmd_list();
 static int __display_exit_status();
 static int __display_version();
 
@@ -103,13 +103,11 @@ int help(int argc, char **argv){
 
     if ((i = __parse_opts(argc, argv, &opt))){
         if (! opt.side_func)
-            i = (i < 0);
-        else if ((i = (opt.side_func() < 0)))
+            i = (i < 0) ? 1 : 0;
+        else if ((i = opt.side_func()))
             xperror_internal_file();
         return i;
     }
-
-    setvbuf(stdout, NULL, _IOFBF, 0);
 
     const char *target = NULL;
     if ((argc -= optind) > 0){
@@ -119,11 +117,9 @@ int help(int argc, char **argv){
     else
         argc = 1;
 
-    int exit_status = 0;
     char S[] = "\n\n\n";
-
     do {
-        exit_status |= __display_help(opt.code, target);
+        i |= __display_help(opt.code, target);
 
         if (--argc){
             target = *(++argv);
@@ -132,9 +128,11 @@ int help(int argc, char **argv){
             fflush(stdout);
         }
         else
-            return exit_status;
+            return i;
     } while (1);
 }
+
+
 
 
 /**
@@ -168,7 +166,7 @@ static int __parse_opts(int argc, char **argv, help_opts *opt){
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0){
         switch (c){
             case 'a':
-                __display_list();
+                __display_cmd_list();
                 return 1;
             case 'd':
                 opt->code = description;
@@ -203,7 +201,7 @@ static int __parse_opts(int argc, char **argv, help_opts *opt){
  * @note display the commands in the same order as 'dit help'.
  * @note array for reordering the commands is in reverse order for looping efficiency.
  */
-static void __display_list(){
+static void __display_cmd_list(){
     const int cmd_rearange[CMDS_NUM] = {5, 7, 3, 11, 9, 4, 12, 8, 2, 6, 0, 10, 1};
 
     for (int i = CMDS_NUM; i--;)
@@ -214,20 +212,22 @@ static void __display_list(){
 /**
  * @brief display the exit status of last executed command line.
  *
- * @return int  positive integer (success) or -1 (unexpected error)
+ * @return int  exit status like command's one
  */
 static int __display_exit_status(){
     int exit_status;
-    if ((exit_status = check_last_exit_status()) >= 0)
+    if ((exit_status = check_last_exit_status()) >= 0){
         fprintf(stdout, "%d\n", exit_status);
-    return exit_status;
+        return 0;
+    }
+    return 1;
 }
 
 
 /**
  * @brief display the version of this tool.
  *
- * @return int  0 (success) or -1 (unexpected error)
+ * @return int  exit status like command's one
  */
 static int __display_version(){
     FILE *fp;
@@ -239,8 +239,10 @@ static int __display_version(){
         fclose(fp);
         return 0;
     }
-    return -1;
+    return 1;
 }
+
+
 
 
 /**
@@ -317,6 +319,7 @@ static int __display_help(help_conts code, const char *target){
         else {
             xperror_invalid_arg('C', i, "dit command", target);
             xperror_suggestion(false);
+            fflush(stderr);
             return 1;
         }
     }
@@ -352,7 +355,7 @@ static void __dit_manual(){
         "\n"
         "Commands:\n"
         "main features of this tool:\n"
-        "  convert        show how a command line is reflected to "DOCKER_OR_HISTORY"\n"
+        "  convert        show how a command line is reflected in "DOCKER_OR_HISTORY"\n"
         "  optimize       do refactoring on Dockerfile based on its best practices\n"
         "\n"
         "customization of tool settings:\n"
@@ -482,6 +485,7 @@ void inspect_manual(){
         "    and the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
         "  - The units of file size are 'k,M,G,T,P,E,Z', which is powers of 1000.\n"
         "  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n"
+        "  - If standard output is not connected to a terminal, each file name is not colorized.\n"
         "\n"
         "The above options are similar to the 'ls' command which is a GNU one.\n"
         "See that man page for details.\n"
@@ -529,19 +533,19 @@ static void __dit_description(){
 
 static void __config_description(){
     fputs(
-        "Set the level at which commands are reflected to "DOCKER_OR_HISTORY", individually.\n"
+        "Set the level at which commands are reflected in "DOCKER_OR_HISTORY", individually.\n"
     , stdout);
 }
 
 static void __convert_description(){
     fputs(
-        "Show how a command line is transformed for reflection to the "DOCKER_OR_HISTORY".\n"
+        "Show how a command line is transformed for reflection in the "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
 static void __cp_description(){
     fputs(
-        "Perform processing equivalent to COPY/ADD instructions, and reflect this to Dockerfile.\n"
+        "Perform processing equivalent to COPY/ADD instructions, and reflect this in Dockerfile.\n"
     , stdout);
 }
 
@@ -565,7 +569,7 @@ static void __help_description(){
 
 static void __ignore_description(){
     fputs(
-        "Edit set of commands that should not be reflected to "DOCKER_OR_HISTORY", individually.\n"
+        "Edit set of commands that should not be reflected in "DOCKER_OR_HISTORY", individually.\n"
     , stdout);
 }
 

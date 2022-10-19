@@ -24,12 +24,12 @@ typedef struct {
     char **BC_args;    /** array for storing option arguments for '-B' or '-C' */
     int B_end;         /** index number representing the end of option arguments for '-B' */
     int C_end;         /** index number representing the end of option arguments for '-C' */
-    int target;        /** integer representing the files to be edited */
+    int target_c;      /** character representing the files to be edited ('d', 'h' or 'b') */
     int lines;         /** the maximum number of lines to remove */
     int times;         /** option argument for '-N' */
     bool reset;        /** whether to reset log-file */
     bool verbose;      /** whether to display deleted lines on screen */
-    int assume;        /** the response to confirmation that it is okay to remove the hit lines */
+    int assume_c;      /** the response to confirmation that it is okay to remove the lines ('Y' or 'N') */
 } erase_opts;
 
 
@@ -100,12 +100,12 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
     opt->BC_args = (char **) malloc(sizeof(char *) * (argc - 1));
     opt->B_end = 0;
     opt->C_end = 0;
-    opt->target = '\0';
+    opt->target_c = '\0';
     opt->lines = -1;
     opt->times = 0;
     opt->reset = false;
     opt->verbose = false;
-    opt->assume = '\0';
+    opt->assume_c = '\0';
 
     int c, i, *ptr = NULL;
     const char * const *valid_args = NULL;
@@ -119,10 +119,10 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                     opt->BC_args[opt->C_end++] = optarg;
                 break;
             case 'd':
-                assign_both_or_either(opt->target, 'h', 'b', 'd');
+                assign_both_or_either(opt->target_c, 'h', 'b', 'd');
                 break;
             case 'h':
-                assign_both_or_either(opt->target, 'd', 'b', 'h');
+                assign_both_or_either(opt->target_c, 'd', 'b', 'h');
                 break;
             case 'L':
                 ptr = &(opt->lines);
@@ -146,7 +146,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
                 opt->verbose = true;
                 break;
             case 'y':
-                opt->assume = 'Y';
+                opt->assume_c = 'Y';
                 break;
             case 1:
                 erase_manual();
@@ -157,12 +157,12 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
 #endif
             case 0:
                 if (size == ASSUMES_NUM){
-                    ptr = &(opt->assume);
+                    ptr = &(opt->assume_c);
                     valid_args = assume_args;
                     // mode = 3;  (mode = size ^ 1)
                 }
                 else /* if (size == TARGETS_NUM) */ {
-                    ptr = &(opt->target);
+                    ptr = &(opt->target_c);
                     valid_args = target_args;
                     // mode = 2;  (mode = size ^ 1)
                 }
@@ -178,7 +178,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt){
         }
     }
 
-    if (opt->target){
+    if (opt->target_c){
         if (! opt->C_end){
             free(opt->BC_args);
             opt->BC_args = NULL;
