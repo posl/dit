@@ -99,14 +99,11 @@ chmod a=rx \
 
 echo '0' > /dit/tmp/last-exit-status
 echo '0' > /dit/tmp/last-history-number
-echo '0 0' > /dit/tmp/reflect-report.prov
-echo 'd:+0 h:+0' > /dit/tmp/reflect-report.real
 
 dit config -r
-dit erase -dhr
 dit ignore -dhr
 dit optimize -r
-
+dit reflect
 
 cp -f /dit/etc/dit_profile.sh /etc/profile.d/
 

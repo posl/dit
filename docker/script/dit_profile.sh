@@ -22,7 +22,7 @@ alias \
     onbuild='dit onbuild' \
     onb='dit onbuild' \
     optimize='dit optimize' \
-    opt='dit optimize' \
+    optim='dit optimize' \
     reflect='dit reflect' \
     refl='dit reflect' \
     setcmd='dit setcmd' \

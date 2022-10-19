@@ -8,7 +8,7 @@ if ( apt-get --version > /dev/null 2>&1 ); then
     rm -rf /var/lib/apt/lists/*
 
 elif ( yum --version > /dev/null 2>&1 ); then
-    yum update
+    yum update -y
     yum install -y "$1"
     yum clean all
     rm -rf /var/cache/yum
