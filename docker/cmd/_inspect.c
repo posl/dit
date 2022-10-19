@@ -102,7 +102,7 @@ int inspect(int argc, char **argv){
     insp_opts opt;
 
     if ((i = __parse_opts(argc, argv, &opt)))
-        return (i < 0);
+        return (i < 0) ? 1 : 0;
 
     const char *path = ".";
     if ((argc -= optind) > 0){
@@ -195,6 +195,8 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 return -1;
         }
     }
+
+    opt->color &= isatty(fileno(stdout));
     return 0;
 }
 
@@ -217,14 +219,16 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
     file_node *tree = NULL;
 
     size_t path_len;
-    if (base_path && ((path_len = strlen(base_path)) > 0)){
+    if (base_path && ((path_len = strlen(base_path) + 1) > 0)){
         inf_path ipath;
         ipath.ptr = NULL;
         ipath.max = 0;
 
         if (__concat_inf_path(&ipath, 0, base_path, path_len)){
             char *name;
-            if ((name = xstrndup(base_path, path_len))){
+            if ((name = (char *) malloc(sizeof(char) * path_len))){
+                memcpy(name, base_path, path_len);
+
                 if (! (tree = __construct_recursive(&ipath, path_len, name, opt->comp)))
                     free(name);
             }
@@ -239,7 +243,7 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
  * @brief construct the directory tree, recursively.
  *
  * @param[out] ipath  file path to the file we are currently looking at
- * @param[in]  ipath_len  the length of path string
+ * @param[in]  ipath_len  the length of path string including the terminating null character
  * @param[in]  name  name of the file we are currently looking at
  * @param[in]  comp  comparison function used when qsort
  * @return file_node*  the result of sub-constructing
@@ -253,28 +257,32 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
     if (file && S_ISDIR(file->mode)){
         DIR *dir;
         if ((dir = opendir(ipath->ptr))){
-            if (__concat_inf_path(ipath, ipath_len++, "/", 1)){
+            if (__concat_inf_path(ipath, ipath_len - 1, "/", 2)){
                 struct dirent *entry;
+                char *d_name;
                 size_t name_len;
                 file_node *tmp;
 
                 while ((entry = readdir(dir))){
-                    name = entry->d_name;
-                    if ((name[0] == '.') && (! name[1 + ((name[1] != '.') ? 0 : 1)]))
+                    d_name = entry->d_name;
+                    if ((d_name[0] == '.') && (! d_name[(d_name[1] != '.') ? 1 : 2]))
                         continue;
 
-                    name_len = strlen(name);
-                    if ((name = xstrndup(name, name_len))){
-                        if (__concat_inf_path(ipath, ipath_len, name, name_len)){
+                    name_len = strlen(d_name) + 1;
+                    if (__concat_inf_path(ipath, ipath_len, d_name, name_len)){
+                        if ((name = (char *) malloc(sizeof(char) * name_len))){
+                            memcpy(name, d_name, name_len);
+
                             if ((tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp))){
                                 if (__append_file(file, tmp))
                                     continue;
+
                                 if (tmp->link_path)
                                     free(tmp->link_path);
                                 free(tmp);
                             }
+                            free(name);
                         }
-                        free(name);
                     }
                     break;
                 }
@@ -299,7 +307,7 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
  * @param[out] ipath  base path string
  * @param[in]  ipath_len  the length of base path string
  * @param[in]  suf  string to concatenate to the end of base path string
- * @param[in]  suf_len  the length of the string
+ * @param[in]  suf_len  the length of the string including the terminating null character
  * @return bool  successful or not
  *
  * @note path string of arbitrary length can be achieved.
@@ -307,7 +315,7 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len){
     size_t current_max, needed_len;
     current_max = ipath->max;
-    needed_len = ipath_len + suf_len + 1;
+    needed_len = ipath_len + suf_len;
 
     if (current_max < needed_len){
         if (! current_max)
@@ -330,11 +338,9 @@ static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
             return false;
     }
 
-    char *path;
-    path = ipath->ptr + ipath_len;
-    while (suf_len--)
-        *(path++) = *(suf++);
-    *path = '\0';
+    char *dest;
+    dest = ipath->ptr + ipath_len;
+    memcpy(dest, suf, suf_len);
 
     return true;
 }
@@ -727,7 +733,7 @@ static void __print_file_size(off_t size){
  * @param[in]  link_flag  whether or not to display the information of the link destination
  */
 static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag){
-    char *name, *tmp, format[] = " -> \033[%sm%s\033[0m ";
+    char *name, *tmp, *format;
     mode_t mode;
     int offset = 0;
 
@@ -748,8 +754,8 @@ static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag){
         tmp++;
     }
 
-    tmp =
-        opt->color ? (
+    if (opt->color){
+        tmp =
             file->link_invalid ? "31" :
             S_ISREG(mode) ? (
                 (mode & S_ISUID) ? "37;41" :
@@ -769,19 +775,27 @@ static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag){
             S_ISFIFO(mode) ? "33" :
             S_ISLNK(mode) ? "1;36" :
             S_ISSOCK(mode) ? "1;35" :
-            "0"
-        ) :
-        "0";
+            "0";
 
-    format[15] =
-        opt->classify ? (
+        format = " -> \033[%sm%s\033[0m";
+    }
+    else {
+        tmp = name;
+        format = " -> %s";
+    }
+
+    fprintf(stdout, (format + offset), tmp, name);
+
+    if (opt->classify){
+        int indicator;
+        indicator =
             (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
             S_ISDIR(mode) ? '/' :
             S_ISFIFO(mode) ? '|' :
             S_ISSOCK(mode) ? '=' :
-            '\0'
-        ) :
-        '\0';
+            '\0';
 
-    fprintf(stdout, (format + offset), tmp, name);
+        if (indicator)
+            fputc(indicator, stdout);
+    }
 }

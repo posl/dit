@@ -71,26 +71,28 @@ static const int idx2mode[CONF_MODES_NUM] = {4, 0, 2, 3, 1};
 int config(int argc, char **argv){
     int i, reset_flag = 0;
 
-    if ((i = __parse_opts(argc, argv, &reset_flag)))
-        return (i < 0);
-
-    switch ((argc - optind)){
-        case 0:
-            i = __config_contents(CONF_RESET_OR_SHOW(reset_flag));
-            break;
-        case 1:
-            if ((i = __config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) < 0)
-                xperror_invalid_arg('C', 0, "mode", argv[optind]);
-            break;
-        default:
-            i = -1;
-            xperror_too_many_args(1);
+    if ((i = __parse_opts(argc, argv, &reset_flag))){
+        i = (i < 0) ? 1 : 0;
     }
+    else
+        switch ((argc - optind)){
+            case 0:
+                i = __config_contents(CONF_RESET_OR_SHOW(reset_flag));
+                break;
+            case 1:
+                if ((i = __config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) > 0)
+                    xperror_config_arg(argv[optind]);
+                break;
+            default:
+                i = 1;
+                xperror_too_many_args(1);
+        }
 
     if (i){
-        if (i > 0)
+        if (i < 0){
+            i = 1;
             xperror_internal_file();
-        i = 1;
+        }
         xperror_suggestion(true);
     }
     return i;
@@ -140,7 +142,7 @@ static int __parse_opts(int argc, char **argv, int *opt){
  *
  * @param[in]  code  some flags (bit 1: wheter to reset, bit 2: whether to write, bit 3: argument existence)
  * @param[out] ...  if necessary, string for determining the modes and variable to store them
- * @return int  0 (success), 1 (unexpected error) or -1 (argument recognition error)
+ * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
 static int __config_contents(int code, ...){
     bool reset_flag, write_flag, has_arg;
@@ -165,7 +167,7 @@ static int __config_contents(int code, ...){
                 mode2h = tmp.rem;
             }
             else {
-                exit_status = 1;
+                exit_status = -1;
                 c = CONF_INITIAL_STAT;
             }
 
@@ -191,7 +193,7 @@ static int __config_contents(int code, ...){
                 }
             }
             else
-                exit_status = -1;
+                exit_status = 1;
 
             va_end(sp);
         }
@@ -200,7 +202,7 @@ static int __config_contents(int code, ...){
             case 0:
                 if (! write_flag)
                     break;
-            case 1:
+            case -1:
                 if (! reset_flag)
                     fseek(fp, 0, SEEK_SET);
                 fwrite(&c, sizeof(c), 1, fp);
@@ -208,7 +210,7 @@ static int __config_contents(int code, ...){
         fclose(fp);
     }
     else
-        exit_status = 1;
+        exit_status = -1;
 
     return exit_status;
 }
@@ -218,8 +220,8 @@ static int __config_contents(int code, ...){
  * @brief get the modes of dit command 'convert', and hand over it to the command.
  *
  * @param[in]  config_arg  string for determining the modes
- * @param[out] p_mode2d  variable to store the mode used when reflecting to Dockerfile
- * @param[out] p_mode2h  variable to store the mode used when reflecting to history-file
+ * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
+ * @param[out] p_mode2h  variable to store the mode used when reflecting in history-file
  * @return int  0 (success), 1 (unexpected error) or -1 (argument recognition error)
  */
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
@@ -238,15 +240,18 @@ int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p
  * @brief parse the passed string, and generate next modes.
  *
  * @param[in]  config_arg  string for determining the modes
- * @param[out] p_mode2d  variable to store the mode used when reflecting to Dockerfile
- * @param[out] p_mode2h  variable to store the mode used when reflecting to history-file
+ * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
+ * @param[out] p_mode2h  variable to store the mode used when reflecting in history-file
  * @return bool  successful or not
  */
 static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
-    char *S;
-    bool success_flag = true;
+    if (config_arg){
+        size_t size;
+        size = strlen(config_arg) + 1;
 
-    if (config_arg && (S = xstrndup(config_arg, strlen(config_arg)))){
+        char S[size];
+        memcpy(S, config_arg, size);
+
         char *tmp, *token;
         int mode2d, mode2h, mode, offset, target_c, i;
 
@@ -273,10 +278,8 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
             }
             else if (i > 0){
                 if (token[1] == '='){
-                    if (! strchr("bdh", token[0])){
-                        success_flag = false;
-                        break;
-                    }
+                    if (! strchr("bdh", token[0]))
+                        return false;
                     if (token[3] == '\0')
                         i = -1;
 
@@ -302,22 +305,15 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
                         mode2h = mode;
                 }
             }
-            else {
-                success_flag = false;
-                break;
-            }
+            else
+                return false;
         }
 
-        if (success_flag){
-            *p_mode2d = mode2d;
-            *p_mode2h = mode2h;
-        }
-        free(S);
+        *p_mode2d = mode2d;
+        *p_mode2h = mode2h;
+        return true;
     }
-    else
-        success_flag = false;
-
-    return success_flag;
+    return false;
 }
 
 
