@@ -95,7 +95,6 @@ static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag);
  * @return int  command's exit status
  *
  * @note treated like a normal main function.
- * @attention try this with '--help' option for more information.
  */
 int inspect(int argc, char **argv){
     int i;
@@ -313,26 +312,26 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
  * @note path string of arbitrary length can be achieved.
  */
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len){
-    size_t current_max, needed_len;
-    current_max = ipath->max;
+    size_t curr_max, needed_len;
+    curr_max = ipath->max;
     needed_len = ipath_len + suf_len;
 
-    if (current_max < needed_len){
-        if (! current_max)
-            current_max = 1024;
+    if (curr_max < needed_len){
+        if (! curr_max)
+            curr_max = 1024;
 
-        size_t previous_max;
-        while (current_max < needed_len){
-            previous_max = current_max;
-            current_max *= 2;
-            if (previous_max >= current_max)
+        size_t prev_max;
+        while (curr_max < needed_len){
+            prev_max = curr_max;
+            curr_max *= 2;
+            if (prev_max >= curr_max)
                 return false;
         }
 
         void *ptr;
-        if ((ptr = realloc(ipath->ptr, sizeof(char) * current_max))){
+        if ((ptr = realloc(ipath->ptr, (sizeof(char) * curr_max)))){
             ipath->ptr = (char *) ptr;
-            ipath->max = current_max;
+            ipath->max = curr_max;
         }
         else
             return false;
@@ -426,10 +425,10 @@ static bool __append_file(file_node *tree, file_node *file){
     if (tree->children_num == tree->children_max){
         size_t old_size, new_size;
         old_size = tree->children_max;
-        new_size = old_size ? (old_size * 2) : 128;
+        new_size = old_size ? (old_size * 2) : 32;
 
         void *ptr;
-        if ((old_size < new_size) && (ptr = realloc(tree->children, sizeof(file_node *) * new_size))){
+        if ((old_size < new_size) && (ptr = realloc(tree->children, (sizeof(file_node *) * new_size)))){
             tree->children = (file_node **) ptr;
             tree->children_max = new_size;
         }
@@ -704,7 +703,7 @@ static void __print_file_owner(file_node *file, bool numeric_id){
  */
 static void __print_file_size(off_t size){
     if (size < 1000)
-        fprintf(stdout, "%6d B    ", (int) size);
+        fprintf(stdout, "%6d B    ", ((int) size));
     else {
         int i = -1, rem;
         char *units = "kMGTPEZ";
@@ -717,7 +716,7 @@ static void __print_file_size(off_t size){
 
         if (i <= 6){
             rem /= 100;
-            fprintf(stdout, "%3d.%1d %cB    ", (int) size, rem, units[i]);
+            fprintf(stdout, "%3d.%1d %cB    ", ((int) size), rem, units[i]);
         }
         else
             fputs(INSP_EXCESS_STR "    ", stdout);
