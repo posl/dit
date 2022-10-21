@@ -31,14 +31,12 @@ alias \
 
 
 #
-# set shell variables that is referred every time any command is executed
+# set shell variables that is referred every time any command line is executed
 #
 
 PROMPT_REFLECT(){
-    LAST_EXIT_STATUS="$?"
-
-    if ( history 1 | awk -f /dit/etc/dit_update.awk ); then
-        echo "${LAST_EXIT_STATUS:-0}" > /dit/tmp/last-exit-status
+    if ( history 1 | awk -f /dit/etc/parse_history.awk ); then
+        echo "$?" > /dit/tmp/last-exit-status
 
         if ( dit convert -qs ); then
             dit reflect -dh
@@ -73,8 +71,7 @@ CB='\[\e[1;32m\]'
 CE='\[\e[m\]'
 PS1="${CB}"' ['"${CE}"'$( PROMPT_REPORT )'"${CB}"'] '"${CE}"'\u:\w '"${CB}"'\$ '"${CE}"
 
-export PROMPT_COMMAND
-export PS1
+export PROMPT_COMMAND PS1
 
 
 

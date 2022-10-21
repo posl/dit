@@ -10,7 +10,7 @@ RUN sh dit_install.sh gcc libc-dev
 # generate the dit command
 WORKDIR /dit/src
 COPY ./cmd ./
-RUN gcc *.c -o /usr/local/bin/dit -mtune=native -march=native -O2
+RUN gcc -O2 -march=native -o /usr/local/bin/dit *.c
 
 
 

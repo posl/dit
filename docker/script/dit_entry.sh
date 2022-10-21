@@ -2,7 +2,7 @@
 
 
 #
-# initialize the files in the shared directory
+# check the shared directory and initialize the base file for Dockerfile
 #
 
 if [ ! -e /dit/mnt ]; then
@@ -10,30 +10,20 @@ if [ ! -e /dit/mnt ]; then
     exit 1
 fi
 
-
-if [ ! -e /dit/mnt/.dit_history ]; then
-    touch /dit/mnt/.dit_history
-fi
-
-if [ ! -s /dit/mnt/.dockerignore ]; then
-    echo '.dit_history' > /dit/mnt/.dockerignore
-fi
+touch \
+    /dit/mnt/.dit_history \
+    /dit/mnt/.dockerignore \
+    /dit/mnt/Dockerfile \
+    /dit/mnt/Dockerfile.draft
 
 
-if [ ! -e /dit/mnt/Dockerfile ]; then
-    touch /dit/mnt/Dockerfile
-fi
-
-if [ ! -s /dit/mnt/Dockerfile.draft ]; then
-    cat <<EOF > /dit/mnt/Dockerfile.draft
+cat <<EOF > /dit/etc/Dockerfile.base
 FROM ${BASE_NAME}:${BASE_VERSION}
 SHELL [ "${SHELL:-/bin/sh}", "-c" ]
 WORKDIR $(pwd)
 EOF
-fi
 
-unset BASE_NAME
-unset BASE_VERSION
+unset BASE_NAME BASE_VERSION
 
 
 
@@ -94,7 +84,7 @@ chmod a=rx \
 
 
 #
-# perform other necessary initializations, and enter a login shell
+# perform other necessary initializations and enter a login shell
 #
 
 echo '0' > /dit/tmp/last-exit-status
@@ -105,6 +95,13 @@ dit ignore -dhr
 dit optimize -r
 dit reflect
 
+
 cp -f /dit/etc/dit_profile.sh /etc/profile.d/
+
+rm -f \
+    /dit/etc/dit_entry.sh \
+    /dit/etc/dit_install.sh \
+    /dit/etc/dit_profile.sh
+
 
 exec /bin/bash --login
