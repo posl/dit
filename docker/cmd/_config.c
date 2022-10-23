@@ -69,7 +69,7 @@ static const int idx2mode[CONF_MODES_NUM] = {4, 0, 2, 3, 1};
  * @note treated like a normal main function.
  */
 int config(int argc, char **argv){
-    int i, reset_flag = 0;
+    int i, reset_flag;
 
     if ((i = __parse_opts(argc, argv, &reset_flag))){
         i = (i < 0) ? 1 : 0;
@@ -118,11 +118,13 @@ static int __parse_opts(int argc, char **argv, int *opt){
         {  0,       0,           0,    0  }
     };
 
+    *opt = false;
+
     int c;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0){
         switch (c){
             case 'r':
-                *opt = 1;
+                *opt = true;
                 break;
             case 1:
                 config_manual();
@@ -217,7 +219,7 @@ static int __config_contents(int code, ...){
 
 
 /**
- * @brief get the modes of dit command 'convert', and hand over it to the command.
+ * @brief get the modes of dit command 'convert' and hand over it to the command.
  *
  * @param[in]  config_arg  string for determining the modes
  * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
@@ -237,7 +239,7 @@ int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p
 
 
 /**
- * @brief parse the passed string, and generate next modes.
+ * @brief parse the passed string and generate next modes.
  *
  * @param[in]  config_arg  string for determining the modes
  * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
@@ -250,7 +252,7 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
         size = strlen(config_arg) + 1;
 
         char S[size];
-        memcpy(S, config_arg, size);
+        memcpy(S, config_arg, (sizeof(char) * size));
 
         char *tmp, *token;
         int mode2d, mode2h, mode, offset, target_c, i;
@@ -278,7 +280,7 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
             }
             else if (i > 0){
                 if (token[1] == '='){
-                    if (! strchr("bdh", token[0]))
+                    if ((token[0] != 'b') && (token[0] != 'd') && (token[0] != 'h'))
                         return false;
                     if (token[3] == '\0')
                         i = -1;

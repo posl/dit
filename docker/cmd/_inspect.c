@@ -219,14 +219,12 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
 
     size_t path_len;
     if (base_path && ((path_len = strlen(base_path) + 1) > 0)){
-        inf_path ipath;
-        ipath.ptr = NULL;
-        ipath.max = 0;
+        inf_path ipath = {NULL, 0};
 
         if (__concat_inf_path(&ipath, 0, base_path, path_len)){
             char *name;
             if ((name = (char *) malloc(sizeof(char) * path_len))){
-                memcpy(name, base_path, path_len);
+                memcpy(name, base_path, (sizeof(char) * path_len));
 
                 if (! (tree = __construct_recursive(&ipath, path_len, name, opt->comp)))
                     free(name);
@@ -270,7 +268,7 @@ static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char 
                     name_len = strlen(d_name) + 1;
                     if (__concat_inf_path(ipath, ipath_len, d_name, name_len)){
                         if ((name = (char *) malloc(sizeof(char) * name_len))){
-                            memcpy(name, d_name, name_len);
+                            memcpy(name, d_name, (sizeof(char) * name_len));
 
                             if ((tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp))){
                                 if (__append_file(file, tmp))
@@ -339,7 +337,7 @@ static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
 
     char *dest;
     dest = ipath->ptr + ipath_len;
-    memcpy(dest, suf, suf_len);
+    memcpy(dest, suf, (sizeof(char) * suf_len));
 
     return true;
 }
@@ -556,7 +554,7 @@ static const char *__get_file_ext(const char *name){
 
 
 /**
- * @brief display the directory tree, and release the heap space used for it.
+ * @brief display the directory tree and release the heap space used for it.
  *
  * @param[out] tree  pre-constructed directory tree
  * @param[in]  opt  variable containing the result of option parse
