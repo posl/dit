@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <grp.h>
+#include <limits.h>
 #include <pwd.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -23,18 +24,62 @@
 #define DISPLAYS_NUM 3
 #define TARGETS_NUM 3
 
+
 #define VERSION_FILE "/dit/etc/dit_version"
+
+#define DOCKER_FILE_DRAFT "/dit/mnt/Dockerfile.draft"
+#define HISTORY_FILE "/dit/mnt/.dit_history"
+
 #define CONVERT_FILE_D "/dit/tmp/convert-result.dock"
 #define CONVERT_FILE_H "/dit/tmp/convert-result.hist"
-#define SETCMD_FILE "/dit/var/setcmd.log"
+
+
+
+/******************************************************************************
+    * commonly used Expressions
+******************************************************************************/
 
 #define assign_both_or_either(target, a, b, c)  (target = (target == (a)) ? (b) : (c))
 
+#define check_string_of_length1(str, c)  ((str[0] == c) && (! str[1]))
+#define check_string_isstdin(file_name)  check_string_of_length1(file_name, '-')
+#define check_string_isnewline(line)  check_string_of_length1(line, '\n')
+
+
+/******************************************************************************
+    * commonly used Error Message Functions
+******************************************************************************/
+
+#define xperror_config_arg(target)  xperror_invalid_arg('C', 0, "mode", target)
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
 
-#define xperror_standards(addition)  xperror_message(strerror(errno), addition)
-#define xperror_individually(msg)  xperror_message(msg, NULL)
+#define xperror_standards(errid, addition)  xperror_message(strerror(errid), addition, false)
+#define xperror_individually(msg)  xperror_message(msg, NULL, false)
 #define xperror_internal_file()  xperror_individually("unexpected error while manipulating an internal file")
+
+
+/******************************************************************************
+    * IDs for 'receive_dockerfile_instruction'
+******************************************************************************/
+
+#define ID_ADD           0
+#define ID_ARG           1
+#define ID_CMD           2
+#define ID_COPY          3
+#define ID_ENTRYPOINT    4
+#define ID_ENV           5
+#define ID_EXPOSE        6
+#define ID_FROM          7
+#define ID_HEALTHCHECK   8
+#define ID_LABEL         9
+#define ID_ONBUILD      10
+#define ID_RUN          11
+#define ID_SHELL        12
+#define ID_STOPSIGNAL   13
+#define ID_USER         14
+#define ID_VOLUME       15
+#define ID_WORKDIR      16
+
 
 
 /******************************************************************************
@@ -76,16 +121,28 @@ void setcmd_manual();
 
 
 /******************************************************************************
-    * Error Handling Functions
+    * Functions used in separate files
 ******************************************************************************/
 
-void xperror_invalid_arg(int code, int state, const char * restrict desc, const char * restrict arg);
+int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
+
+int reflect_to_Dockerfile(const char *line);
+int read_provisional_report(unsigned short prov_reflecteds[2]);
+int write_provisional_report(unsigned short prov_reflecteds[2]);
+
+
+
+/******************************************************************************
+    * Error Message Functions
+******************************************************************************/
+
+void xperror_invalid_arg(int code_c, int state, const char * restrict desc, const char * restrict arg);
 void xperror_valid_args(const char * const expected[], size_t size);
 
 void xperror_missing_args(const char * restrict desc, const char * restrict before_arg);
-void xperror_too_many_args(unsigned int limit);
+void xperror_too_many_args(int limit);
 
-void xperror_message(const char * restrict msg, const char * restrict addition);
+void xperror_message(const char * restrict msg, const char * restrict addition, bool omit_newline);
 void xperror_suggestion(bool cmd_flag);
 
 
@@ -93,8 +150,8 @@ void xperror_suggestion(bool cmd_flag);
     * Utilitys
 ******************************************************************************/
 
-char *xstrndup(const char *src, size_t n);
-int strcmp_upper_case(const char * restrict target, const char * restrict expected);
+char *xfgets_for_loop(const char *file_name, bool preserve_flag, int *p_errid);
+int xstrcmp_upper_case(const char * restrict target, const char * restrict expected);
 
 
 /******************************************************************************
@@ -103,23 +160,15 @@ int strcmp_upper_case(const char * restrict target, const char * restrict expect
 
 int receive_positive_integer(const char *target);
 int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode);
+char *receive_dockerfile_instruction(const char *line, int *p_id);
 
 
 /******************************************************************************
     * Check Functions
 ******************************************************************************/
 
-int check_file_isempty(const char *file_name);
+int check_file_size(const char *file_name);
 int check_last_exit_status();
-
-
-/******************************************************************************
-    * Functions used in separate files
-******************************************************************************/
-
-int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
-
-int manage_provisional_report(unsigned short *prov_reflects, int mode_c, int keep_c);
 
 
 #endif

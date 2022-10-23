@@ -32,16 +32,8 @@ typedef enum {
 } help_conts;
 
 
-/** Data type for storing the results of option parse */
-typedef struct {
-    help_conts code;        /** serial number of the content displayed by help function */
-    int (* side_func)();    /** side function that may be executed by specifying certain options */
-} help_opts;
-
-
-static int __parse_opts(int argc, char **argv, help_opts *opt);
+static int __parse_opts(int argc, char **argv, help_conts *opt);
 static void __display_cmd_list();
-static int __display_exit_status();
 static int __display_version();
 
 static int __display_help(help_conts code, const char *target);
@@ -99,15 +91,10 @@ extern const char * const cmd_reprs[3];
  */
 int help(int argc, char **argv){
     int i;
-    help_opts opt;
+    help_conts code;
 
-    if ((i = __parse_opts(argc, argv, &opt))){
-        if (! opt.side_func)
-            i = (i < 0) ? 1 : 0;
-        else if ((i = opt.side_func()))
-            xperror_internal_file();
-        return i;
-    }
+    if ((i = __parse_opts(argc, argv, &code)))
+        return (i < 0) ? 1 : 0;
 
     const char *target = NULL;
     if ((argc -= optind) > 0){
@@ -119,11 +106,11 @@ int help(int argc, char **argv){
 
     char S[] = "\n\n\n";
     do {
-        i |= __display_help(opt.code, target);
+        i |= __display_help(code, target);
 
         if (--argc){
             target = *(++argv);
-            S[1] = (opt.code != manual) ? '\0' : '\n';
+            S[1] = (code != manual) ? '\0' : '\n';
             fputs(S, stdout);
             fflush(stdout);
         }
@@ -145,22 +132,20 @@ int help(int argc, char **argv){
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_opts(int argc, char **argv, help_opts *opt){
-    const char *short_opts = "ademPV";
+static int __parse_opts(int argc, char **argv, help_conts *opt){
+    const char *short_opts = "ademV";
 
     const struct option long_opts[] = {
         { "all",              no_argument, NULL, 'a' },
         { "description",      no_argument, NULL, 'd' },
         { "example",          no_argument, NULL, 'e' },
         { "manual",           no_argument, NULL, 'm' },
-        { "last-exit-status", no_argument, NULL, 'P' },
         { "version",          no_argument, NULL, 'V' },
         { "help",             no_argument, NULL,  1  },
         {  0,                  0,           0,    0  }
     };
 
-    opt->code = manual;
-    opt->side_func = NULL;
+    *opt = manual;
 
     int c;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0){
@@ -169,20 +154,16 @@ static int __parse_opts(int argc, char **argv, help_opts *opt){
                 __display_cmd_list();
                 return 1;
             case 'd':
-                opt->code = description;
+                *opt = description;
                 break;
             case 'e':
-                opt->code = example;
+                *opt = example;
                 break;
             case 'm':
-                opt->code = manual;
+                *opt = manual;
                 break;
-            case 'P':
-                opt->side_func = __display_exit_status;
-                return 1;
             case 'V':
-                opt->side_func = __display_version;
-                return 1;
+                return __display_version();
             case 1:
                 help_manual();
                 return 1;
@@ -210,24 +191,9 @@ static void __display_cmd_list(){
 
 
 /**
- * @brief display the exit status of last executed command line.
- *
- * @return int  exit status like command's one
- */
-static int __display_exit_status(){
-    int exit_status;
-    if ((exit_status = check_last_exit_status()) >= 0){
-        fprintf(stdout, "%d\n", exit_status);
-        return 0;
-    }
-    return 1;
-}
-
-
-/**
  * @brief display the version of this tool.
  *
- * @return int  exit status like command's one
+ * @return int  1 (normally exit) or -1 (error exit)
  */
 static int __display_version(){
     FILE *fp;
@@ -237,9 +203,10 @@ static int __display_version(){
             fputs(S, stdout);
 
         fclose(fp);
-        return 0;
+        return 1;
     }
-    return 1;
+    xperror_internal_file();
+    return -1;
 }
 
 
@@ -319,7 +286,6 @@ static int __display_help(help_conts code, const char *target){
         else {
             xperror_invalid_arg('C', i, "dit command", target);
             xperror_suggestion(false);
-            fflush(stderr);
             return 1;
         }
     }
@@ -363,7 +329,7 @@ static void __dit_manual(){
         "  ignore         edit set of commands that are ignored "WHEN_REFLECTING"\n"
         "\n"
         "editing your Dockerfile:\n"
-        "  cp             copy files from the host environment, and reflect this as COPY/ADD instructions\n"
+        "  cp             copy files from the host environment and reflect this as COPY/ADD instructions\n"
         "  label          edit list of LABEL/EXPOSE instructions\n"
         "  setcmd         set CMD/ENTRYPOINT instruction\n"
         "  healthcheck    set HEALTHCHECK instruction\n"
@@ -400,10 +366,10 @@ void config_manual(){
         "\n"
         HELP_REMARKS_STR
         "  - If neither OPTION nor MODE is specified, display the current settings.\n"
-        "  - To specify a mode, you can use the above serial numbers and strings,\n"
+        "  - To specify a mode, you can use the above serial numbers and strings\n"
         "    and any of the strings "CAN_BE_TRUNCATED".\n"
         "  - If you specify an underscore instead of a mode, the current settings is inherited.\n"
-        "  - Each MODE is one of the following formats, and targets the files listed on the right.\n"
+        "  - Each MODE is one of the following formats and targets the files listed on the right.\n"
         "      <mode>           both files\n"
         "      [bdh]=<mode>     'b' (both files), 'd' (Dockerfile), 'h' (history-file)\n"
         "      [0-4_][0-4_]     first character (Dockerfile), second character (history-file)\n"
@@ -438,20 +404,18 @@ void help_manual(){
         "Show requested information for each specified dit COMMAND.\n"
         "\n"
         HELP_OPTIONS_SYR
-        "  -a, --all                 list all dit commands available" EXIT_NORMALLY
-        "  -d, --description         show the short descriptions\n"
-        "  -e, --example             show the examples of use\n"
-        "  -m, --manual              show the detailed manuals\n"
-        "  -P, --last-exit-status    display the recorded exit status" EXIT_NORMALLY
-        "  -V, --version             display the version of this tool" EXIT_NORMALLY
-        "      --help                " HELP_OPTION_DESC
+        "  -a, --all            list all dit commands available" EXIT_NORMALLY
+        "  -d, --description    show the short descriptions\n"
+        "  -e, --example        show the examples of use\n"
+        "  -m, --manual         show the detailed manuals\n"
+        "  -V, --version        display the version of this tool" EXIT_NORMALLY
+        "      --help           " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
         "  - If no COMMANDs are specified, show information about the main interface of dit commands.\n"
         "  - Each COMMAND "CAN_BE_TRUNCATED", in addition\n"
         "    'config' and 'healthcheck' can be specified by 'cfg' and 'hc' respectively.\n"
-        "  - If neither '-dem' is specified, it operates as if '-m' is specified.\n"
-        "  - Each occurrence of '-dem' overrides the previous occurrence.\n"
+        "  - When neither '-dem' is specified, it operates as if '-m' is specified.\n"
     , stdout);
 }
 
@@ -481,13 +445,13 @@ void inspect_manual(){
         HELP_REMARKS_STR
         "  - If no DIRECTORYs are specified, it operates as if the current directory is specified.\n"
         "  - The WORD argument for '--sort' "CAN_BE_TRUNCATED".\n"
-        "  - User or group name longer than 8 characters are converted to the corresponding ID,\n"
+        "  - User or group name longer than 8 characters are converted to the corresponding ID\n"
         "    and the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
         "  - The units of file size are 'k,M,G,T,P,E,Z', which is powers of 1000.\n"
         "  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n"
         "  - If standard output is not connected to a terminal, each file name is not colorized.\n"
         "\n"
-        "The above options are similar to the 'ls' command which is a GNU one.\n"
+        "This command is based on the 'ls' command which is a GNU one.\n"
         "See that man page for details.\n"
     , stdout);
 }
@@ -509,7 +473,34 @@ void optimize_manual(){
 
 
 void reflect_manual(){
-    fputs("reflect manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit reflect [OPTION]... [SOURCE]...\n"
+        "Append the contents of each specified SOURCE to "DOCKER_OR_HISTORY".\n"
+        "\n"
+        HELP_OPTIONS_SYR
+        "  -d                   reflect in Dockerfile\n"
+        "  -h                   reflect in history-file\n"
+        "      --target=DEST    set destination file:\n"
+        "                         dockerfile (-d), history-file (-h), both (-dh)\n"
+        "  -p                   leave repeated empty output lines as they are\n"
+        "  -s                   suppress repeated empty output lines\n"
+        "      --blank=WORD     replace how to handle repeated empty output lines:\n"
+        "                         ignore (default), preserve (-p), squeeze (-s)\n"
+        "      --help           " HELP_OPTION_DESC
+        "\n"
+        HELP_REMARKS_STR
+        "  - If no SOURCEs are specified, it uses the internal files generated by 'convert' command.\n"
+        "  - If '-' is specified as SOURCE, it read standard input until an EOF is entered.\n"
+        "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
+        "  - Destination file must be specified explicitly by '-dh' or '--target'.\n"
+        "  - If both files are destinations, only the internal files above can be used.\n"
+        "  - If the size of destination file reaches the upper limit (2G), it may exit with the error.\n"
+        "  - When reflecting in Dockerfile, each instruction must be on one line and\n"
+        "    the line to be reflected must not contain FROM and MAINTAINER instructions.\n"
+        "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is one or less.\n"
+        "  - Internally, logging such as the number of reflected lines is performed.\n"
+    , stdout);
 }
 
 
@@ -545,7 +536,7 @@ static void __convert_description(){
 
 static void __cp_description(){
     fputs(
-        "Perform processing equivalent to COPY/ADD instructions, and reflect this in Dockerfile.\n"
+        "Perform processing equivalent to COPY/ADD instructions and reflect this in Dockerfile.\n"
     , stdout);
 }
 
@@ -627,7 +618,7 @@ static void __config_example(){
         "dit config                 Display the current settings.\n"
         "dit config no-reflect      Replace the settings with 'd=no-reflect h=no-reflect'.\n"
         "dit config d=st,h=no-ig    Replace the settings with 'd=strict h=no-ignore'.\n"
-        "dit config -r _3           Reset the settings, and replace the setting of 'h' with 'simple'.\n"
+        "dit config -r _3           Reset the settings and replace the setting of 'h' with 'simple'.\n"
     , stdout);
 }
 
@@ -693,7 +684,12 @@ static void __optimize_example(){
 
 
 static void __reflect_example(){
-    fputs("reflect example\n", stdout);
+    fputs(
+        "dit reflect                      Error in noraml use, but used internally for logging.\n"
+        "dit reflect -d /tmp/erase.out    Reflect the contents of '/tmp/erase.out' in Dockerfile.\n"
+        "dit reflect --target=hist -      Reflect the input contents in history-file.\n"
+        "dit reflect -dh                  Reflect the output contents of the previous 'convert' command.\n"
+    , stdout);
 }
 
 
