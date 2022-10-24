@@ -10,18 +10,22 @@
 
 #include "main.h"
 
-#define HELP_CONTS_NUM 3
+#define HELP_CONTENTS_NUM 3
+
 #define HELP_USAGES_STR "Usages:\n"
-#define HELP_OPTIONS_SYR "Options:\n"
+#define HELP_OPTIONS_STR "Options:\n"
 #define HELP_REMARKS_STR "Remarks:\n"
 
 #define DOCKER_OR_HISTORY  "Dockerfile or history-file"
 #define WHEN_REFLECTING  "when reflecting a executed command line"
 
+#define TARGET_OPTION_ARG  "  dockerfile (-d), history-file (-h), both (-dh)\n"
 #define EXIT_NORMALLY  ", and exit normally\n"
 #define HELP_OPTION_DESC  "display this help" EXIT_NORMALLY
 
 #define CAN_BE_TRUNCATED  "can be truncated as long as it is unique"
+#define SPECIFIED_BY_TARGET  "file must be specified explicitly by '-dh' or '--target'"
+#define CMD_ENT_RESTRICT  "so that each of CMD and ENTRYPOINT instructions is one or less"
 
 
 /** Data type that collects serial numbers of the contents displayed by help function */
@@ -226,7 +230,7 @@ static int __display_help(help_conts code, const char *target){
     void (* help_func)();
 
     if (target){
-        void (* const cmd_helps[HELP_CONTS_NUM][CMDS_NUM])() = {
+        void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])() = {
             {
                 config_manual,
                 convert_manual,
@@ -290,7 +294,7 @@ static int __display_help(help_conts code, const char *target){
         }
     }
     else {
-        void (* const dit_helps[HELP_CONTS_NUM])() = {
+        void (* const dit_helps[HELP_CONTENTS_NUM])() = {
             __dit_manual,
             __dit_description,
             __dit_example
@@ -322,13 +326,13 @@ static void __dit_manual(){
         "Commands:\n"
         "main features of this tool:\n"
         "  convert        show how a command line is reflected in "DOCKER_OR_HISTORY"\n"
-        "  optimize       do refactoring on Dockerfile based on its best practices\n"
+        "  optimize       do refactoring and optimization on Dockerfile based on its best practices\n"
         "\n"
         "customization of tool settings:\n"
         "  config         set the level of ignoring commands "WHEN_REFLECTING"\n"
         "  ignore         edit set of commands that are ignored "WHEN_REFLECTING"\n"
         "\n"
-        "editing your Dockerfile:\n"
+        "editing Dockerfile:\n"
         "  cp             copy files from the host environment and reflect this as COPY/ADD instructions\n"
         "  label          edit list of LABEL/EXPOSE instructions\n"
         "  setcmd         set CMD/ENTRYPOINT instruction\n"
@@ -337,7 +341,7 @@ static void __dit_manual(){
         "\n"
         "utilitys:\n"
         "  reflect        append the contents of some files to "DOCKER_OR_HISTORY"\n"
-        "  erase          remove some lines from "DOCKER_OR_HISTORY"\n"
+        "  erase          delete some lines from "DOCKER_OR_HISTORY"\n"
         "  inspect        show some directory trees with details about each file\n"
         "  help           show information for some dit commands\n"
         "\n"
@@ -351,9 +355,9 @@ void config_manual(){
         HELP_USAGES_STR
         "  dit config [OPTION]... [MODE[,MODE]...]\n"
         "Set the level at which commands that should not be reflected are ignored, used\n"
-        WHEN_REFLECTING" to "DOCKER_OR_HISTORY", individually.\n"
+        WHEN_REFLECTING" in "DOCKER_OR_HISTORY", individually.\n"
         "\n"
-        HELP_OPTIONS_SYR
+        HELP_OPTIONS_STR
         "  -r, --reset    reset each level with default value\n"
         "      --help     " HELP_OPTION_DESC
         "\n"
@@ -388,7 +392,38 @@ void cp_manual(){
 
 
 void erase_manual(){
-    fputs("erase manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit erase [OPTION]...\n"
+        "Delete the lines that match the specified conditions from "DOCKER_OR_HISTORY".\n"
+        "\n"
+        HELP_OPTIONS_STR
+        "  -B, --begin-with=STR    delete the lines starting with STR\n"
+        "  -C, --contain=STR       delete the lines that contain STR\n"
+        "  -d                      delete from Dockerfile\n"
+        "  -h                      delete from history-file\n"
+        "      --target=FILE       determine the target file:\n"
+        "                          " TARGET_OPTION_ARG
+        "  -L, --limits=NUM        delete at most NUM lines, counting from the most recently added\n"
+        "  -N, --times=NUM         delete lines added within the last NUM times\n"
+        "  -r, --reset             reset the internal log-file that records the number of reflected lines\n"
+        "  -v, --verbose           display deleted lines\n"
+        "  -y                      eliminate the confirmation work before deletion\n"
+        "      --assume=Y/n        set the answer before the confirmation work\n"
+        "      --help              " HELP_OPTION_DESC
+        "\n"
+        HELP_REMARKS_STR
+        "  - The FILE argument for '--target' "CAN_BE_TRUNCATED".\n"
+        "  - The target "SPECIFIED_BY_TARGET".\n"
+        "  - If no OPTIONs are given to determine which lines to delete, it behaves as if '-N1' is given.\n"
+        "  - The -N option uses the internal log-files that record the number of reflected lines, and\n"
+        "    if there is an inconsistency between one of that files and the target file, it is reset.\n"
+        "  - Above log-files are not saved across interruptions such as exiting the container.\n"
+        "  - Dockerfile is always modified "CMD_ENT_RESTRICT".\n"
+        "  - By default, Y/n confirmation is performed using standard error output and standard input\n"
+        "    as to whether it is okay to delete lines that match the specified conditions, and if you\n"
+        "    answer 'Yes', delete all of the lines, if you answer 'No', delete the selected lines.\n"
+    , stdout);
 }
 
 
@@ -403,7 +438,7 @@ void help_manual(){
         "  dit help [OPTION]... [COMMAND]...\n"
         "Show requested information for each specified dit COMMAND.\n"
         "\n"
-        HELP_OPTIONS_SYR
+        HELP_OPTIONS_STR
         "  -a, --all            list all dit commands available" EXIT_NORMALLY
         "  -d, --description    show the short descriptions\n"
         "  -e, --example        show the examples of use\n"
@@ -415,7 +450,7 @@ void help_manual(){
         "  - If no COMMANDs are specified, show information about the main interface of dit commands.\n"
         "  - Each COMMAND "CAN_BE_TRUNCATED", in addition\n"
         "    'config' and 'healthcheck' can be specified by 'cfg' and 'hc' respectively.\n"
-        "  - When neither '-dem' is specified, it operates as if '-m' is specified.\n"
+        "  - When neither '-dem' is given, it behaves as if '-m' is given.\n"
     , stdout);
 }
 
@@ -431,7 +466,7 @@ void inspect_manual(){
         "  dit inspect [OPTION]... [DIRECTORY]...\n"
         "List information about the files under each specified DIRECTORY in a tree format.\n"
         "\n"
-        HELP_OPTIONS_SYR
+        HELP_OPTIONS_STR
         "  -C, --color              colorize file name to distinguish file types\n"
         "  -F, --classify           append indicator (one of '*/=|') to each file name:\n"
         "                             to executable file, directory, socket or fifo, in order\n"
@@ -445,8 +480,8 @@ void inspect_manual(){
         HELP_REMARKS_STR
         "  - If no DIRECTORYs are specified, it operates as if the current directory is specified.\n"
         "  - The WORD argument for '--sort' "CAN_BE_TRUNCATED".\n"
-        "  - User or group name longer than 8 characters are converted to the corresponding ID\n"
-        "    and the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
+        "  - User or group name longer than 8 characters are converted to the corresponding ID, and\n"
+        "    the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
         "  - The units of file size are 'k,M,G,T,P,E,Z', which is powers of 1000.\n"
         "  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n"
         "  - If standard output is not connected to a terminal, each file name is not colorized.\n"
@@ -478,11 +513,11 @@ void reflect_manual(){
         "  dit reflect [OPTION]... [SOURCE]...\n"
         "Append the contents of each specified SOURCE to "DOCKER_OR_HISTORY".\n"
         "\n"
-        HELP_OPTIONS_SYR
-        "  -d                   reflect in Dockerfile\n"
-        "  -h                   reflect in history-file\n"
-        "      --target=DEST    set destination file:\n"
-        "                         dockerfile (-d), history-file (-h), both (-dh)\n"
+        HELP_OPTIONS_STR
+        "  -d                   append to Dockerfile\n"
+        "  -h                   append to history-file\n"
+        "      --target=DEST    determine destination file:\n"
+        "                       " TARGET_OPTION_ARG
         "  -p                   leave repeated empty output lines as they are\n"
         "  -s                   suppress repeated empty output lines\n"
         "      --blank=WORD     replace how to handle repeated empty output lines:\n"
@@ -493,12 +528,12 @@ void reflect_manual(){
         "  - If no SOURCEs are specified, it uses the internal files generated by 'convert' command.\n"
         "  - If '-' is specified as SOURCE, it read standard input until an EOF is entered.\n"
         "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
-        "  - Destination file must be specified explicitly by '-dh' or '--target'.\n"
+        "  - Destination "SPECIFIED_BY_TARGET".\n"
         "  - If both files are destinations, only the internal files above can be used.\n"
         "  - If the size of destination file reaches the upper limit (2G), it may exit with the error.\n"
         "  - When reflecting in Dockerfile, each instruction must be on one line and\n"
         "    the line to be reflected must not contain FROM and MAINTAINER instructions.\n"
-        "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is one or less.\n"
+        "  - Dockerfile is adjusted "CMD_ENT_RESTRICT".\n"
         "  - Internally, logging such as the number of reflected lines is performed.\n"
     , stdout);
 }
@@ -536,13 +571,13 @@ static void __convert_description(){
 
 static void __cp_description(){
     fputs(
-        "Perform processing equivalent to COPY/ADD instructions and reflect this in Dockerfile.\n"
+        "Perform the processing equivalent to COPY/ADD instructions and reflect this in Dockerfile.\n"
     , stdout);
 }
 
 static void __erase_description(){
     fputs(
-        "Remove the lines that match some conditions from "DOCKER_OR_HISTORY".\n"
+        "Delete the lines that match some conditions from "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
@@ -584,7 +619,7 @@ static void __onbuild_description(){
 
 static void __optimize_description(){
     fputs(
-        "Generate Dockerfile as the result of refactoring based on its best practices.\n"
+        "Generate Dockerfile as the result of refactoring and optimization based on its best practices.\n"
     , stdout);
 }
 
@@ -618,7 +653,7 @@ static void __config_example(){
         "dit config                 Display the current settings.\n"
         "dit config no-reflect      Replace the settings with 'd=no-reflect h=no-reflect'.\n"
         "dit config d=st,h=no-ig    Replace the settings with 'd=strict h=no-ignore'.\n"
-        "dit config -r _3           Reset the settings and replace the setting of 'h' with 'simple'.\n"
+        "dit config -r _3           Reset the settings, and replace the setting of 'h' with 'simple'.\n"
     , stdout);
 }
 
@@ -634,7 +669,12 @@ static void __cp_example(){
 
 
 static void __erase_example(){
-    fputs("erase example\n", stdout);
+    fputs(
+        "dit erase -dh                            Delete the lines added just before.\n"
+        "dit erase -d -BLABEL -BEXPOSE            Delete unnecessary metadata from Dockerfile.\n"
+        "dit erase --cont=cat --targ=hist         Delete unnecessary 'cat' command from history-file.\n"
+        "dit erase -dvy -B ONBUILD > erase.out    Extract ONBUILD instructions from Dockerfile.\n"
+    , stdout);
 }
 
 
@@ -685,10 +725,10 @@ static void __optimize_example(){
 
 static void __reflect_example(){
     fputs(
-        "dit reflect                      Error in noraml use, but used internally for logging.\n"
-        "dit reflect -d /tmp/erase.out    Reflect the contents of '/tmp/erase.out' in Dockerfile.\n"
-        "dit reflect --target=hist -      Reflect the input contents in history-file.\n"
-        "dit reflect -dh                  Reflect the output contents of the previous 'convert' command.\n"
+        "dit reflect                 Error in noraml use, but used internally for logging.\n"
+        "dit reflect -d erase.out    Reflect the contents of './erase.out' in Dockerfile.\n"
+        "dit reflect -hs -           Reflect the input contents in history-file while suqueezing blanks.\n"
+        "dit reflect --target b      Reflect the output contents of the previous 'convert' command.\n"
     , stdout);
 }
 
