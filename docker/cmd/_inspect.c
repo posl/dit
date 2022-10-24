@@ -30,11 +30,11 @@ typedef struct {
 
 /** Data type that is applied to the smallest element that makes up the directory tree */
 typedef struct file_node{
-    char *name;
-    mode_t mode;
-    uid_t uid;
-	gid_t gid;
-    off_t size;
+    char *name;                     /** file name */
+    mode_t mode;                    /** file mode */
+    uid_t uid;                      /** file uid */
+	gid_t gid;                      /** file gid */
+    off_t size;                     /** file size */
 
     char *link_path;                /** file name of link destination if this is a symbolic link */
     mode_t link_mode;               /** file mode of link destination if this is a symbolic link */
@@ -59,9 +59,9 @@ typedef struct {
 static int __parse_opts(int argc, char **argv, insp_opts *opt);
 
 static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt);
-static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, qcmp comp);
+static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, qcmp comp);
 static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
-static file_node *__new_file(char * restrict path, char * restrict name);
+static file_node *__new_file(const char * restrict path, char * restrict name);
 static bool __append_file(file_node *tree, file_node *file);
 
 static int __qcmp_name(const void *a, const void *b);
@@ -72,8 +72,8 @@ static int __fcmp_size(file_node *file1, file_node *file2);
 static int __fcmp_ext(file_node *file1, file_node *file2);
 static const char *__get_file_ext(const char *name);
 
-static void __display_dir_tree(file_node *tree, insp_opts *opt);
-static void __display_recursive(file_node *file, insp_opts *opt, unsigned int depth);
+static void __destruct_dir_tree(file_node *tree, insp_opts *opt);
+static void __destruct_recursive(file_node *file, insp_opts *opt, unsigned int depth);
 static void __print_file_mode(mode_t mode);
 static void __print_file_owner(file_node *file, bool numeric_id);
 static void __print_file_size(off_t size);
@@ -114,7 +114,7 @@ int inspect(int argc, char **argv){
     file_node *tree;
     do {
         if ((tree = __construct_dir_tree(path, &opt)))
-            __display_dir_tree(tree, &opt);
+            __destruct_dir_tree(tree, &opt);
         else
             i = 1;
 
@@ -217,20 +217,12 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
 static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
     file_node *tree = NULL;
 
-    size_t path_len;
-    if (base_path && ((path_len = strlen(base_path) + 1) > 0)){
+    if (base_path){
         inf_path ipath = {NULL, 0};
+        tree = __construct_recursive(&ipath, 0, base_path, opt->comp);
 
-        if (__concat_inf_path(&ipath, 0, base_path, path_len)){
-            char *name;
-            if ((name = (char *) malloc(sizeof(char) * path_len))){
-                memcpy(name, base_path, (sizeof(char) * path_len));
-
-                if (! (tree = __construct_recursive(&ipath, path_len, name, opt->comp)))
-                    free(name);
-            }
+        if (ipath.ptr)
             free(ipath.ptr);
-        }
     }
     return tree;
 }
@@ -240,57 +232,57 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
  * @brief construct the directory tree, recursively.
  *
  * @param[out] ipath  file path to the file we are currently looking at
- * @param[in]  ipath_len  the length of path string including the terminating null character
+ * @param[in]  ipath_len  the length of path string
  * @param[in]  name  name of the file we are currently looking at
  * @param[in]  comp  comparison function used when qsort
  * @return file_node*  the result of sub-constructing
  *
  * @note at the same time, sort files in directory.
  */
-static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, char *name, qcmp comp){
-    file_node *file;
-    file = __new_file(ipath->ptr, name);
+static file_node *__construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, qcmp comp){
+    file_node *file = NULL;
 
-    if (file && S_ISDIR(file->mode)){
-        DIR *dir;
-        if ((dir = opendir(ipath->ptr))){
-            if (__concat_inf_path(ipath, ipath_len - 1, "/", 2)){
-                struct dirent *entry;
-                char *d_name;
-                size_t name_len;
-                file_node *tmp;
+    size_t name_len;
+    if (((name_len = strlen(name) + 1) > 0) && __concat_inf_path(ipath, ipath_len, name, name_len)){
+        char *dest;
+        if ((dest = (char *) malloc(sizeof(char) * name_len))){
+            memcpy(dest, name, (sizeof(char) * name_len));
 
-                while ((entry = readdir(dir))){
-                    d_name = entry->d_name;
-                    if ((d_name[0] == '.') && (! d_name[(d_name[1] != '.') ? 1 : 2]))
-                        continue;
+            if ((file = __new_file(ipath->ptr, dest))){
+                if (S_ISDIR(file->mode)){
+                    DIR *dir;
+                    if ((dir = opendir(ipath->ptr))){
+                        ipath_len += name_len;
 
-                    name_len = strlen(d_name) + 1;
-                    if (__concat_inf_path(ipath, ipath_len, d_name, name_len)){
-                        if ((name = (char *) malloc(sizeof(char) * name_len))){
-                            memcpy(name, d_name, (sizeof(char) * name_len));
+                        if (__concat_inf_path(ipath, ipath_len - 1, "/", 2)){
+                            struct dirent *entry;
+                            file_node *tmp;
 
-                            if ((tmp = __construct_recursive(ipath, ipath_len + name_len, name, comp))){
-                                if (__append_file(file, tmp))
+                            while ((entry = readdir(dir))){
+                                name = entry->d_name;
+                                if ((name[0] == '.') && (! name[(name[1] != '.') ? 1 : 2]))
                                     continue;
 
-                                if (tmp->link_path)
-                                    free(tmp->link_path);
-                                free(tmp);
+                                if (! (tmp = __construct_recursive(ipath, ipath_len, name, comp)))
+                                    break;
+                                if (! __append_file(file, tmp)){
+                                    __destruct_recursive(tmp, NULL, 0);
+                                    break;
+                                }
                             }
-                            free(name);
-                        }
-                    }
-                    break;
-                }
 
-                if (file->children)
-                    qsort(file->children, file->children_num, sizeof(file_node *), comp);
+                            if (file->children)
+                                qsort(file->children, file->children_num, sizeof(file_node *), comp);
+                        }
+                        closedir(dir);
+                    }
+                    else
+                        file->errid = errno;
+                }
             }
-            closedir(dir);
+            else
+                free(dest);
         }
-        else
-            file->errid = errno;
     }
     return file;
 }
@@ -350,7 +342,7 @@ static bool __concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf
  * @param[in]  name  name of the file we are currently looking at
  * @return file_node*  new element that makes up the directory tree
  */
-static file_node *__new_file(char * restrict path, char * restrict name){
+static file_node *__new_file(const char * restrict path, char * restrict name){
     file_node *file;
     if ((file = (file_node *) malloc(sizeof(file_node)))){
         file->name = name;
@@ -554,17 +546,17 @@ static const char *__get_file_ext(const char *name){
 
 
 /**
- * @brief display the directory tree and release the heap space used for it.
+ * @brief display the directory tree and release the dynamic memory used for it.
  *
  * @param[out] tree  pre-constructed directory tree
  * @param[in]  opt  variable containing the result of option parse
  */
-static void __display_dir_tree(file_node *tree, insp_opts *opt){
+static void __destruct_dir_tree(file_node *tree, insp_opts *opt){
     fputs(
         "Permission      User     Group      Size\n"
         "=========================================\n"
     , stdout);
-    __display_recursive(tree, opt, 0);
+    __destruct_recursive(tree, opt, 0);
 }
 
 
@@ -572,46 +564,51 @@ static void __display_dir_tree(file_node *tree, insp_opts *opt){
  * @brief display and release the directory tree, recursively.
  *
  * @param[out] file  the file we are currently trying to display
- * @param[in]  opt  variable containing the result of option parse
+ * @param[in]  opt  variable containing the result of option parse or NULL
  * @param[in]  depth  hierarchy in the directory tree of the file we are currently trying to display
  *
- * @note at the same time, release the data that is no longer needed.
+ * @note at the same time, release the dynamic memory that is no longer needed.
+ * @note if NULL is passed to 'opt', just release the dynamic memory that is never used.
  */
-static void __display_recursive(file_node *file, insp_opts *opt, unsigned int depth){
+static void __destruct_recursive(file_node *file, insp_opts *opt, unsigned int depth){
     int i;
 
-    if (! (file->errid && file->noinfo)){
-        __print_file_mode(file->mode);
-        __print_file_owner(file, opt->numeric_id);
-        __print_file_size(file->size);
-    }
-    else
-        fputs("       ???       ???       ???       ???    ", stdout);
+    if (opt){
+        if (! (file->errid && file->noinfo)){
+            __print_file_mode(file->mode);
+            __print_file_owner(file, opt->numeric_id);
+            __print_file_size(file->size);
+        }
+        else
+            fputs("       ???       ???       ???       ???    ", stdout);
 
-    if (depth){
-        for (i = depth; --i;)
-            fputs("|   ", stdout);
-        fputs("|-- ", stdout);
+        if (depth){
+            for (i = depth; --i;)
+                fputs("|   ", stdout);
+            fputs("|-- ", stdout);
+        }
+
+        __print_file_name(file, opt, false);
+
+        if (file->link_path && *(file->link_path))
+            __print_file_name(file, opt, true);
+
+        if (file->errid)
+            fprintf(stdout, " (%s)", strerror(file->errid));
+
+        fputc('\n', stdout);
     }
 
-    __print_file_name(file, opt, false);
     free(file->name);
 
-    if (file->link_path){
-        if (*(file->link_path))
-            __print_file_name(file, opt, true);
+    if (file->link_path)
         free(file->link_path);
-    }
-    if (file->errid)
-        fprintf(stdout, " (%s)", strerror(file->errid));
-
-    fputc('\n', stdout);
 
     if (file->children){
         i = 0;
         depth++;
         do
-            __display_recursive(file->children[i++], opt, depth);
+            __destruct_recursive(file->children[i++], opt, depth);
         while (i < file->children_num);
 
         free(file->children);
