@@ -25,7 +25,6 @@
 
 #define CAN_BE_TRUNCATED  "can be truncated as long as it is unique"
 #define SPECIFIED_BY_TARGET  "file must be specified explicitly by '-dh' or '--target'"
-#define CMD_ENT_RESTRICT  "so that each of CMD and ENTRYPOINT instructions is one or less"
 
 
 /** Data type that collects serial numbers of the contents displayed by help function */
@@ -140,13 +139,13 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
     const char *short_opts = "ademV";
 
     const struct option long_opts[] = {
-        { "all",              no_argument, NULL, 'a' },
-        { "description",      no_argument, NULL, 'd' },
-        { "example",          no_argument, NULL, 'e' },
-        { "manual",           no_argument, NULL, 'm' },
-        { "version",          no_argument, NULL, 'V' },
-        { "help",             no_argument, NULL,  1  },
-        {  0,                  0,           0,    0  }
+        { "all",         no_argument, NULL, 'a' },
+        { "description", no_argument, NULL, 'd' },
+        { "example",     no_argument, NULL, 'e' },
+        { "manual",      no_argument, NULL, 'm' },
+        { "version",     no_argument, NULL, 'V' },
+        { "help",        no_argument, NULL,  1  },
+        {  0,             0,           0,    0  }
     };
 
     *opt = manual;
@@ -228,6 +227,7 @@ static int __display_version(){
 static int __display_help(help_conts code, const char *target){
     const char *topic;
     void (* help_func)();
+    int exit_status = 0;
 
     if (target){
         void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])() = {
@@ -290,7 +290,7 @@ static int __display_help(help_conts code, const char *target){
         else {
             xperror_invalid_arg('C', i, "dit command", target);
             xperror_suggestion(false);
-            return 1;
+            exit_status = 1;
         }
     }
     else {
@@ -303,10 +303,12 @@ static int __display_help(help_conts code, const char *target){
         help_func = dit_helps[code];
     }
 
-    if (code != manual)
-        fprintf(stdout, " < %s >\n", topic);
-    help_func();
-    return 0;
+    if (! exit_status){
+        if (code != manual)
+            fprintf(stdout, " < %s >\n", topic);
+        help_func();
+    }
+    return exit_status;
 }
 
 
@@ -397,29 +399,36 @@ void erase_manual(){
         "  dit erase [OPTION]...\n"
         "Delete the lines that match the specified conditions from "DOCKER_OR_HISTORY".\n"
         "\n"
-        HELP_OPTIONS_STR
-        "  -B, --begin-with=STR    delete the lines starting with STR\n"
-        "  -C, --contain=STR       delete the lines that contain STR\n"
-        "  -d                      delete from Dockerfile\n"
-        "  -h                      delete from history-file\n"
-        "      --target=FILE       determine the target file:\n"
-        "                          " TARGET_OPTION_ARG
-        "  -L, --limits=NUM        delete at most NUM lines, counting from the most recently added\n"
-        "  -N, --times=NUM         delete lines added within the last NUM times\n"
-        "  -r, --reset             reset the internal log-file that records the number of reflected lines\n"
-        "  -v, --verbose           display deleted lines\n"
-        "  -y                      eliminate the confirmation work before deletion\n"
-        "      --assume=Y/n        set the answer before the confirmation work\n"
-        "      --help              " HELP_OPTION_DESC
+        "Options for Deleation:\n"
+        "  -B, --begin-with=STR        delete the lines starting with STR\n"
+        "  -C, --contain=STR           delete the lines containing STR\n"
+        "  -L, --lines=ARG[,ARG]...    delete the lines with the number specified by ARGs:\n"
+        "                                NUM (unique specification), [NUM]-[NUM] (range specification)\n"
+        "  -Z, --undoes[=NUM]          delete the lines added within the last NUM (default is 1) times\n"
+        "\n"
+        "Options for Behavior:\n"
+        "  -d                          delete from Dockerfile\n"
+        "  -h                          delete from history-file\n"
+        "      --target=FILE           determine the target file:\n"
+        "                              " TARGET_OPTION_ARG
+        "  -i, --ignore-case           ignore case distinctions in the STR arguments and data\n"
+        "  -m, --max-count=NUM         delete at most NUM lines, counting from the most recently added\n"
+        "  -r, --reset                 reset the internal log-file\n"
+        "  -v, --verbose               display deleted lines\n"
+        "  -y                          eliminate the confirmation work before deletion\n"
+        "      --assume=Y/n            set the answer before the confirmation work\n"
+        "      --help                  " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
+        "  - If no Options for Deleation are given, it behaves as if '-Z' is given.\n"
+        "  - The line numbers for the '-L' option start from 1, and 0 is the same as specifying nothing.\n"
+        "  - If NUM is omitted in the range specification of the '-L' option, it is interpreted as\n"
+        "    specifying the line number representing the beginning or end depending on the position."
         "  - The FILE argument for '--target' "CAN_BE_TRUNCATED".\n"
         "  - The target "SPECIFIED_BY_TARGET".\n"
-        "  - If no OPTIONs are given to determine which lines to delete, it behaves as if '-N1' is given.\n"
-        "  - The -N option uses the internal log-files that record the number of reflected lines, and\n"
-        "    if there is an inconsistency between one of that files and the target file, it is reset.\n"
+        "  - The '-Z' option uses the internal log-files that record the number of reflected lines, and\n"
+        "    if there is an inconsiestency between one of that files and the target file, it is reset.\n"
         "  - Above log-files are not saved across interruptions such as exiting the container.\n"
-        "  - Dockerfile is always modified "CMD_ENT_RESTRICT".\n"
         "  - By default, Y/n confirmation is performed using standard error output and standard input\n"
         "    as to whether it is okay to delete lines that match the specified conditions, and if you\n"
         "    answer 'Yes', delete all of the lines, if you answer 'No', delete the selected lines.\n"
@@ -533,7 +542,7 @@ void reflect_manual(){
         "  - If the size of destination file reaches the upper limit (2G), it may exit with the error.\n"
         "  - When reflecting in Dockerfile, each instruction must be on one line and\n"
         "    the line to be reflected must not contain FROM and MAINTAINER instructions.\n"
-        "  - Dockerfile is adjusted "CMD_ENT_RESTRICT".\n"
+        "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is one or less.\n"
         "  - Internally, logging such as the number of reflected lines is performed.\n"
     , stdout);
 }
@@ -671,9 +680,9 @@ static void __cp_example(){
 static void __erase_example(){
     fputs(
         "dit erase -dh                            Delete the lines added just before.\n"
-        "dit erase -d -BLABEL -BEXPOSE            Delete unnecessary metadata from Dockerfile.\n"
-        "dit erase --cont=cat --targ=hist         Delete unnecessary 'cat' command from history-file.\n"
-        "dit erase -dvy -B ONBUILD > erase.out    Extract ONBUILD instructions from Dockerfile.\n"
+        "dit erase -d -L -                        Delete all lines from Dockerfile.\n"
+        "dit erase --cont=cat --targ=hist         Delete unnecessary 'cat' commands from history-file.\n"
+        "dit erase -divy -BONBUILD > erase.out    Extract ONBUILD instructions from Dockerfile.\n"
     , stdout);
 }
 
