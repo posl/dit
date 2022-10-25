@@ -8,7 +8,7 @@ NR == 1 {
     N = $1
 
     if (((getline M < HNF) > 0) && (M ~ /^[0-9]+$/)){
-        if (M < N){
+        if (N == (M + 1)){
             $1 = ""
             sub(/[ \t]*/, "", $0)
             print $0 > CLF

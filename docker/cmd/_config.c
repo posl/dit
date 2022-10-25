@@ -29,7 +29,7 @@
 #define CONF_EXCEED_STAT  (CONF_MODES_NUM * CONF_MODES_NUM)
 
 
-static int __parse_opts(int argc, char **argv, int *opt);
+static int __parse_opts(int argc, char **argv, bool *opt);
 static int __config_contents(int code, ...);
 
 static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
@@ -69,11 +69,11 @@ static const int idx2mode[CONF_MODES_NUM] = {4, 0, 2, 3, 1};
  * @note treated like a normal main function.
  */
 int config(int argc, char **argv){
-    int i, reset_flag;
+    int i;
+    bool reset_flag;
 
-    if ((i = __parse_opts(argc, argv, &reset_flag))){
+    if ((i = __parse_opts(argc, argv, &reset_flag)))
         i = (i < 0) ? 1 : 0;
-    }
     else
         switch ((argc - optind)){
             case 0:
@@ -104,12 +104,12 @@ int config(int argc, char **argv){
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
- * @param[out] opt  variable to store integer representing whether to reset config-file
+ * @param[out] opt  variable to store boolean representing whether to reset config-file
  * @return int  0 (parse success), 1 (normally exit) or -1 (error exit)
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_opts(int argc, char **argv, int *opt){
+static int __parse_opts(int argc, char **argv, bool *opt){
     const char *short_opts = "r";
 
     const struct option long_opts[] = {
@@ -239,7 +239,7 @@ int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p
 
 
 /**
- * @brief parse the passed string and generate next modes.
+ * @brief parse the passed string, and generate next modes.
  *
  * @param[in]  config_arg  string for determining the modes
  * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile

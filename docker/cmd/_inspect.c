@@ -755,21 +755,21 @@ static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag){
                 (mode & S_ISUID) ? "37;41" :
                 (mode & S_ISGID) ? "30;43" :
                 (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) ? "1;32" :
-                "0"
+                    "0"
             ) :
             S_ISDIR(mode) ? (
                 (mode & S_IWOTH) ? (
                     (mode & S_ISVTX) ? "30;42" :
-                    "34;42"
+                        "34;42"
                 ) :
                 (mode & S_ISVTX) ? "37;44" :
-                "1;34"
+                    "1;34"
             ) :
             (S_ISCHR(mode) || S_ISBLK(mode)) ? "1;33" :
             S_ISFIFO(mode) ? "33" :
             S_ISLNK(mode) ? "1;36" :
             S_ISSOCK(mode) ? "1;35" :
-            "0";
+                "0";
 
         format = " -> \033[%sm%s\033[0m";
     }
@@ -787,7 +787,7 @@ static void __print_file_name(file_node *file, insp_opts *opt, bool link_flag){
             S_ISDIR(mode) ? '/' :
             S_ISFIFO(mode) ? '|' :
             S_ISSOCK(mode) ? '=' :
-            '\0';
+                '\0';
 
         if (indicator)
             fputc(indicator, stdout);
