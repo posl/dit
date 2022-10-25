@@ -35,10 +35,10 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt);
 
 static int __parse_and_reflect(int argc, char **argv, refl_opts *opt);
 static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, int *p_errid);
-static int __reflect_line(const char *line, int target_c, int next_target_c);
+static int __reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag);
 static int __init_dockerfile(FILE *fp);
 
-static int __check_dockerfile_instruction(const char *line);
+static int __check_dockerfile_instruction(char *line, bool onbuild_flag);
 
 static int __record_reflected_lines();
 static int __manage_provisional_report(unsigned short reflecteds[2], const char *mode);
@@ -266,7 +266,7 @@ static int __parse_and_reflect(int argc, char **argv, refl_opts *opt){
 static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, int *p_errid){
     static bool first_blank = true;
 
-    const char *line;
+    char *line;
     int tmp, exit_status = 0;
 
     if (! p_errid){
@@ -290,7 +290,7 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
             else
                 first_blank = true;
         }
-        if ((tmp = __reflect_line(line, target_c, opt->target_c))){
+        if ((tmp = __reflect_line(line, target_c, opt->target_c, false, false))){
             if (! *p_errid)
                 *p_errid = -1;
             if (exit_status >= 0)
@@ -305,11 +305,13 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
 
 
 /**
- * @brief reflect the specified line in Dockerfile or history-file and record the number of reflected lines.
+ * @brief reflect the specified line in Dockerfile or history-file, and record the number of reflected lines.
  *
  * @param[in]  line  target line
  * @param[in]  target_c  whether the destination file is Dockerfile or history-file ('d' or 'h')
  * @param[in]  next_target_c  the next 'target_c' if there are files waiting to be processed or '\0'
+ * @param[in]  verbose  whether to display reflected lines on screen
+ * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
  * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
  *
  * @note if the destination file is too large to be represented by int type, exit with the error.
@@ -317,7 +319,7 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
  *
  * @attention this function must be called until NULL is passed to 'line' to close the destination file.
  */
-static int __reflect_line(const char *line, int target_c, int next_target_c){
+static int __reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag){
     static FILE *fp = NULL;
     static unsigned short curr_reflecteds[2] = {0};
 
@@ -327,7 +329,7 @@ static int __reflect_line(const char *line, int target_c, int next_target_c){
         do {
             int target_id;
             if (target_c == 'd'){
-                if (__check_dockerfile_instruction(line)){
+                if (__check_dockerfile_instruction(line, onbuild_flag)){
                     exit_status = 1;
                     break;
                 }
@@ -346,14 +348,22 @@ static int __reflect_line(const char *line, int target_c, int next_target_c){
                     exit_status = 1;
                     break;
                 }
-                if ((! (fp = fopen(dest_file, "a"))) || ((i <= 0) && (! target_id) && __init_dockerfile(fp))){
-                    exit_status = -1;
-                    break;
+                if ((! (fp = fopen(dest_file, "a"))) ||
+                    ((i <= 0) && (! target_id) && ((curr_reflecteds[0] += __init_dockerfile(fp)) != 3))){
+                        exit_status = -1;
+                        break;
                 }
             }
 
+            const char *format = "ONBUILD %s";
+            if (! onbuild_flag)
+                format += 8;
+
             curr_reflecteds[target_id]++;
-            fputs(line, fp);
+            fprintf(fp, format, line);
+
+            if (verbose)
+                fprintf(stdout, format, line);
         } while (0);
     }
     else if (target_c != next_target_c){
@@ -373,13 +383,17 @@ static int __reflect_line(const char *line, int target_c, int next_target_c){
 
 
 /**
- * @brief reflect the specified line in Dockerfile and record the number of reflected lines.
+ * @brief reflect the specified line in Dockerfile, and record the number of reflected lines.
  *
  * @param[in]  line  target line
- * @return int  exit status like command's one
+ * @param[in]  verbose  whether to display reflected lines on screen
+ * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
+ * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ *
+ * @attention this function must be called until NULL is passed to 'line' to close the destination file.
  */
-int reflect_to_Dockerfile(const char *line){
-    return __reflect_line(line, 'd', '\0');
+int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag){
+    return __reflect_line(line, 'd', '\0', verbose, onbuild_flag);
 }
 
 
@@ -389,13 +403,13 @@ int reflect_to_Dockerfile(const char *line){
  * @brief reflect the Dockerfile base instructions in an empty Dockerfile.
  *
  * @param[out] fp  handler for destination file
- * @return int  exit status like command's one
+ * @return int  the number of reflected lines
  *
- * @note reflect FROM, SHELL, and WORKDIR instructions exactly one by one in this order, otherwise an error.
+ * @note reflect FROM, SHELL and WORKDIR instructions exactly one by one in this order, otherwise an error.
  */
 static int __init_dockerfile(FILE *fp){
-    const char *line;
-    int errid = 0, idx = 0, exit_status = 0;
+    char *line;
+    int errid = 0, reflected = 0;
 
     int instr_ids[3] = {
         ID_FROM,
@@ -404,17 +418,15 @@ static int __init_dockerfile(FILE *fp){
     };
 
     while ((line = xfgets_for_loop(DOCKER_FILE_BASE, false, &errid))){
-        if ((idx < 3) && (receive_dockerfile_instruction(line, instr_ids + idx))){
-            idx++;
+        if ((reflected < 3) && (receive_dockerfile_instruction(line, instr_ids + reflected))){
+            reflected++;
             fputs(line, fp);
         }
-        else {
+        else
             errid = -1;
-            exit_status = 1;
-        }
     }
 
-    return exit_status;
+    return reflected;
 }
 
 
@@ -429,42 +441,52 @@ static int __init_dockerfile(FILE *fp){
  * @brief check the validity of the target line as Dockerfile instruction.
  *
  * @param[in]  line  target line
+ * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
  * @return int  exit status like command's one
  *
  * @note satisfy the restriction that each of CMD and ENTRYPOINT instructions is one or less in Dockerfile.
+ *
+ * TODO: error checking function by parsing
  */
-static int __check_dockerfile_instruction(const char *line){
+static int __check_dockerfile_instruction(char *line, bool onbuild_flag){
     static bool cmd_ent_duplicates[2] = {true, true};
 
-    int instr_id = -1;
-    if ((! (receive_dockerfile_instruction(line, &instr_id))) || (instr_id == ID_FROM)){
-        xperror_message(line, "Invalid instruction", true);
-        return 1;
-    }
+    int instr_id = -1, exit_status = 0;
+    const char *err_desc;
 
-    // TODO: error checking function by parsing
-    // 'instr_id' and the return value of the function above are useful
+    err_desc =
+        (! (receive_dockerfile_instruction(line, &instr_id))) ? "Invalid Instruction" :
+        ((instr_id == ID_FROM) || (instr_id == ID_MAINTAINER)) ? "Instruction not Allowed" :
+        (onbuild_flag && (instr_id == ID_ONBUILD)) ? "Instruction Format Error" :
+            NULL;
 
-    const int instr_ids[2] = {
-        ID_CMD,
-        ID_ENTRYPOINT
-    };
+    if (! err_desc){
+        const int instr_ids[2] = {
+            ID_CMD,
+            ID_ENTRYPOINT
+        };
 
-    for (int i = 0; i < 2; i++){
-        if (instr_id == instr_ids[i]){
-            if (cmd_ent_duplicates[i]){
-                // TODO: waiting the implementation of erase commnad
-                // TODO: waiting the implementation of setcmd commnad
+        for (int i = 0; i < 2; i++){
+            if (instr_id == instr_ids[i]){
+                if (cmd_ent_duplicates[i]){
+                    // TODO: waiting the implementation of erase commnad
+                    // TODO: waiting the implementation of setcmd commnad
 
-                cmd_ent_duplicates[0] = false;
-                cmd_ent_duplicates[1] = false;
-                break;
+                    cmd_ent_duplicates[0] = false;
+                    cmd_ent_duplicates[1] = false;
+                    break;
+                }
+                else
+                    cmd_ent_duplicates[i] = true;
             }
-            else
-                cmd_ent_duplicates[i] = true;
         }
     }
-    return 0;
+    else {
+        xperror_message(line, err_desc, true);
+        exit_status = 1;
+    }
+
+    return exit_status;
 }
 
 
@@ -599,7 +621,7 @@ int read_provisional_report(unsigned short prov_reflecteds[2]){
  * @param[in]  prov_reflecteds  array of length 2 for storing the provisional numbers of reflected lines
  * @return int  exit status like command's one
  *
- * @note basically read the current values by 'read_provisional_report', add some processing and call.
+ * @note basically read the current values by 'read_provisional_report', add some processing and call this.
  */
 int write_provisional_report(unsigned short prov_reflecteds[2]){
     return __manage_provisional_report(prov_reflecteds, "w\0");
