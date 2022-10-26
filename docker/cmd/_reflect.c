@@ -327,32 +327,31 @@ static int __reflect_line(char *line, int target_c, int next_target_c, bool verb
 
     if (line){
         do {
-            int target_id;
+            const char *dest_file;
+            int size, target_id;
+
             if (target_c == 'd'){
                 if (__check_dockerfile_instruction(line, onbuild_flag)){
                     exit_status = 1;
                     break;
                 }
+                dest_file = DOCKER_FILE_DRAFT;
                 target_id = 0;
             }
-            else
+            else {
+                dest_file = HISTORY_FILE;
                 target_id = 1;
+            }
 
-            if (! fp){
-                const char *dest_file;
-                int i;
-
-                dest_file = (! target_id) ? DOCKER_FILE_DRAFT : HISTORY_FILE;
-                if ((i = check_file_size(dest_file)) == -2){
-                    xperror_standards(EFBIG, dest_file);
-                    exit_status = 1;
+            if ((size = check_file_size(dest_file)) == -2){
+                xperror_standards(EFBIG, dest_file);
+                exit_status = 1;
+                break;
+            }
+            if ((! (fp || (fp = fopen(dest_file, "a")))) ||
+                ((size <= 0) && (! target_id) && ((curr_reflecteds[0] += __init_dockerfile(fp)) != 3))){
+                    exit_status = -1;
                     break;
-                }
-                if ((! (fp = fopen(dest_file, "a"))) ||
-                    ((i <= 0) && (! target_id) && ((curr_reflecteds[0] += __init_dockerfile(fp)) != 3))){
-                        exit_status = -1;
-                        break;
-                }
             }
 
             const char *format = "ONBUILD %s";
@@ -530,9 +529,9 @@ static int __record_reflected_lines(){
 
 
 /**
- * @brief manage the file in which the provisional numbers of reflected lines is recorded.
+ * @brief manage the file in which the provisional number of reflected lines is recorded.
  *
- * @param[out] reflecteds  array of length 2 for storing the provisional numbers of reflected lines
+ * @param[out] reflecteds  array of length 2 for storing the provisional number of reflected lines
  * @param[in]  mode  string representing the modes of length 2 or 4
  * @return int  exit status like command's one
  *
@@ -602,9 +601,9 @@ static int __manage_provisional_report(unsigned short reflecteds[2], const char 
 
 
 /**
- * @brief read the provisional numbers of reflected lines from the file that recorded them.
+ * @brief read the provisional number of reflected lines from the file that recorded them.
  *
- * @param[out] prov_reflecteds  array of length 2 for storing the provisional numbers of reflected lines
+ * @param[out] prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
  * @return int  exit status like command's one
  *
  * @attention 'prov_reflecteds' must be initialized with 0 before the first call.
@@ -616,9 +615,9 @@ int read_provisional_report(unsigned short prov_reflecteds[2]){
 
 
 /**
- * @brief write the provisional numbers of reflected lines to the file that records them.
+ * @brief write the provisional number of reflected lines to the file that records them.
  *
- * @param[in]  prov_reflecteds  array of length 2 for storing the provisional numbers of reflected lines
+ * @param[in]  prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
  * @return int  exit status like command's one
  *
  * @note basically read the current values by 'read_provisional_report', add some processing and call this.
