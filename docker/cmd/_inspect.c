@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the dit command 'inspect', that shows the directory tree.
+ * @brief Described the dit command 'inspect', that shows some directory trees.
  * @author Tsukasa Inada
  * @date 2022/07/18
  */
@@ -218,7 +218,7 @@ static file_node *__construct_dir_tree(const char *base_path, insp_opts *opt){
     file_node *tree = NULL;
 
     if (base_path){
-        inf_path ipath = {NULL, 0};
+        inf_path ipath = { .ptr = NULL, .max = 0};
         tree = __construct_recursive(&ipath, 0, base_path, opt->comp);
 
         if (ipath.ptr)

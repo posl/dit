@@ -7,16 +7,16 @@
  * @author Tsukasa Inada
  * @date 2022/08/29
  *
- * @note In the config-file, a 2-digit integer in quinary notation is stored as signed char type.
+ * @note In the config-file, a 2-digit integer in quinary notation is stored as signed char.
  */
 
 #include "main.h"
 
 #define CONFIG_FILE "/dit/var/config.stat"
 
-#define CONF_ISRSTFLG 1
-#define CONF_ISWRTFLG 2
-#define CONF_ISHASARG 4
+#define CONF_ISRSTFLG 0b001
+#define CONF_ISWRTFLG 0b010
+#define CONF_ISHASARG 0b100
 
 #define CONF_RESET_OR_SHOW(reset_flag)  (((reset_flag) << 1) | (reset_flag))
 #define CONF_SET_OR_UPDATE(reset_flag)  (CONF_ISWRTFLG | CONF_ISHASARG | (reset_flag))
@@ -278,16 +278,14 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
                 else
                     i = 0;
             }
-            else if (i > 0){
-                if (token[1] == '='){
-                    if ((token[0] != 'b') && (token[0] != 'd') && (token[0] != 'h'))
-                        return false;
-                    if (token[3] == '\0')
-                        i = -1;
+            else if ((i > 0) && (token[1] == '=')){
+                if ((token[0] != 'b') && (token[0] != 'd') && (token[0] != 'h'))
+                    return false;
+                if (token[3] == '\0')
+                    i = -1;
 
-                    offset = 2;
-                    target_c = token[0];
-                }
+                offset = 2;
+                target_c = token[0];
             }
 
             token += offset;
