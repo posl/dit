@@ -30,8 +30,11 @@
 #define DOCKER_FILE_DRAFT "/dit/mnt/Dockerfile.draft"
 #define HISTORY_FILE "/dit/mnt/.dit_history"
 
-#define CONVERT_FILE_D "/dit/tmp/convert-result.dock"
-#define CONVERT_FILE_H "/dit/tmp/convert-result.hist"
+#define CONVERT_RESULT_FILE_D "/dit/tmp/convert-result.dock"
+#define CONVERT_RESULT_FILE_H "/dit/tmp/convert-result.hist"
+
+#define ERASE_RESULT_FILE_D "/dit/tmp/erase-result.dock"
+#define ERASE_RESULT_FILE_H "/dit/tmp/erase-result.hist"
 
 
 
@@ -43,7 +46,6 @@
 
 #define check_string_of_length1(str, c)  ((str[0] == c) && (! str[1]))
 #define check_string_isstdin(file_name)  check_string_of_length1(file_name, '-')
-#define check_string_isnewline(line)  check_string_of_length1(line, '\n')
 
 
 /******************************************************************************
@@ -53,9 +55,9 @@
 #define xperror_config_arg(target)  xperror_invalid_arg('C', 0, "mode", target)
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
 
-#define xperror_standards(errid, addition)  xperror_message(strerror(errid), addition, false)
-#define xperror_individually(msg)  xperror_message(msg, NULL, false)
-#define xperror_internal_file()  xperror_individually("unexpected error while manipulating an internal file")
+#define xperror_standards(errid, addition)  xperror_message(strerror(errid), addition)
+#define xperror_individually(msg)  xperror_message(msg, NULL)
+#define xperror_internal_file()  xperror_individually(NULL)
 
 
 /******************************************************************************
@@ -72,13 +74,14 @@
 #define ID_FROM          7
 #define ID_HEALTHCHECK   8
 #define ID_LABEL         9
-#define ID_ONBUILD      10
-#define ID_RUN          11
-#define ID_SHELL        12
-#define ID_STOPSIGNAL   13
-#define ID_USER         14
-#define ID_VOLUME       15
-#define ID_WORKDIR      16
+#define ID_MAINTAINER   10
+#define ID_ONBUILD      11
+#define ID_RUN          12
+#define ID_SHELL        13
+#define ID_STOPSIGNAL   14
+#define ID_USER         15
+#define ID_VOLUME       16
+#define ID_WORKDIR      17
 
 
 
@@ -126,7 +129,10 @@ void setcmd_manual();
 
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
 
-int reflect_to_Dockerfile(const char *line);
+int delete_from_dockerfile(const char * const beginning_strs[], size_t size, bool verbose, bool assume_c);
+int update_erase_logs(unsigned short prov_reflecteds[2]);
+
+int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag);
 int read_provisional_report(unsigned short prov_reflecteds[2]);
 int write_provisional_report(unsigned short prov_reflecteds[2]);
 
@@ -142,7 +148,7 @@ void xperror_valid_args(const char * const expected[], size_t size);
 void xperror_missing_args(const char * restrict desc, const char * restrict before_arg);
 void xperror_too_many_args(int limit);
 
-void xperror_message(const char * restrict msg, const char * restrict addition, bool omit_newline);
+void xperror_message(const char * restrict msg, const char * restrict addition);
 void xperror_suggestion(bool cmd_flag);
 
 
@@ -158,9 +164,9 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
     * String Recognizers
 ******************************************************************************/
 
-int receive_positive_integer(const char *target);
+int receive_positive_integer(const char *target, int *left);
 int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode);
-char *receive_dockerfile_instruction(const char *line, int *p_id);
+char *receive_dockerfile_instruction(char *line, int *p_id);
 
 
 /******************************************************************************

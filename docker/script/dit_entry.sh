@@ -58,6 +58,8 @@ touch \
     \
     /dit/tmp/convert-result.dock \
     /dit/tmp/convert-result.hist \
+    /dit/tmp/erase-result.dock \
+    /dit/tmp/erase-result.hist \
     /dit/tmp/last-command-line \
     /dit/tmp/last-exit-status \
     /dit/tmp/last-history-number \

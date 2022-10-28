@@ -12,7 +12,7 @@
 
 #define XFGETS_NESTINGS_MAX 2
 
-#define DOCKER_INSTRS_NUM 17
+#define DOCKER_INSTRS_NUM 18
 
 #define EXIT_STATUS_FILE "/dit/tmp/last-exit-status"
 
@@ -182,7 +182,7 @@ void xperror_invalid_arg(int code_c, int state, const char * restrict desc, cons
 /**
  * @brief print the valid arguments to stderr.
  *
- * @param[in]  expected  array of expected string
+ * @param[in]  expected  array of expected strings
  * @param[in]  size  array size
  */
 void xperror_valid_args(const char * const expected[], size_t size){
@@ -217,6 +217,7 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
         format[offset++] = '\n';
         format[offset] = '\0';
     }
+
     fprintf(stderr, format, program_name, desc, before_arg);
 }
 
@@ -226,7 +227,8 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
  *
  * @param[in]  limit  the maximum number of arguments or negative integer
  *
- * @attention if limit is 2 or more, it does not work as expected.
+ * @note if 'limit' is negative integer, print an error message about specifying both files as targets.
+ * @attention if 'limit' is 2 or more, it does not work as expected.
  */
 void xperror_too_many_args(int limit){
     char format[] = "%s: No %sarguments allowed when reflecting in both files\n";
@@ -238,6 +240,7 @@ void xperror_too_many_args(int limit){
         format[26] = '\n';
         format[27] = '\0';
     }
+
     fprintf(stderr, format, program_name, adjective);
 }
 
@@ -247,20 +250,21 @@ void xperror_too_many_args(int limit){
 /**
  * @brief print the specified error message to stderr.
  *
- * @param[in]  msg  the error message
+ * @param[in]  msg  the error message or NULL
  * @param[in]  addition  additional information, if any
- * @param[in]  omit_newline  whether to omit the trailing newline character
+ *
+ * @note if 'msg' is NULL, print an error message about manipulating an internal file.
  */
-void xperror_message(const char * restrict msg, const char * restrict addition, bool omit_newline){
-    char format[] = "%s: %s: %s\n";
+void xperror_message(const char * restrict msg, const char * restrict addition){
+    char *format = "%s: %s: %s\n";
     int offset = 0;
 
+    if (! msg)
+        msg = "unexpected error while manipulating an internal file";
     if (! addition){
         offset = 4;
         addition = msg;
     }
-    if (omit_newline)
-        format[10] = '\0';
 
     fprintf(stderr, (format + offset), program_name, addition, msg);
 }
@@ -302,8 +306,9 @@ void xperror_suggestion(bool cmd_flag){
  * @note read to the end of the file by using it as a conditional expression in a loop statement.
  * @note this function can be nested by passing different 'src_file' to a depth of 'XFGETS_NESTINGS_MAX'.
  * @note all lines of the file whose size is too large to be represented by int type cannot be preserved.
- * @note this function only updates the contents of 'p_errid' when an error occurs while opening the file.
+ * @note this function updates the contents of 'p_errid' only when an error occurs while opening the file.
  * @note if the contents of 'p_errid' was set to something other than 0, perform finish processing.
+ * @note the trailing newline character of the line that is the return value is stripped.
  *
  * @attention the string returned at the first call should be released at the end if you preserve read lines.
  * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
@@ -314,63 +319,66 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
 
     xfgets_info *p_info;
     bool allocate_flag = false, reset_flag = true;
-    char *tmp;
+    char *start;
+    unsigned int tmp;
     size_t length;
 
     p_info = info_list + info_idx;
 
     if ((info_idx < 0) || (p_info->src_file != src_file)){
-        if (info_idx >= (XFGETS_NESTINGS_MAX - 1))
-            return NULL;
-
         FILE *fp;
-        if (! (fp = src_file ? fopen(src_file, "r") : stdin)){
+        errno = 0;
+
+        if ((info_idx < (XFGETS_NESTINGS_MAX - 1)) && (fp = src_file ? fopen(src_file, "r") : stdin)){
+            info_idx++;
+            p_info++;
+
+            p_info->src_file = src_file;
+            p_info->fp = fp;
+            p_info->dest = NULL;
+            p_info->curr_size = 1023;
+            p_info->curr_length = 0;
+
+            allocate_flag = true;
+        }
+        else {
             if (p_errid)
                 *p_errid = errno;
             return NULL;
         }
-
-        info_idx++;
-        p_info++;
-
-        p_info->src_file = src_file;
-        p_info->fp = fp;
-        p_info->dest = NULL;
-        p_info->curr_size = 1023;
-        p_info->curr_length = 0;
-
-        allocate_flag = true;
     }
 
     length = p_info->curr_length;
 
     do {
         if (allocate_flag){
-            if ((tmp = (char *) realloc(p_info->dest, (sizeof(char) * p_info->curr_size)))){
-                p_info->dest = tmp;
+            if ((start = (char *) realloc(p_info->dest, (sizeof(char) * p_info->curr_size)))){
+                p_info->dest = start;
                 allocate_flag = false;
                 continue;
             }
         }
-        else if (! (p_errid && *p_errid)){
-            tmp = p_info->dest + length;
-            if (fgets(tmp, (p_info->curr_size - length), p_info->fp)){
-                length += strlen(tmp);
+        else if ((! (p_errid && *p_errid)) && ((tmp = p_info->curr_size - length) > 1)){
+            start = p_info->dest + length;
 
-                if ((reset_flag = (p_info->dest[length - 1] != '\n'))){
-                    p_info->curr_size++;
-                    if ((p_info->curr_size <<= 1)){
-                        p_info->curr_size--;
+            if (fgets(start, tmp, p_info->fp)){
+                length += strlen(start);
+
+                if (p_info->dest[length - 1] != '\n'){
+                    tmp = p_info->curr_size + 1;
+                    if ((tmp <<= 1)){
+                        p_info->curr_size = tmp - 1;
                         allocate_flag = true;
                         continue;
                     }
                 }
+                else {
+                    p_info->dest[--length] = '\0';
+                    reset_flag = false;
+                }
             }
-            else if (length != p_info->curr_length){
-                p_info->dest[length++] = '\n';
-                p_info->dest[length] = '\0';
+            else if (length != p_info->curr_length)
                 reset_flag = false;
-            }
         }
 
         if (reset_flag){
@@ -382,17 +390,17 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
             if ((! preserve_flag) && p_info->dest)
                 free(p_info->dest);
 
-            tmp = NULL;
+            start = NULL;
             info_idx--;
         }
         else if (preserve_flag){
-            tmp = p_info->dest + p_info->curr_length;
+            start = p_info->dest + p_info->curr_length;
             p_info->curr_length = length + 1;
         }
         else
-            tmp = p_info->dest;
+            start = p_info->dest;
 
-        return tmp;
+        return start;
     } while (1);
 }
 
@@ -423,29 +431,41 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
 
 
 /**
- * @brief receive the passed string as a positive integer.
+ * @brief receive the passed string as a positive integer or a set of two positive integer.
  *
  * @param[in]  target  target string
- * @return int  the resulting integer or -1
+ * @param[out] left  if enable a range specification by using a hyphen, variable to store the left integer
+ * @return int  the resulting (right) integer or -1
  *
  * @note receive an integer that can be expressed as "/^[0-9]+$/" in a regular expression.
+ * @note when specifying a range by using a hyphen and omitting an integer, it is interpreted as specifying 0.
  */
-int receive_positive_integer(const char *target){
-    int i = -1;
+int receive_positive_integer(const char *target, int *left){
+    int curr = -1, prev;
+
     if (target){
-        i = 0;
-        do
+        curr = 0;
+        do {
             if (isdigit(*target)){
-                i *= 10;
-                i += (*target - '0');
+                if (curr <= (INT_MAX / 10)){
+                    prev = curr * 10;
+                    curr = prev + (*target - '0');
+
+                    if (curr >= prev)
+                        continue;
+                }
             }
-            else {
-                i = -1;
-                break;
+            else if (left && (*target == '-')){
+                *left = curr;
+                left = NULL;
+                curr = 0;
+                continue;
             }
-        while (*(++target));
+            curr = -1;
+            break;
+        } while (*(++target));
     }
-    return i;
+    return curr;
 }
 
 
@@ -453,28 +473,31 @@ int receive_positive_integer(const char *target){
  * @brief find the passed string in array of expected strings.
  *
  * @param[in]  target  target string
- * @param[in]  expected  array of expected string
+ * @param[in]  expected  array of expected strings
  * @param[in]  size  array size
  * @param[in]  mode  mode of comparison (bit 1: perform uppercase conversion, bit 2: accept forward match)
  * @return int  index number of the corresponding string, -1 (ambiguous) or others (invalid)
  *
  * @note make efficient by applying binary search sequentially from the first character of target string.
- * @attention array of expected string must be pre-sorted alphabetically.
+ * @attention array of expected strings must be pre-sorted alphabetically.
  */
 int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode){
     if (target && (size > 0)){
         const char *A[size];
         memcpy(A, expected, (sizeof(const char *) * size));
 
+        bool upper_case, forward_match, break_flag = false;
         int c, tmp, mid, min, max;
-        bool break_flag = false;
+
+        upper_case = mode & 0b01;
+        forward_match = mode & 0b10;
 
         min = 0;
         max = size - 1;
         tmp = -max;
 
         while ((c = *(target++))){
-            if (mode & 1)
+            if (upper_case)
                 c = toupper(c);
 
             while (tmp){
@@ -514,9 +537,10 @@ int receive_expected_string(const char *target, const char * const expected[], s
                 return -2;
         }
 
-        return (! tmp) ? (((mode & 2) || (! *(A[min]))) ? min : -2) : -1;
+        if (! tmp)
+            return (forward_match || (! *(A[min]))) ? min : -2;
     }
-    return -3;
+    return -1;
 }
 
 
@@ -528,9 +552,9 @@ int receive_expected_string(const char *target, const char * const expected[], s
  * @return char*  substring that is the argument for the instruction in the target line or NULL
  *
  * @note when there is a corresponding instruction, its index number is stored in 'p_id'.
- * @attention the instruction must not contain unnecessary leading white space and must be capitalized.
+ * @attention the instruction must not contain unnecessary leading white spaces.
  */
-char *receive_dockerfile_instruction(const char *line, int *p_id){
+char *receive_dockerfile_instruction(char *line, int *p_id){
     const char * const instr_reprs[DOCKER_INSTRS_NUM] = {
         "ADD",
         "ARG",
@@ -542,6 +566,7 @@ char *receive_dockerfile_instruction(const char *line, int *p_id){
         "FROM",
         "HEALTHCHECK",
         "LABEL",
+        "MAINTAINER",
         "ONBUILD",
         "RUN",
         "SHELL",
@@ -563,10 +588,10 @@ char *receive_dockerfile_instruction(const char *line, int *p_id){
     instr[instr_len] = '\0';
 
     if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM)){
-        if (strcmp(instr, instr_reprs[*p_id]))
+        if (xstrcmp_upper_case(instr, instr_reprs[*p_id]))
             tmp = NULL;
     }
-    else if ((*p_id = receive_expected_string(instr, instr_reprs, DOCKER_INSTRS_NUM, 0)) < 0)
+    else if ((*p_id = receive_expected_string(instr, instr_reprs, DOCKER_INSTRS_NUM, 1)) < 0)
         tmp = NULL;
 
     if (tmp)
@@ -589,13 +614,21 @@ char *receive_dockerfile_instruction(const char *line, int *p_id){
  *
  * @param[in]  file_name  target file name
  * @return int  the resulting file size, -1 (unexpected error) or -2 (too large)
+ *
+ * @note if the file is too large, set an error number indicating that.
  */
 int check_file_size(const char *file_name){
     struct stat file_stat;
     int i = -1;
 
-    if (! stat(file_name, &file_stat))
-        i = ((file_stat.st_size >= 0) && (file_stat.st_size <= INT_MAX)) ? ((int) file_stat.st_size) : -2;
+    if (! stat(file_name, &file_stat)){
+        if ((file_stat.st_size >= 0) && (file_stat.st_size <= INT_MAX))
+            i = (int) file_stat.st_size;
+        else {
+            i = -2;
+            errno = EFBIG;
+        }
+    }
     return i;
 }
 
