@@ -20,6 +20,9 @@
 #define WHEN_REFLECTING  "when reflecting a executed command line"
 
 #define TARGET_OPTION_ARG  "  dockerfile (-d), history-file (-h), both (-dh)\n"
+#define SQUEEZE_OPTION_DESC  "suppress repeated empty output lines\n"
+#define BLANK_OPTION_DESC  "replace how to handle repeated empty output lines:\n"
+
 #define EXIT_NORMALLY  ", and exit normally\n"
 #define HELP_OPTION_DESC  "display this help" EXIT_NORMALLY
 
@@ -414,6 +417,10 @@ void erase_manual(){
         "  -i, --ignore-case           ignore case distinctions in the STR arguments and data\n"
         "  -m, --max-count=NUM         delete at most NUM lines, counting from the most recently added\n"
         "  -r, --reset                 reset the internal log-file\n"
+        "  -s                          " SQUEEZE_OPTION_DESC
+        "  -t                          ignore repeated empty output lines\n"
+        "      --blank=WORD            " BLANK_OPTION_DESC
+        "                                preserve (default), squeeze (-s), truncate (-t)\n"
         "  -v, --verbose               display deleted lines\n"
         "  -y                          eliminate the confirmation work before deletion\n"
         "      --assume=Y/n            set the answer before the confirmation work\n"
@@ -425,15 +432,15 @@ void erase_manual(){
         "  - The line numbers for the '-L' option start from 1, and 0 is the same as specifying nothing.\n"
         "  - If NUM is omitted in the range specification of the '-L' option, it is interpreted as\n"
         "    specifying the line number representing the beginning or end depending on the position.\n"
-        "  - The FILE argument for '--target' "CAN_BE_TRUNCATED".\n"
+        "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
         "  - The target "SPECIFIED_BY_TARGET".\n"
         "  - The '-Z' option uses the internal log-files that record the number of reflected lines, and\n"
         "    if there is an inconsiestency between one of that files and the target file, it is reset.\n"
         "  - When the number of reflected rows is 0, the log-files are not updated at all.\n"
         "  - Above log-files are not saved across interruptions such as exiting the container.\n"
         "  - By default, Y/n confirmation is performed using standard error output and standard input\n"
-        "    as to whether it is okay to delete lines that match the specified conditions, and if you\n"
-        "    answer 'Yes', delete all of the lines, if you answer 'No', delete the selected lines.\n"
+        "    as to whether it is okay to delete the lines that match the specified conditions, and if\n"
+        "    you answer 'Yes', delete all of the lines, if you answer 'No', delete the selected lines.\n"
     , stdout);
 }
 
@@ -530,9 +537,9 @@ void reflect_manual(){
         "      --target=DEST    determine destination file:\n"
         "                       " TARGET_OPTION_ARG
         "  -p                   leave repeated empty output lines as they are\n"
-        "  -s                   suppress repeated empty output lines\n"
-        "      --blank=WORD     replace how to handle repeated empty output lines:\n"
-        "                         ignore (default), preserve (-p), squeeze (-s)\n"
+        "  -s                   " SQUEEZE_OPTION_DESC
+        "      --blank=WORD     " BLANK_OPTION_DESC
+        "                         preserve (-p), squeeze (-s), truncate (default)\n"
         "      --help           " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
@@ -683,7 +690,7 @@ static void __erase_example(){
     fputs(
         "dit erase -dh                            Delete the lines added just before.\n"
         "dit erase -d -L -                        Delete all lines from Dockerfile.\n"
-        "dit erase --cont=cat --targ=hist         Delete unnecessary 'cat' commands from history-file.\n"
+        "dit erase --targ=hist --cont=cat         Delete unnecessary 'cat' commands from history-file.\n"
         "dit erase -divy -BONBUILD > erase.out    Extract ONBUILD instructions from Dockerfile.\n"
     , stdout);
 }
@@ -739,7 +746,7 @@ static void __reflect_example(){
         "dit reflect                 Error in noraml use, but used internally for logging.\n"
         "dit reflect -d erase.out    Reflect the contents of './erase.out' in Dockerfile.\n"
         "dit reflect -hs -           Reflect the input contents in history-file while suqueezing blanks.\n"
-        "dit reflect --target b      Reflect the output contents of the previous dit command 'convert'.\n"
+        "dit reflect --target b      Reflect the output contents of the previous 'convert'.\n"
     , stdout);
 }
 

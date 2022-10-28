@@ -30,7 +30,7 @@ typedef struct {
 static int (* const __get_dit_cmd(const char *target))(int, char **);
 
 
-/** array of strings representing each dit command in alphabetical order */
+/** array of strings in alphabetical order representing each dit command */
 const char * const cmd_reprs[CMDS_NUM] = {
     "config",
     "convert",
@@ -48,20 +48,27 @@ const char * const cmd_reprs[CMDS_NUM] = {
 };
 
 
-/** array of strings representing each response to the Y/n question in alphabetical order */
+/** array of strings in alphabetical order representing each response to the Y/n question */
 const char * const assume_args[ASSUMES_NUM] = {
     "NO",
     "YES"
 };
 
-/** array of strings representing each argument for '--display' in alphabetical order */
+/** array of strings in alphabetical order representing how to handle the blank lines */
+const char * const blank_args[BLANKS_NUM] = {
+    "preserve",
+    "squeeze",
+    "truncate"
+};
+
+/** array of strings in alphabetical order representing what contents should be displayed */
 const char * const display_args[DISPLAYS_NUM] = {
     "BOTH",
     "IN",
     "OUT"
 };
 
-/** array of strings representing each argument for '--target' in alphabetical order */
+/** array of strings in alphabetical order representing whether the target is Dockerfile or history-file */
 const char * const target_args[TARGETS_NUM] = {
     "both",
     "dockerfile",

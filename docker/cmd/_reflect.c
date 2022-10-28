@@ -13,8 +13,6 @@
 
 #include "main.h"
 
-#define BLANKS_NUM 3
-
 #define DOCKER_FILE_BASE "/dit/etc/Dockerfile.base"
 
 #define REFLECT_FILE_P "/dit/tmp/reflect-report.prov"
@@ -27,7 +25,7 @@
 /** Data type for storing the results of option parse */
 typedef struct {
     int target_c;    /** character representing destination file ('d', 'h' or 'b') */
-    int blank_c;     /** how to handle blank lines */
+    int blank_c;     /** how to handle the blank lines ('p', 's' or 't') */
 } refl_opts;
 
 
@@ -44,6 +42,7 @@ static int __record_reflected_lines();
 static int __manage_provisional_report(unsigned short reflecteds[2], const char *mode);
 
 
+extern const char * const blank_args[BLANKS_NUM];
 extern const char * const target_args[TARGETS_NUM];
 
 
@@ -118,17 +117,12 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
         {  0,        0,                  0,    0    }
     };
 
-    const char * const blank_args[BLANKS_NUM] = {
-        "ignore",
-        "preserve",
-        "squeeze"
-    };
-
     opt->target_c = '\0';
-    opt->blank_c = 'i';
+    opt->blank_c = 't';
 
     int c, i, *ptr;
     const char * const *valid_args = NULL;
+    size_t size;
 
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
         switch (c){
@@ -145,25 +139,23 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
             case 1:
                 reflect_manual();
                 return 1;
-
-#if (BLANKS_NUM != TARGETS_NUM)
-    #error "inconsistent with the definition of the macros"
-#endif
             case 0:
                 if (flag){
                     ptr = &(opt->blank_c);
                     valid_args = blank_args;
+                    size = BLANKS_NUM;
                 }
                 else {
                     ptr = &(opt->target_c);
                     valid_args = target_args;
+                    size = TARGETS_NUM;
                 }
-                if ((c = receive_expected_string(optarg, valid_args, BLANKS_NUM, 2)) >= 0){
-                    *ptr = valid_args[c][0];
+                if ((c = receive_expected_string(optarg, valid_args, size, 2)) >= 0){
+                    *ptr = *(valid_args[c]);
                     break;
                 }
                 xperror_invalid_arg('O', c, long_opts[i].name, optarg);
-                xperror_valid_args(valid_args, TARGETS_NUM);
+                xperror_valid_args(valid_args, size);
             default:
                 return -1;
         }
@@ -287,7 +279,7 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
                             first_blank = false;
                             break;
                         }
-                    case 'i':
+                    case 't':
                         continue;
                 }
             }

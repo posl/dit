@@ -32,6 +32,7 @@ typedef struct {
     bool ignore_case;    /** whether to ignore case when comparing strings */
     int max_count;       /** the maximum number of lines to delete, counting from the most recently added */
     bool reset_flag;     /** whether to reset the log-file (specified by optional arguments) */
+    int blank_c;         /** how to handle the blank lines ('p', 's' or 't') */
     bool verbose;        /** whether to display deleted lines on screen */
     int assume_c;        /** the response to delete confirmation ('Y', 'N' or '\0') */
 } erase_opts;
@@ -74,6 +75,7 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
 
 
 extern const char * const assume_args[ASSUMES_NUM];
+extern const char * const blank_args[BLANKS_NUM];
 extern const char * const target_args[TARGETS_NUM];
 
 
@@ -134,26 +136,28 @@ int erase(int argc, char **argv){
  * @attention options are separated for behavior and for deletion, and must be parsed in that order.
  */
 static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
-    const char *short_opts = "B:C:L:Z::dhim:rvy";
+    const char *short_opts = "B:C:L:Z::dhim:rstvy";
 
-    int size;
+    int flag;
     const struct option long_opts[] = {
-        { "begin-with",  required_argument,  NULL,  'B'        },
-        { "contain",     required_argument,  NULL,  'C'        },
-        { "lines",       required_argument,  NULL,  'L'        },  // ERASE_OPTID_LINES = 2
-        { "undoes",      optional_argument,  NULL,  'Z'        },  // ERASE_OPTID_UNDOES = 3
-        { "ignore-case", no_argument,        NULL,  'i'        },
-        { "max-count",   required_argument,  NULL,  'm'        },  // ERASE_OPTID_MAX_COUNT = 5
-        { "reset",       no_argument,        NULL,  'r'        },
-        { "verbose",     no_argument,        NULL,  'v'        },
-        { "help",        no_argument,        NULL,   1         },
-        { "assume",      required_argument, &size, ASSUMES_NUM },
-        { "target",      required_argument, &size, TARGETS_NUM },
-        {  0,             0,                  0,     0         }
+        { "begin-with",  required_argument,  NULL, 'B' },
+        { "contain",     required_argument,  NULL, 'C' },
+        { "lines",       required_argument,  NULL, 'L' },  // ERASE_OPTID_LINES = 2
+        { "undoes",      optional_argument,  NULL, 'Z' },  // ERASE_OPTID_UNDOES = 3
+        { "ignore-case", no_argument,        NULL, 'i' },
+        { "max-count",   required_argument,  NULL, 'm' },  // ERASE_OPTID_MAX_COUNT = 5
+        { "reset",       no_argument,        NULL, 'r' },
+        { "verbose",     no_argument,        NULL, 'v' },
+        { "help",        no_argument,        NULL,  1  },
+        { "assume",      required_argument, &flag, 'A' },
+        { "blank",       required_argument, &flag, 'B' },
+        { "target",      required_argument, &flag, 'T' },
+        {  0,             0,                  0,    0  }
     };
 
-    int c, i, err_code = '\0';
+    int c, i, mode, err_code = '\0';
     const char * const *valid_args;
+    size_t size;
 
     if (! data){
         opt->has_delopt = false;
@@ -162,6 +166,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         opt->ignore_case = false;
         opt->max_count = -1;
         opt->reset_flag = false;
+        opt->blank_c = 'p';
         opt->verbose = false;
         opt->assume_c = '\0';
 
@@ -213,6 +218,10 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
                 case 'r':
                     opt->reset_flag = true;
                     break;
+                case 's':
+                case 't':
+                    opt->blank_c = c;
+                    break;
                 case 'v':
                     opt->verbose = true;
                     break;
@@ -222,23 +231,28 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
                 case 1:
                     erase_manual();
                     return 1;
-
-#if ((ASSUMES_NUM != 2) || (TARGETS_NUM != 3))
-    #error "inconsistent with the definition of the macros"
-#endif
                 case 0:
-                    if (size == ASSUMES_NUM){
-                        ptr = &(opt->assume_c);
-                        valid_args = assume_args;
-                        // mode = 3;  (mode = size ^ 1)
+                    switch (flag){
+                        case 'A':
+                            ptr = &(opt->assume_c);
+                            valid_args = assume_args;
+                            size = ASSUMES_NUM;
+                            mode = 3;
+                            break;
+                        case 'B':
+                            ptr = &(opt->blank_c);
+                            valid_args = blank_args;
+                            size = BLANKS_NUM;
+                            mode = 2;
+                            break;
+                        case 'T':
+                            ptr = &(opt->target_c);
+                            valid_args = target_args;
+                            size = TARGETS_NUM;
+                            mode = 2;
                     }
-                    else {
-                        ptr = &(opt->target_c);
-                        valid_args = target_args;
-                        // mode = 2;  (mode = size ^ 1)
-                    }
-                    if ((c = receive_expected_string(optarg, valid_args, size, size ^ 1)) >= 0){
-                        *ptr = valid_args[c][0];
+                    if ((c = receive_expected_string(optarg, valid_args, size, mode)) >= 0){
+                        *ptr = *(valid_args[c]);
                         ptr = NULL;
                         break;
                     }
