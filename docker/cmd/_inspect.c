@@ -10,8 +10,6 @@
 
 #include "main.h"
 
-#define SORTS_NUM 3
-
 #define INSP_EXCESS_STR " #EXCESS"
 
 
@@ -151,7 +149,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
         {  0,                 0,                 0,    0  }
     };
 
-    const char * const sort_args[SORTS_NUM] = {
+    const char * const sort_args[ARGS_NUM] = {
         "extension",
         "name",
         "size"
@@ -184,12 +182,12 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 inspect_manual();
                 return NORMALLY_EXIT;
             case 0:
-                if ((c = receive_expected_string(optarg, sort_args, SORTS_NUM, 2)) >= 0){
+                if ((c = receive_expected_string(optarg, sort_args, ARGS_NUM, 2)) >= 0){
                     opt->comp = (c ? ((c == 1) ? __qcmp_name : __qcmp_size) : __qcmp_ext);
                     break;
                 }
                 xperror_invalid_arg('O', c, long_opts[i].name, optarg);
-                xperror_valid_args(sort_args, SORTS_NUM);
+                xperror_valid_args(sort_args, ARGS_NUM);
             default:
                 xperror_suggestion(true);
                 return ERROR_EXIT;

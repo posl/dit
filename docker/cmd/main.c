@@ -49,27 +49,28 @@ const char * const cmd_reprs[CMDS_NUM] = {
 
 
 /** array of strings in alphabetical order representing each response to the Y/n question */
-const char * const assume_args[ASSUMES_NUM] = {
+const char * const assume_args[ARGS_NUM] = {
     "NO",
+    "QUIT",
     "YES"
 };
 
 /** array of strings in alphabetical order representing how to handle the blank lines */
-const char * const blank_args[BLANKS_NUM] = {
+const char * const blank_args[ARGS_NUM] = {
     "preserve",
     "squeeze",
     "truncate"
 };
 
 /** array of strings in alphabetical order representing what contents should be displayed */
-const char * const display_args[DISPLAYS_NUM] = {
+const char * const display_args[ARGS_NUM] = {
     "BOTH",
     "IN",
     "OUT"
 };
 
 /** array of strings in alphabetical order representing whether the target is Dockerfile or history-file */
-const char * const target_args[TARGETS_NUM] = {
+const char * const target_args[ARGS_NUM] = {
     "both",
     "dockerfile",
     "history-file"

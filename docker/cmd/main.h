@@ -34,11 +34,7 @@
 #define UNEXPECTED_ERROR (-1)
 
 #define CMDS_NUM 13
-
-#define ASSUMES_NUM 2
-#define BLANKS_NUM 3
-#define DISPLAYS_NUM 3
-#define TARGETS_NUM 3
+#define ARGS_NUM 3
 
 
 /******************************************************************************

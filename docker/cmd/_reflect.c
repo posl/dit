@@ -42,8 +42,8 @@ static int __record_reflected_lines();
 static int __manage_provisional_report(unsigned short reflecteds[2], const char *mode);
 
 
-extern const char * const blank_args[BLANKS_NUM];
-extern const char * const target_args[TARGETS_NUM];
+extern const char * const blank_args[ARGS_NUM];
+extern const char * const target_args[ARGS_NUM];
 
 
 
@@ -122,7 +122,6 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
 
     int c, i, *ptr;
     const char * const *valid_args = NULL;
-    size_t size;
 
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
         switch (c){
@@ -143,19 +142,17 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
                 if (flag){
                     ptr = &(opt->blank_c);
                     valid_args = blank_args;
-                    size = BLANKS_NUM;
                 }
                 else {
                     ptr = &(opt->target_c);
                     valid_args = target_args;
-                    size = TARGETS_NUM;
                 }
-                if ((c = receive_expected_string(optarg, valid_args, size, 2)) >= 0){
+                if ((c = receive_expected_string(optarg, valid_args, ARGS_NUM, 2)) >= 0){
                     *ptr = *(valid_args[c]);
                     break;
                 }
                 xperror_invalid_arg('O', c, long_opts[i].name, optarg);
-                xperror_valid_args(valid_args, size);
+                xperror_valid_args(valid_args, ARGS_NUM);
             default:
                 return ERROR_EXIT;
         }

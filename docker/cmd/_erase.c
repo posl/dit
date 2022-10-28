@@ -34,7 +34,7 @@ typedef struct {
     bool reset_flag;     /** whether to reset the log-file (specified by optional arguments) */
     int blank_c;         /** how to handle the blank lines ('p', 's' or 't') */
     bool verbose;        /** whether to display deleted lines on screen */
-    int assume_c;        /** the response to delete confirmation ('Y', 'N' or '\0') */
+    int assume_c;        /** the response to delete confirmation ('Y', 'N', 'Q' or '\0') */
 } erase_opts;
 
 
@@ -74,9 +74,9 @@ static int __delete_marked_lines(erase_opts *opt, erase_data *data);
 static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, bool concat_flag);
 
 
-extern const char * const assume_args[ASSUMES_NUM];
-extern const char * const blank_args[BLANKS_NUM];
-extern const char * const target_args[TARGETS_NUM];
+extern const char * const assume_args[ARGS_NUM];
+extern const char * const blank_args[ARGS_NUM];
+extern const char * const target_args[ARGS_NUM];
 
 
 
@@ -157,7 +157,6 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
 
     int c, i, err_code = '\0';
     const char * const *valid_args;
-    size_t size;
 
     if (! data){
         opt->has_delopt = false;
@@ -236,22 +235,19 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
                         case 'A':
                             ptr = &(opt->assume_c);
                             valid_args = assume_args;
-                            size = ASSUMES_NUM;
                             mode = 3;
                             break;
                         case 'B':
                             ptr = &(opt->blank_c);
                             valid_args = blank_args;
-                            size = BLANKS_NUM;
                             mode = 2;
                             break;
                         case 'T':
                             ptr = &(opt->target_c);
                             valid_args = target_args;
-                            size = TARGETS_NUM;
                             mode = 2;
                     }
-                    if ((c = receive_expected_string(optarg, valid_args, size, mode)) >= 0){
+                    if ((c = receive_expected_string(optarg, valid_args, ARGS_NUM, mode)) >= 0){
                         *ptr = *(valid_args[c]);
                         ptr = NULL;
                         break;
@@ -314,7 +310,7 @@ err_exit:
         xperror_invalid_arg(err_code, c, long_opts[i].name, optarg);
 
         if ((err_code == 'O') && (c < 0))
-            xperror_valid_args(valid_args, size);
+            xperror_valid_args(valid_args, ARGS_NUM);
     }
     else
         xperror_target_files();
