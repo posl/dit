@@ -73,7 +73,7 @@ int config(int argc, char **argv){
     bool reset_flag;
 
     if ((i = __parse_opts(argc, argv, &reset_flag)))
-        i = (i < 0) ? 1 : 0;
+        i = (i < 0) ? FAILURE : SUCCESS;
     else
         switch ((argc - optind)){
             case 0:
@@ -84,13 +84,13 @@ int config(int argc, char **argv){
                     xperror_config_arg(argv[optind]);
                 break;
             default:
-                i = 1;
+                i = FAILURE;
                 xperror_too_many_args(1);
         }
 
     if (i){
         if (i < 0){
-            i = 1;
+            i = FAILURE;
             xperror_internal_file();
         }
         xperror_suggestion(true);
@@ -128,12 +128,12 @@ static int __parse_opts(int argc, char **argv, bool *opt){
                 break;
             case 1:
                 config_manual();
-                return 1;
+                return NORMALLY_EXIT;
             default:
-                return -1;
+                return ERROR_EXIT;
         }
     }
-    return 0;
+    return SUCCESS;
 }
 
 
@@ -154,7 +154,7 @@ static int __config_contents(int code, ...){
     has_arg = code & CONF_ISHASARG;
 
     FILE *fp;
-    int exit_status = 0;
+    int exit_status = SUCCESS;
 
     if ((fp = fopen(CONFIG_FILE, (reset_flag ? "wb" : "rb+")))){
         signed char c = CONF_INITIAL_STAT;
@@ -169,7 +169,7 @@ static int __config_contents(int code, ...){
                 mode2h = tmp.rem;
             }
             else {
-                exit_status = -1;
+                exit_status = UNEXPECTED_ERROR;
                 c = CONF_INITIAL_STAT;
             }
 
@@ -195,24 +195,26 @@ static int __config_contents(int code, ...){
                 }
             }
             else
-                exit_status = 1;
+                exit_status = POSSIBLE_ERROR;
 
             va_end(sp);
         }
 
         switch (exit_status){
-            case 0:
+            case SUCCESS:
                 if (! write_flag)
                     break;
-            case -1:
+            case UNEXPECTED_ERROR:
                 if (! reset_flag)
                     fseek(fp, 0, SEEK_SET);
+
                 fwrite(&c, sizeof(c), 1, fp);
         }
+
         fclose(fp);
     }
     else
-        exit_status = -1;
+        exit_status = UNEXPECTED_ERROR;
 
     return exit_status;
 }
@@ -224,7 +226,7 @@ static int __config_contents(int code, ...){
  * @param[in]  config_arg  string for determining the modes
  * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
  * @param[out] p_mode2h  variable to store the mode used when reflecting in history-file
- * @return int  0 (success), 1 (unexpected error) or -1 (argument recognition error)
+ * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
     return __config_contents(CONF_GET_FROM_CONVERT, config_arg, p_mode2d, p_mode2h);

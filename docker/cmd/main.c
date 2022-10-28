@@ -118,7 +118,7 @@ int main(int argc, char **argv){
     }
 
     xperror_suggestion(false);
-    return 1;
+    return FAILURE;
 }
 
 
@@ -194,6 +194,7 @@ void xperror_invalid_arg(int code_c, int state, const char * restrict desc, cons
  */
 void xperror_valid_args(const char * const expected[], size_t size){
     fputs("Valid arguments are:\n", stderr);
+
     for (int i = 0; i < size; i++)
         fprintf(stderr, "  - '%s'\n", expected[i]);
 }
@@ -325,10 +326,7 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
     static xfgets_info info_list[XFGETS_NESTINGS_MAX];
 
     xfgets_info *p_info;
-    bool allocate_flag = false, reset_flag = true;
-    char *start;
-    unsigned int tmp;
-    size_t length;
+    bool allocate_flag = false;
 
     p_info = info_list + info_idx;
 
@@ -354,6 +352,11 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
             return NULL;
         }
     }
+
+    size_t length;
+    char *start;
+    unsigned int tmp;
+    bool reset_flag = true;
 
     length = p_info->curr_length;
 
@@ -426,6 +429,7 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
     while (! (c = toupper(*target) - *(expected++)))
         if (! *(target++))
             return 0;
+
     return c;
 }
 
@@ -494,7 +498,7 @@ int receive_expected_string(const char *target, const char * const expected[], s
         memcpy(A, expected, (sizeof(const char *) * size));
 
         bool upper_case, forward_match, break_flag = false;
-        int c, tmp, mid, min, max;
+        int min, max, tmp, c, mid;
 
         upper_case = mode & 0b01;
         forward_match = mode & 0b10;
@@ -636,6 +640,7 @@ int check_file_size(const char *file_name){
             errno = EFBIG;
         }
     }
+
     return i;
 }
 
@@ -651,8 +656,10 @@ int check_last_exit_status(){
 
     if ((fp = fopen(EXIT_STATUS_FILE, "r"))){
         unsigned int u;
+
         if ((fscanf(fp, "%u", &u) == 1) && (! (u >> 8)))
             i = u;
+
         fclose(fp);
     }
     return i;

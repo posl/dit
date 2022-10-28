@@ -96,7 +96,7 @@ extern const char * const target_args[TARGETS_NUM];
  * @note treated like a normal main function.
  */
 int erase(int argc, char **argv){
-    int i, exit_status = 1;
+    int i, exit_status = FAILURE;
     erase_opts opt;
 
     if (! (i = __parse_opts(argc, argv, &opt, NULL))){
@@ -106,11 +106,11 @@ int erase(int argc, char **argv){
             xperror_too_many_args(0);
     }
     else if (i > 0)
-        exit_status = 0;
+        exit_status = SUCCESS;
 
     if (exit_status){
         if (exit_status < 0){
-            exit_status = 1;
+            exit_status = FAILURE;
             xperror_internal_file();
         }
         xperror_suggestion(true);
@@ -155,7 +155,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         {  0,             0,                  0,    0  }
     };
 
-    int c, i, mode, err_code = '\0';
+    int c, i, err_code = '\0';
     const char * const *valid_args;
     size_t size;
 
@@ -170,7 +170,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         opt->verbose = false;
         opt->assume_c = '\0';
 
-        int *ptr;
+        int *ptr, mode;
         while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
             switch (c){
                 case 'B':
@@ -230,7 +230,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
                     break;
                 case 1:
                     erase_manual();
-                    return 1;
+                    return NORMALLY_EXIT;
                 case 0:
                     switch (flag){
                         case 'A':
@@ -259,7 +259,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
                     err_code = 'O';
                     goto err_exit;
                 default:
-                    return -1;
+                    return ERROR_EXIT;
             }
         }
 
@@ -269,7 +269,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         if (! (opt->has_delopt || opt->undoes)){
             if (opt->verbose){
                 __display_prev(opt->target_c);
-                return 1;
+                return NORMALLY_EXIT;
             }
             else
                 opt->undoes = 1;
@@ -307,7 +307,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         }
     }
 
-    return 0;
+    return SUCCESS;
 
 err_exit:
     if (err_code){
@@ -318,7 +318,8 @@ err_exit:
     }
     else
         xperror_target_files();
-    return -1;
+
+    return ERROR_EXIT;
 }
 
 
@@ -330,8 +331,8 @@ err_exit:
  * @param[in]  target_c  character representing the target files ('d', 'h' or 'b')
  */
 static void __display_prev(int target_c){
-    int offset = 0, next_target_c;
-    const char *format = "\n < %s >\n", *line, *src_file;
+    int next_target_c, offset = 0;
+    const char *line, *src_file, *format = "\n < %s >\n";
 
     do {
         next_target_c = '\0';
@@ -371,13 +372,13 @@ static void __display_prev(int target_c){
  * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
  */
 static int __do_erase(int argc, void *argv, erase_opts *opt, bool command_line){
-    int exit_status, tmp, next_target_c;
+    int next_target_c, tmp, exit_status = SUCCESS;
 
     erase_logs logs;
     erase_data data = { .logs = &logs };
 
     unsigned short prov_reflecteds[2] = {0};
-    exit_status = read_provisional_report(prov_reflecteds);
+    read_provisional_report(prov_reflecteds);
 
     do {
         if (opt->target_c == 'b'){
@@ -404,9 +405,7 @@ static int __do_erase(int argc, void *argv, erase_opts *opt, bool command_line){
         __destruct_erase_data(&data);
     } while ((opt->target_c = next_target_c));
 
-    if (write_provisional_report(prov_reflecteds))
-        exit_status = -1;
-
+    write_provisional_report(prov_reflecteds);
     return exit_status;
 }
 
@@ -449,7 +448,8 @@ static int __construct_erase_data(erase_data *data, int target_c, unsigned short
 
     char *line;
     bool preserve_flag;
-    int exit_status = 0, lines_num = 0;
+    int exit_status = SUCCESS;
+    size_t lines_num = 0;
 
     preserve_flag = (! no_delete);
     while ((line = xfgets_for_loop(target_file, preserve_flag, &exit_status))){
@@ -490,11 +490,11 @@ static int __construct_erase_data(erase_data *data, int target_c, unsigned short
         }
 
         if ((mode_c >= 0) && __manage_erase_logs(log_file, mode_c, data->logs, no_delete))
-            exit_status = -1;
+            exit_status = UNEXPECTED_ERROR;
     }
     else {
         xperror_standards(exit_status, target_file);
-        exit_status = 1;
+        exit_status = POSSIBLE_ERROR;
     }
 
     return exit_status;
@@ -583,6 +583,8 @@ static int __delete_marked_lines(erase_opts *opt, erase_data *data){
         dest_file = ERASE_RESULT_FILE_H;
         log_file = ERASE_FILE_H;
     }
+
+    
 }
 
 
@@ -642,12 +644,12 @@ int delete_from_dockerfile(const char * const beginning_strs[], size_t size, boo
 static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, bool concat_flag){
     char fm[] = "rb";
     FILE *fp = NULL;
-    int exit_status = 0;
+    int exit_status = SUCCESS;
 
     if (mode_c){
         fm[0] = mode_c;
         fp = fopen(file_name, fm);
-        exit_status = 1;
+        exit_status = FAILURE;
     }
 
     size_t size, total = 0;
@@ -673,14 +675,14 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
                             if ((total < INT_MAX) && (total == logs->total))
                                 logs->reset_flag = false;
 
-                            exit_status = 0;
+                            exit_status = SUCCESS;
                         }
                         else
                             free(array);
                     }
                 }
                 else
-                    exit_status = 0;
+                    exit_status = SUCCESS;
             }
             break;
         case 'w':
@@ -696,7 +698,7 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
                 else if (concat_flag)
                     total = *(logs->p_provlog);
 
-                exit_status = 0;
+                exit_status = SUCCESS;
                 if (concat_flag && total){
                     tmp = div(total - 1, 255);
                     size = tmp.quot + 1;
@@ -709,11 +711,12 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
                         logs->array[logs->size - 1] = tmp.rem + 1;
                     }
                     else
-                        exit_status = 1;
+                        exit_status = FAILURE;
                 }
 
                 if (! exit_status){
                     fwrite(&(logs->size), sizeof(logs->size), 1, fp);
+
                     if (logs->size)
                         fwrite(logs->array, sizeof(unsigned char), logs->size, fp);
                 }
@@ -742,7 +745,7 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
  */
 int update_erase_logs(unsigned short prov_reflecteds[2]){
     const char *targets = "dh";
-    int tmp, exit_status = 0;
+    int tmp, exit_status = SUCCESS;
 
     erase_logs logs;
     erase_data data = { .logs = &logs };

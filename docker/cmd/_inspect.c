@@ -101,9 +101,11 @@ int inspect(int argc, char **argv){
     insp_opts opt;
 
     if ((i = __parse_opts(argc, argv, &opt)))
-        return (i < 0) ? 1 : 0;
+        return (i < 0) ? FAILURE : SUCCESS;
 
     const char *path = ".";
+    file_node *tree;
+
     if ((argc -= optind) > 0){
         argv += optind;
         path = *argv;
@@ -111,12 +113,11 @@ int inspect(int argc, char **argv){
     else
         argc = 1;
 
-    file_node *tree;
     do {
         if ((tree = __construct_dir_tree(path, &opt)))
             __destruct_dir_tree(tree, &opt);
         else
-            i = 1;
+            i = FAILURE;
 
         if (--argc){
             path = *(++argv);
@@ -181,7 +182,7 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 break;
             case 1:
                 inspect_manual();
-                return 1;
+                return NORMALLY_EXIT;
             case 0:
                 if ((c = receive_expected_string(optarg, sort_args, SORTS_NUM, 2)) >= 0){
                     opt->comp = (c ? ((c == 1) ? __qcmp_name : __qcmp_size) : __qcmp_ext);
@@ -191,12 +192,12 @@ static int __parse_opts(int argc, char **argv, insp_opts *opt){
                 xperror_valid_args(sort_args, SORTS_NUM);
             default:
                 xperror_suggestion(true);
-                return -1;
+                return ERROR_EXIT;
         }
     }
 
     opt->color &= isatty(fileno(stdout));
-    return 0;
+    return SUCCESS;
 }
 
 
@@ -518,6 +519,7 @@ static int __fcmp_ext(file_node *file1, file_node *file2){
     const char *ext1, *ext2;
     ext1 = __get_file_ext(file1->name);
     ext2 = __get_file_ext(file2->name);
+
     return strcmp(ext1, ext2);
 }
 
@@ -531,9 +533,11 @@ static int __fcmp_ext(file_node *file1, file_node *file2){
 static const char *__get_file_ext(const char *name){
     const char *ext;
     ext = name;
+
     while (*name)
         if (*(name++) == '.')
             ext = name;
+
     return ext;
 }
 
@@ -556,6 +560,7 @@ static void __destruct_dir_tree(file_node *tree, insp_opts *opt){
         "Permission      User     Group      Size\n"
         "=========================================\n"
     , stdout);
+
     __destruct_recursive(tree, opt, 0);
 }
 

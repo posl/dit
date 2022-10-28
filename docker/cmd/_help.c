@@ -100,9 +100,11 @@ int help(int argc, char **argv){
     help_conts code;
 
     if ((i = __parse_opts(argc, argv, &code)))
-        return (i < 0) ? 1 : 0;
+        return (i < 0) ? FAILURE : SUCCESS;
 
     const char *target = NULL;
+    char S[] = "\n\n\n";
+
     if ((argc -= optind) > 0){
         argv += optind;
         target = *argv;
@@ -110,7 +112,6 @@ int help(int argc, char **argv){
     else
         argc = 1;
 
-    char S[] = "\n\n\n";
     do {
         i |= __display_help(code, target);
 
@@ -158,7 +159,7 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
         switch (c){
             case 'a':
                 __display_cmd_list();
-                return 1;
+                return NORMALLY_EXIT;
             case 'd':
                 *opt = description;
                 break;
@@ -172,13 +173,14 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
                 return __display_version();
             case 1:
                 help_manual();
-                return 1;
+                return NORMALLY_EXIT;
             default:
                 xperror_suggestion(true);
-                return -1;
+                return ERROR_EXIT;
         }
     }
-    return 0;
+
+    return SUCCESS;
 }
 
 
@@ -209,10 +211,10 @@ static int __display_version(){
             fputs(S, stdout);
 
         fclose(fp);
-        return 1;
+        return NORMALLY_EXIT;
     }
     xperror_internal_file();
-    return -1;
+    return ERROR_EXIT;
 }
 
 
@@ -230,7 +232,7 @@ static int __display_version(){
 static int __display_help(help_conts code, const char *target){
     const char *topic;
     void (* help_func)();
-    int exit_status = 0;
+    int exit_status = SUCCESS;
 
     if (target){
         void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])() = {
@@ -293,7 +295,7 @@ static int __display_help(help_conts code, const char *target){
         else {
             xperror_invalid_arg('C', i, "dit command", target);
             xperror_suggestion(false);
-            exit_status = 1;
+            exit_status = FAILURE;
         }
     }
     else {
@@ -302,6 +304,7 @@ static int __display_help(help_conts code, const char *target){
             __dit_description,
             __dit_example
         };
+
         topic = "dit";
         help_func = dit_helps[code];
     }
@@ -311,6 +314,7 @@ static int __display_help(help_conts code, const char *target){
             fprintf(stdout, " < %s >\n", topic);
         help_func();
     }
+
     return exit_status;
 }
 

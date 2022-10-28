@@ -18,12 +18,32 @@
 #include <unistd.h>
 
 
+
+
+/******************************************************************************
+    * commonly used Constants
+******************************************************************************/
+
+#define SUCCESS 0
+#define FAILURE 1
+
+#define NORMALLY_EXIT 1
+#define ERROR_EXIT (-1)
+
+#define POSSIBLE_ERROR 1
+#define UNEXPECTED_ERROR (-1)
+
 #define CMDS_NUM 13
 
 #define ASSUMES_NUM 2
+#define BLANKS_NUM 3
 #define DISPLAYS_NUM 3
 #define TARGETS_NUM 3
 
+
+/******************************************************************************
+    * commonly used Internal Files
+******************************************************************************/
 
 #define VERSION_FILE "/dit/etc/dit_version"
 
@@ -35,6 +55,7 @@
 
 #define ERASE_RESULT_FILE_D "/dit/tmp/erase-result.dock"
 #define ERASE_RESULT_FILE_H "/dit/tmp/erase-result.hist"
+
 
 
 
@@ -82,6 +103,7 @@
 #define ID_USER         15
 #define ID_VOLUME       16
 #define ID_WORKDIR      17
+
 
 
 
@@ -135,6 +157,7 @@ int update_erase_logs(unsigned short prov_reflecteds[2]);
 int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag);
 int read_provisional_report(unsigned short prov_reflecteds[2]);
 int write_provisional_report(unsigned short prov_reflecteds[2]);
+
 
 
 
