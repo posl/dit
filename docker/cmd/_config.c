@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the dit command 'config', that edits the modes of dit command 'convert'.
+ * @brief Described the dit command 'config', that edits the modes of the dit command 'convert'.
  * @author Tsukasa Inada
  * @date 2022/08/29
  *
@@ -60,7 +60,7 @@ static const int idx2mode[CONF_MODES_NUM] = {4, 0, 2, 3, 1};
 
 
 /**
- * @brief edit the modes of dit command 'convert'.
+ * @brief edit the modes of the dit command 'convert'.
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
@@ -219,7 +219,7 @@ static int __config_contents(int code, ...){
 
 
 /**
- * @brief get the modes of dit command 'convert' and hand over it to the command.
+ * @brief get the modes of the dit command 'convert' and hand over it to the command.
  *
  * @param[in]  config_arg  string for determining the modes
  * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
