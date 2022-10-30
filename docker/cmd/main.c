@@ -265,7 +265,6 @@ void xperror_too_many_args(int limit){
  * @note if 'msg' is NULL, print an error message about manipulating an internal file.
  */
 void xperror_message(const char * restrict msg, const char * restrict addition){
-    char *format = "%s: %s: %s\n";
     int offset = 0;
 
     if (! msg)
@@ -275,7 +274,7 @@ void xperror_message(const char * restrict msg, const char * restrict addition){
         addition = msg;
     }
 
-    fprintf(stderr, (format + offset), program_name, addition, msg);
+    fprintf(stderr, ("%s: %s: %s\n" + offset), program_name, addition, msg);
 }
 
 
@@ -495,8 +494,8 @@ int receive_positive_integer(const char *target, int *left){
  */
 int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode){
     if (target && (size > 0)){
-        const char *A[size];
-        memcpy(A, expected, (sizeof(const char *) * size));
+        const char *expected_copy[size];
+        memcpy(expected_copy, expected, (sizeof(const char *) * size));
 
         bool upper_case, forward_match, break_flag = false;
         int min, max, tmp, c, mid;
@@ -516,7 +515,7 @@ int receive_expected_string(const char *target, const char * const expected[], s
                 if (tmp < 0){
                     mid = (min + max) / 2;
 
-                    tmp = *(A[mid]++) - c;
+                    tmp = *(expected_copy[mid]++) - c;
                     if (tmp){
                         if (tmp < 0)
                             min = mid + 1;
@@ -525,11 +524,11 @@ int receive_expected_string(const char *target, const char * const expected[], s
                     }
                     else {
                         tmp = mid;
-                        while ((--tmp >= min) && (c == *(A[tmp]++)));
+                        while ((--tmp >= min) && (c == *(expected_copy[tmp]++)));
                         min = ++tmp;
 
                         tmp = mid;
-                        while ((++tmp <= max) && (c == *(A[tmp]++)));
+                        while ((++tmp <= max) && (c == *(expected_copy[tmp]++)));
                         max = --tmp;
 
                         break_flag = true;
@@ -545,12 +544,12 @@ int receive_expected_string(const char *target, const char * const expected[], s
 
             if (break_flag)
                 break_flag = false;
-            else if (c != *(A[min]++))
+            else if (c != *(expected_copy[min]++))
                 return -2;
         }
 
         if (! tmp)
-            return (forward_match || (! *(A[min]))) ? min : -2;
+            return (forward_match || (! *(expected_copy[min]))) ? min : -2;
     }
     return -1;
 }

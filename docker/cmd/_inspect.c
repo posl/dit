@@ -628,8 +628,8 @@ static void __destruct_recursive(file_node *file, insp_opts *opt, unsigned int d
  * @param[in]  mode  file mode
  */
 static void __print_file_mode(mode_t mode){
-    char S[11];
-    S[0] =
+    char mode_str[11];
+    mode_str[0] =
         S_ISREG(mode) ? '-' :
         S_ISDIR(mode) ? 'd' :
         S_ISCHR(mode) ? 'c' :
@@ -638,18 +638,19 @@ static void __print_file_mode(mode_t mode){
         S_ISLNK(mode) ? 'l' :
         S_ISSOCK(mode) ? 's' :
         '\?';
-    S[1] = (mode & S_IRUSR) ? 'r' : '-';
-    S[2] = (mode & S_IWUSR) ? 'w' : '-';
-    S[3] = (mode & S_ISUID) ? ((mode & S_IXUSR) ? 's' : 'S') : ((mode & S_IXUSR) ? 'x' : '-');
-    S[4] = (mode & S_IRGRP) ? 'r' : '-';
-    S[5] = (mode & S_IWGRP) ? 'w' : '-';
-    S[6] = (mode & S_ISGID) ? ((mode & S_IXGRP) ? 's' : 'S') : ((mode & S_IXGRP) ? 'x' : '-');
-    S[7] = (mode & S_IROTH) ? 'r' : '-';
-    S[8] = (mode & S_IWOTH) ? 'w' : '-';
-    S[9] = (mode & S_ISVTX) ? ((mode & S_IXOTH) ? 't' : 'T') : ((mode & S_IXOTH) ? 'x' : '-');
-    S[10] = '\0';
 
-    fprintf(stdout, "%s  ", S);
+    mode_str[1] = (mode & S_IRUSR) ? 'r' : '-';
+    mode_str[2] = (mode & S_IWUSR) ? 'w' : '-';
+    mode_str[3] = (mode & S_ISUID) ? ((mode & S_IXUSR) ? 's' : 'S') : ((mode & S_IXUSR) ? 'x' : '-');
+    mode_str[4] = (mode & S_IRGRP) ? 'r' : '-';
+    mode_str[5] = (mode & S_IWGRP) ? 'w' : '-';
+    mode_str[6] = (mode & S_ISGID) ? ((mode & S_IXGRP) ? 's' : 'S') : ((mode & S_IXGRP) ? 'x' : '-');
+    mode_str[7] = (mode & S_IROTH) ? 'r' : '-';
+    mode_str[8] = (mode & S_IWOTH) ? 'w' : '-';
+    mode_str[9] = (mode & S_ISVTX) ? ((mode & S_IXOTH) ? 't' : 'T') : ((mode & S_IXOTH) ? 'x' : '-');
+    mode_str[10] = '\0';
+
+    fprintf(stdout, "%s  ", mode_str);
 }
 
 

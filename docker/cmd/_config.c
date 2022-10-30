@@ -253,18 +253,18 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
         size_t size;
         size = strlen(config_arg) + 1;
 
-        char S[size];
-        memcpy(S, config_arg, (sizeof(char) * size));
+        char *config_arg_copy, tmp[size];
+        config_arg_copy = tmp;
+        memcpy(config_arg_copy, config_arg, (sizeof(char) * size));
 
-        char *tmp, *token;
+        char *token;
         int mode2d, mode2h, mode, offset, target_c, i;
 
-        tmp = S;
         mode2d = *p_mode2d;
         mode2h = *p_mode2h;
 
-        while ((token = strtok(tmp, ","))){
-            tmp = NULL;
+        while ((token = strtok(config_arg_copy, ","))){
+            config_arg_copy = NULL;
             mode = -1;
             offset = 0;
             target_c = 'b';

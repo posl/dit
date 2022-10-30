@@ -59,7 +59,7 @@ PROMPT_REPORT(){
     fi
 }
 
-export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT 2> /dev/null
+export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT
 
 
 if ( unset PROMPT_COMMAND 2> /dev/null ); then
