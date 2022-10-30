@@ -19,14 +19,14 @@
 #define DOCKER_OR_HISTORY  "Dockerfile or history-file"
 #define WHEN_REFLECTING  "when reflecting a executed command line"
 
-#define TARGET_OPTION_ARG  "  dockerfile (-d), history-file (-h), both (-dh)\n"
-#define SQUEEZE_OPTION_DESC  "suppress repeated empty output lines\n"
-#define BLANK_OPTION_DESC  "replace how to handle repeated empty output lines:\n"
+#define TARGET_OPTION_ARGS  "  dockerfile (-d), history-file (-h), both (-dh)\n"
+#define BLANK_OPTION_DESC  "replace how to handle empty output lines:\n"
 
 #define EXIT_NORMALLY  ", and exit normally\n"
 #define HELP_OPTION_DESC  "display this help" EXIT_NORMALLY
 
 #define CAN_BE_TRUNCATED  "can be truncated as long as it is unique"
+#define CASE_INSENSITIVE  "without regard to case"
 #define SPECIFIED_BY_TARGET  "file must be specified explicitly by '-dh' or '--target'"
 
 
@@ -103,7 +103,7 @@ int help(int argc, char **argv){
         return (i < 0) ? FAILURE : SUCCESS;
 
     const char *target = NULL;
-    char S[] = "\n\n\n";
+    char newlines[] = "\n\n\n";
 
     if ((argc -= optind) > 0){
         argv += optind;
@@ -117,8 +117,8 @@ int help(int argc, char **argv){
 
         if (--argc){
             target = *(++argv);
-            S[1] = (code != manual) ? '\0' : '\n';
-            fputs(S, stdout);
+            newlines[1] = (code != manual) ? '\0' : '\n';
+            fputs(newlines, stdout);
             fflush(stdout);
         }
         else
@@ -204,17 +204,17 @@ static void __display_cmd_list(){
  * @return int  1 (normally exit) or -1 (error exit)
  */
 static int __display_version(){
-    FILE *fp;
-    if ((fp = fopen(VERSION_FILE, "r"))){
-        char S[128];
-        while (fgets(S, 128, fp))
-            fputs(S, stdout);
+    const char *line;
+    int errid = 0, exit_status = NORMALLY_EXIT;
 
-        fclose(fp);
-        return NORMALLY_EXIT;
+    while ((line = xfgets_for_loop(VERSION_FILE, false, &errid)))
+        fputs(line, stdout);
+
+    if (errid){
+        xperror_internal_file();
+        exit_status = ERROR_EXIT;
     }
-    xperror_internal_file();
-    return ERROR_EXIT;
+    return exit_status;
 }
 
 
@@ -407,44 +407,46 @@ void erase_manual(){
         "Delete the lines that match the specified conditions from "DOCKER_OR_HISTORY".\n"
         "\n"
         "Options for Deletion:\n"
-        "  -B, --begin-with=STR        delete the lines starting with STR\n"
-        "  -C, --contain=STR           delete the lines containing STR\n"
-        "  -L, --lines=ARG[,ARG]...    delete the lines with the number specified by ARGs:\n"
-        "                                NUM (unique specification), [NUM]-[NUM] (range specification)\n"
-        "  -Z, --undoes[=NUM]          delete the lines added within the last NUM (default is 1) times\n"
+        "  -E, --extended-regexp=PTN     delete the lines containing the pattern\n"
+        "  -N, --numbers=ARG[,ARG]...    delete the lines with the numbers specified by ARGs:\n"
+        "                                  NUM (unique specification), [NUM]-[NUM] (range specification)\n"
+        "  -Z, --undoes[=NUM]            delete the lines added within the last NUM (1 by default) times\n"
         "\n"
         "Options for Behavior:\n"
-        "  -d                          delete from Dockerfile\n"
-        "  -h                          delete from history-file\n"
-        "      --target=FILE           determine the target file:\n"
-        "                              " TARGET_OPTION_ARG
-        "  -i, --ignore-case           ignore case distinctions in the STR arguments and data\n"
-        "  -m, --max-count=NUM         delete at most NUM lines, counting from the most recently added\n"
-        "  -r, --reset                 reset the internal log-file\n"
-        "  -s                          " SQUEEZE_OPTION_DESC
-        "  -t                          ignore repeated empty output lines\n"
-        "      --blank=WORD            " BLANK_OPTION_DESC
-        "                                preserve (default), squeeze (-s), truncate (-t)\n"
-        "  -v, --verbose               display deleted lines\n"
-        "  -y                          eliminate the confirmation work before deletion\n"
-        "      --assume=Y/n            set the answer before the confirmation work\n"
-        "      --help                  " HELP_OPTION_DESC
+        "  -d                            delete from Dockerfile\n"
+        "  -h                            delete from history-file\n"
+        "      --target=FILE             determine the target file:\n"
+        "                                " TARGET_OPTION_ARGS
+        "  -i, --ignore-case             ignore case distinctions in the STR arguments and data\n"
+        "  -m, --max-count=NUM           delete at most NUM lines, counting from the most recently added\n"
+        "  -r, --reset                   reset the internal log-files\n"
+        "  -s                            suppress repeated empty output lines\n"
+        "  -t                            truncate all empty output lines\n"
+        "      --blank=WORD              " BLANK_OPTION_DESC
+        "                                  preserve (default), squeeze (-s), truncate (-t)\n"
+        "  -v, --verbose                 display deleted lines\n"
+        "  -y                            eliminate the confirmation before deletion\n"
+        "      --assume=Y/n              set the answer to the confirmation before deletion:\n"
+        "                                  YES (delete all lines), NO (delete selected lines), QUIT (exit)\n"
+        "      --help                    " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
-        "  - When no Options for Deletion are given, if the '-v' option is given, it displays the\n"
-        "    previous deleted lines, and exit normally, otherwise it behaves as if '-Z' is given.\n"
-        "  - The line numbers for the '-L' option start from 1, and 0 is the same as specifying nothing.\n"
-        "  - If NUM is omitted in the range specification of the '-L' option, it is interpreted as\n"
-        "    specifying the line number representing the beginning or end depending on the position.\n"
+        "  - When no Options for Deletion are given, if '-v' is given, it displays the lines deleted by the\n"
+        "    previous dit command 'erase', and exit normally, otherwise it behaves as if '-Z' is given.\n"
+        "  - If multiple Options for Deletion are given, the specified conditions are ANDed together.\n"
+        "  - The pattern string for '-E' must be extended regular expression of 255 characters or less.\n"
+        "  - The line numbers for '-N' start from 1, and 0 is the same as specifying nothing.\n"
+        "  - In the range specification of '-N', if nothing is specified for NUM,\n"
+        "    the first or last line number will be assigned depending on the position.\n"
         "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
         "  - The target "SPECIFIED_BY_TARGET".\n"
-        "  - The '-Z' option uses the internal log-files that record the number of reflected lines, and\n"
+        "  - The internal log-files that record the number of reflected lines are used by '-Z', and\n"
         "    if there is an inconsiestency between one of that files and the target file, it is reset.\n"
-        "  - When the number of reflected rows is 0, the log-files are not updated at all.\n"
-        "  - Above log-files are not saved across interruptions such as exiting the container.\n"
+        "  - When the number of reflected lines is 0, the internal log-files are not updated at all.\n"
+        "  - The internal log-files are not saved across interruptions such as exiting the container.\n"
+        "  - The argument for '--assume' "CAN_BE_TRUNCATED" "CASE_INSENSITIVE".\n"
         "  - By default, Y/n confirmation is performed using standard error output and standard input\n"
-        "    as to whether it is okay to delete the lines that match the specified conditions, and if\n"
-        "    you answer 'Yes', delete all of the lines, if you answer 'No', delete the selected lines.\n"
+        "    as to whether it is okay to delete the lines that match the specified conditions.\n"
     , stdout);
 }
 
@@ -472,7 +474,7 @@ void help_manual(){
         "  - If no COMMANDs are specified, show information about the main interface of the dit commands.\n"
         "  - Each COMMAND "CAN_BE_TRUNCATED", in addition\n"
         "    'config' and 'healthcheck' can be specified by 'cfg' and 'hc' respectively.\n"
-        "  - When neither '-dem' is given, it behaves as if '-m' is given.\n"
+        "  - When neither of '-dem' is given, it behaves as if '-m' is given.\n"
     , stdout);
 }
 
@@ -501,12 +503,12 @@ void inspect_manual(){
         "\n"
         HELP_REMARKS_STR
         "  - If no DIRECTORYs are specified, it operates as if the current directory is specified.\n"
-        "  - The WORD argument for '--sort' "CAN_BE_TRUNCATED".\n"
+        "  - The argument for '--sort' "CAN_BE_TRUNCATED".\n"
+        "  - If standard output is not connected to a terminal, each file name is not colorized.\n"
         "  - User or group name longer than 8 characters are converted to the corresponding ID, and\n"
         "    the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
         "  - The units of file size are 'k,M,G,T,P,E,Z', which is powers of 1000.\n"
         "  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n"
-        "  - If standard output is not connected to a terminal, each file name is not colorized.\n"
         "\n"
         "This command is based on the 'ls' command which is a GNU one.\n"
         "See that man page for details.\n"
@@ -539,23 +541,24 @@ void reflect_manual(){
         "  -d                   append to Dockerfile\n"
         "  -h                   append to history-file\n"
         "      --target=DEST    determine destination file:\n"
-        "                       " TARGET_OPTION_ARG
-        "  -p                   leave repeated empty output lines as they are\n"
-        "  -s                   " SQUEEZE_OPTION_DESC
+        "                       " TARGET_OPTION_ARGS
+        "  -p                   leave empty output lines as they are\n"
+        "  -s                   suppress repeated empty output lines\n"
         "      --blank=WORD     " BLANK_OPTION_DESC
         "                         preserve (-p), squeeze (-s), truncate (default)\n"
+        "  -v, --verbose        display reflected lines\n"
         "      --help           " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
-        "  - If no SOURCEs are specified, it uses the internal files created by the dit command 'convert'.\n"
-        "  - If '-' is specified as SOURCE, it read standard input until an EOF is entered.\n"
+        "  - If no SOURCEs are specified, it uses the results of the previous dit command 'convert'.\n"
+        "  - If '-' is specified as SOURCE, it read standard input until 'EOF' is entered.\n"
         "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
         "  - Destination "SPECIFIED_BY_TARGET".\n"
-        "  - If both files are destinations, only the internal files above can be used.\n"
+        "  - If both files are destination, the reflection contents cannot be specified by SOURCEs.\n"
         "  - If the size of destination file exceeds the upper limit (2G), it exits with the error.\n"
         "  - When reflecting in Dockerfile, each instruction must be on one line and lines to be reflected\n"
-        "    must not contain unnecessary leading white spaces or FROM and MAINTAINER instructions.\n"
-        "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is one or less.\n"
+        "    must not contain unnecessary leading white spaces and a invalid or disallowed instruction.\n"
+        "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is 1 or less.\n"
         "  - Internally, logging such as the number of reflected lines is performed.\n"
     , stdout);
 }
@@ -692,10 +695,10 @@ static void __cp_example(){
 
 static void __erase_example(){
     fputs(
-        "dit erase -dh                            Delete the lines added just before.\n"
-        "dit erase -d -L -                        Delete all lines from Dockerfile.\n"
-        "dit erase --targ=hist --cont=cat         Delete unnecessary 'cat' commands from history-file.\n"
-        "dit erase -divy -BONBUILD > erase.out    Extract ONBUILD instructions from Dockerfile.\n"
+        "dit erase -dh                   Delete the lines added just before.\n"
+        "dit erase -diy -E '^ONBUILD'    Delete all ONBUILD instructions from Dockerfile.\n"
+        "dit erase -hm10 -N -            Delete last 10 lines from history-file.\n"
+        "dit erase -v --target both      Display the lines deleted by the previous 'erase'.\n"
     , stdout);
 }
 
@@ -722,10 +725,10 @@ static void __ignore_example(){
 
 static void __inspect_example(){
     fputs(
-        "dit inspect -S                 List files under the current directory sorted by their size.\n"
-        "dit inspect --sort=ext /dit    List files under '/dit' sorted by their extension.\n"
-        "dit inspect -CF /dev           List files under '/dev', decorating their name.\n"
-        "dit inspect /bin /sbin         List files under '/bin' and '/sbin' respectively.\n"
+        "dit inspect -S                 List the files under the current directory sorted by their size.\n"
+        "dit inspect --sort=ext /dit    List the files under '/dit' sorted by their extension.\n"
+        "dit inspect -CF /dev           List the files under '/dev', decorating their name.\n"
+        "dit inspect /bin /sbin         List the files under '/bin' and '/sbin' respectively.\n"
     , stdout);
 }
 
@@ -747,10 +750,10 @@ static void __optimize_example(){
 
 static void __reflect_example(){
     fputs(
-        "dit reflect                 Error in noraml use, but used internally for logging.\n"
-        "dit reflect -d erase.out    Reflect the contents of './erase.out' in Dockerfile.\n"
-        "dit reflect -hs -           Reflect the input contents in history-file while suqueezing blanks.\n"
-        "dit reflect --target b      Reflect the output contents of the previous 'convert'.\n"
+        "dit reflect          Error in noraml use, but used internally for logging.\n"
+        "dit reflect -d in    Reflect the contents of './in' in Dockerfile.\n"
+        "dit reflect -hp -    Reflect the input contents in history-file while keeping empty lines.\n"
+        "dit reflect -dhv     Reflect the output contents of the previous 'convert', and report them.\n"
     , stdout);
 }
 
