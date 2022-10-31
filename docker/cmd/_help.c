@@ -20,7 +20,7 @@
 #define WHEN_REFLECTING  "when reflecting a executed command line"
 
 #define TARGET_OPTION_ARGS  "  dockerfile (-d), history-file (-h), both (-dh)\n"
-#define BLANK_OPTION_DESC  "replace how to handle empty output lines:\n"
+#define BLANK_OPTION_DESC  "replace how to handle the empty lines:\n"
 
 #define EXIT_NORMALLY  ", and exit normally\n"
 #define HELP_OPTION_DESC  "display this help" EXIT_NORMALLY
@@ -119,7 +119,6 @@ int help(int argc, char **argv){
             target = *(++argv);
             newlines[1] = (code != manual) ? '\0' : '\n';
             fputs(newlines, stdout);
-            fflush(stdout);
         }
         else
             return i;
@@ -420,8 +419,8 @@ void erase_manual(){
         "  -i, --ignore-case             ignore case distinctions in the STR arguments and data\n"
         "  -m, --max-count=NUM           delete at most NUM lines, counting from the most recently added\n"
         "  -r, --reset                   reset the internal log-files\n"
-        "  -s                            suppress repeated empty output lines\n"
-        "  -t                            truncate all empty output lines\n"
+        "  -s                            suppress repeated empty lines\n"
+        "  -t                            truncate all empty lines\n"
         "      --blank=WORD              " BLANK_OPTION_DESC
         "                                  preserve (default), squeeze (-s), truncate (-t)\n"
         "  -v, --verbose                 display deleted lines\n"
@@ -542,8 +541,8 @@ void reflect_manual(){
         "  -h                   append to history-file\n"
         "      --target=DEST    determine destination file:\n"
         "                       " TARGET_OPTION_ARGS
-        "  -p                   leave empty output lines as they are\n"
-        "  -s                   suppress repeated empty output lines\n"
+        "  -p                   leave the empty lines as they are\n"
+        "  -s                   suppress repeated empty lines\n"
         "      --blank=WORD     " BLANK_OPTION_DESC
         "                         preserve (-p), squeeze (-s), truncate (default)\n"
         "  -v, --verbose        display reflected lines\n"
@@ -752,7 +751,7 @@ static void __reflect_example(){
     fputs(
         "dit reflect          Error in noraml use, but used internally for logging.\n"
         "dit reflect -d in    Reflect the contents of './in' in Dockerfile.\n"
-        "dit reflect -hp -    Reflect the input contents in history-file while keeping empty lines.\n"
+        "dit reflect -hp -    Reflect the input contents in history-file while keeping the empty lines.\n"
         "dit reflect -dhv     Reflect the output contents of the previous 'convert', and report them.\n"
     , stdout);
 }
