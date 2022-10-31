@@ -102,11 +102,8 @@ int main(int argc, char **argv){
         program_name = *(++argv);
 
         int (* cmd)(int, char **);
-        if ((cmd = __get_dit_cmd(program_name))){
-            setvbuf(stdout, NULL, _IOFBF, 0);
-            setvbuf(stderr, NULL, _IOLBF, 0);
+        if ((cmd = __get_dit_cmd(program_name)))
             return cmd(argc, argv);
-        }
 
         const char *arg;
         arg = program_name;
@@ -147,7 +144,31 @@ static int (* const __get_dit_cmd(const char *target))(int, char **){
     };
 
     int i;
-    return ((i = receive_expected_string(target, cmd_reprs, CMDS_NUM, 0)) >= 0) ? cmd_funcs[i] : NULL;
+    int (* cmd)(int, char **) = NULL;
+
+    if ((i = receive_expected_string(target, cmd_reprs, CMDS_NUM, 0)) >= 0){
+        cmd = cmd_funcs[i];
+
+        FILE *fp;
+        int mode;
+
+        i = 2;
+        while (i--){
+            mode = _IOLBF;
+
+            if (i){
+                fp = stdout;
+                if (cmd == inspect)
+                    mode = _IOFBF;
+            }
+            else
+                fp = stderr;
+
+            setvbuf(fp, NULL, mode, 0);
+        }
+    }
+
+    return cmd;
 }
 
 
