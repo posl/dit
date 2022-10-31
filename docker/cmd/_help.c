@@ -38,42 +38,42 @@ typedef enum {
 } help_conts;
 
 
-static int __parse_opts(int argc, char **argv, help_conts *opt);
-static void __display_cmd_list();
-static int __display_version();
+static int parse_opts(int argc, char **argv, help_conts *opt);
+static void display_cmd_list(void);
+static int display_version(void);
 
-static int __display_help(help_conts code, const char *target);
-static void __dit_manual();
+static bool display_help(help_conts code, const char *target);
+static void dit_manual(void);
 
-static void __dit_description();
-static void __config_description();
-static void __convert_description();
-static void __cp_description();
-static void __erase_description();
-static void __healthcheck_description();
-static void __help_description();
-static void __ignore_description();
-static void __inspect_description();
-static void __label_description();
-static void __onbuild_description();
-static void __optimize_description();
-static void __reflect_description();
-static void __setcmd_description();
+static void dit_description(void);
+static void config_description(void);
+static void convert_description(void);
+static void cp_description(void);
+static void erase_description(void);
+static void healthcheck_description(void);
+static void help_description(void);
+static void ignore_description(void);
+static void inspect_description(void);
+static void label_description(void);
+static void onbuild_description(void);
+static void optimize_description(void);
+static void reflect_description(void);
+static void setcmd_description(void);
 
-static void __dit_example();
-static void __config_example();
-static void __convert_example();
-static void __cp_example();
-static void __erase_example();
-static void __healthcheck_example();
-static void __help_example();
-static void __ignore_example();
-static void __inspect_example();
-static void __label_example();
-static void __onbuild_example();
-static void __optimize_example();
-static void __reflect_example();
-static void __setcmd_example();
+static void dit_example(void);
+static void config_example(void);
+static void convert_example(void);
+static void cp_example(void);
+static void erase_example(void);
+static void healthcheck_example(void);
+static void help_example(void);
+static void ignore_example(void);
+static void inspect_example(void);
+static void label_example(void);
+static void onbuild_example(void);
+static void optimize_example(void);
+static void reflect_example(void);
+static void setcmd_example(void);
 
 
 extern const char * const cmd_reprs[3];
@@ -99,7 +99,7 @@ int help(int argc, char **argv){
     int i;
     help_conts code;
 
-    if ((i = __parse_opts(argc, argv, &code)))
+    if ((i = parse_opts(argc, argv, &code)))
         return (i < 0) ? FAILURE : SUCCESS;
 
     const char *target = NULL;
@@ -113,7 +113,8 @@ int help(int argc, char **argv){
         argc = 1;
 
     do {
-        i |= __display_help(code, target);
+        if (! display_help(code, target))
+            i = FAILURE;
 
         if (--argc){
             target = *(++argv);
@@ -138,7 +139,7 @@ int help(int argc, char **argv){
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_opts(int argc, char **argv, help_conts *opt){
+static int parse_opts(int argc, char **argv, help_conts *opt){
     const char *short_opts = "ademV";
 
     const struct option long_opts[] = {
@@ -157,7 +158,7 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0){
         switch (c){
             case 'a':
-                __display_cmd_list();
+                display_cmd_list();
                 return NORMALLY_EXIT;
             case 'd':
                 *opt = description;
@@ -169,7 +170,7 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
                 *opt = manual;
                 break;
             case 'V':
-                return __display_version();
+                return display_version();
             case 1:
                 help_manual();
                 return NORMALLY_EXIT;
@@ -189,7 +190,7 @@ static int __parse_opts(int argc, char **argv, help_conts *opt){
  * @note display the commands in the same order as 'dit help'.
  * @note array for reordering the commands is in reverse order for looping efficiency.
  */
-static void __display_cmd_list(){
+static void display_cmd_list(void){
     const int cmd_rearange[CMDS_NUM] = {5, 7, 3, 11, 9, 4, 12, 8, 2, 6, 0, 10, 1};
 
     for (int i = CMDS_NUM; i--;)
@@ -202,7 +203,7 @@ static void __display_cmd_list(){
  *
  * @return int  1 (normally exit) or -1 (error exit)
  */
-static int __display_version(){
+static int display_version(void){
     const char *line;
     int errid = 0, exit_status = NORMALLY_EXIT;
 
@@ -224,17 +225,16 @@ static int __display_version(){
  *
  * @param[in]  code  serial number identifying the display content
  * @param[in]  target  target string
- * @return int  exit status like command's one
+ * @return bool  successful or not
  *
  * @note "cfg" and "hc", which are default aliases of 'config' and 'heatlthcheck', are supported.
  */
-static int __display_help(help_conts code, const char *target){
+static bool display_help(help_conts code, const char *target){
     const char *topic;
-    void (* help_func)();
-    int exit_status = SUCCESS;
+    void (* help_func)(void);
 
     if (target){
-        void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])() = {
+        void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])(void) = {
             {
                 config_manual,
                 convert_manual,
@@ -251,34 +251,34 @@ static int __display_help(help_conts code, const char *target){
                 setcmd_manual
             },
             {
-                __config_description,
-                __convert_description,
-                __cp_description,
-                __erase_description,
-                __healthcheck_description,
-                __help_description,
-                __ignore_description,
-                __inspect_description,
-                __label_description,
-                __onbuild_description,
-                __optimize_description,
-                __reflect_description,
-                __setcmd_description
+                config_description,
+                convert_description,
+                cp_description,
+                erase_description,
+                healthcheck_description,
+                help_description,
+                ignore_description,
+                inspect_description,
+                label_description,
+                onbuild_description,
+                optimize_description,
+                reflect_description,
+                setcmd_description
             },
             {
-                __config_example,
-                __convert_example,
-                __cp_example,
-                __erase_example,
-                __healthcheck_example,
-                __help_example,
-                __ignore_example,
-                __inspect_example,
-                __label_example,
-                __onbuild_example,
-                __optimize_example,
-                __reflect_example,
-                __setcmd_example
+                config_example,
+                convert_example,
+                cp_example,
+                erase_example,
+                healthcheck_example,
+                help_example,
+                ignore_example,
+                inspect_example,
+                label_example,
+                onbuild_example,
+                optimize_example,
+                reflect_example,
+                setcmd_example
             }
         };
 
@@ -294,27 +294,25 @@ static int __display_help(help_conts code, const char *target){
         else {
             xperror_invalid_arg('C', i, "dit command", target);
             xperror_suggestion(false);
-            exit_status = FAILURE;
+            return FAILURE;
         }
     }
     else {
-        void (* const dit_helps[HELP_CONTENTS_NUM])() = {
-            __dit_manual,
-            __dit_description,
-            __dit_example
+        void (* const dit_helps[HELP_CONTENTS_NUM])(void) = {
+            dit_manual,
+            dit_description,
+            dit_example
         };
 
         topic = "dit";
         help_func = dit_helps[code];
     }
 
-    if (! exit_status){
-        if (code != manual)
-            fprintf(stdout, " < %s >\n", topic);
-        help_func();
-    }
+    if (code != manual)
+        fprintf(stdout, " < %s >\n", topic);
+    help_func();
 
-    return exit_status;
+    return SUCCESS;
 }
 
 
@@ -325,7 +323,7 @@ static int __display_help(help_conts code, const char *target){
 ******************************************************************************/
 
 
-static void __dit_manual(){
+static void dit_manual(void){
     fputs(
         HELP_USAGES_STR
         "  dit [COMMAND] [ARG]...\n"
@@ -358,7 +356,7 @@ static void __dit_manual(){
 }
 
 
-void config_manual(){
+void config_manual(void){
     fputs(
         HELP_USAGES_STR
         "  dit config [OPTION]... [MODE[,MODE]...]\n"
@@ -389,17 +387,17 @@ void config_manual(){
 }
 
 
-void convert_manual(){
+void convert_manual(void){
     fputs("convert manual\n", stdout);
 }
 
 
-void cp_manual(){
+void cp_manual(void){
     fputs("cp manual\n", stdout);
 }
 
 
-void erase_manual(){
+void erase_manual(void){
     fputs(
         HELP_USAGES_STR
         "  dit erase [OPTION]...\n"
@@ -450,12 +448,12 @@ void erase_manual(){
 }
 
 
-void healthcheck_manual(){
+void healthcheck_manual(void){
     fputs("healthcheck manual\n", stdout);
 }
 
 
-void help_manual(){
+void help_manual(void){
     fputs(
         HELP_USAGES_STR
         "  dit help [OPTION]... [COMMAND]...\n"
@@ -478,12 +476,12 @@ void help_manual(){
 }
 
 
-void ignore_manual(){
+void ignore_manual(void){
     fputs("ignore manual\n", stdout);
 }
 
 
-void inspect_manual(){
+void inspect_manual(void){
     fputs(
         HELP_USAGES_STR
         "  dit inspect [OPTION]... [DIRECTORY]...\n"
@@ -515,22 +513,22 @@ void inspect_manual(){
 }
 
 
-void label_manual(){
+void label_manual(void){
     fputs("label manual\n", stdout);
 }
 
 
-void onbuild_manual(){
+void onbuild_manual(void){
     fputs("onbuild manual\n", stdout);
 }
 
 
-void optimize_manual(){
+void optimize_manual(void){
     fputs("optimize manual\n", stdout);
 }
 
 
-void reflect_manual(){
+void reflect_manual(void){
     fputs(
         HELP_USAGES_STR
         "  dit reflect [OPTION]... [SOURCE]...\n"
@@ -563,7 +561,7 @@ void reflect_manual(){
 }
 
 
-void setcmd_manual(){
+void setcmd_manual(void){
     fputs("setcmd manual\n", stdout);
 }
 
@@ -575,85 +573,85 @@ void setcmd_manual(){
 ******************************************************************************/
 
 
-static void __dit_description(){
+static void dit_description(void){
     fputs(
         "Use the tool-specific functions as the subcommand.\n"
     , stdout);
 }
 
-static void __config_description(){
+static void config_description(void){
     fputs(
         "Set the level at which commands are reflected in "DOCKER_OR_HISTORY", individually.\n"
     , stdout);
 }
 
-static void __convert_description(){
+static void convert_description(void){
     fputs(
         "Show how a command line is transformed for reflection in the "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
-static void __cp_description(){
+static void cp_description(void){
     fputs(
         "Perform the processing equivalent to COPY/ADD instructions and reflect this in Dockerfile.\n"
     , stdout);
 }
 
-static void __erase_description(){
+static void erase_description(void){
     fputs(
         "Delete the lines that match some conditions from "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
-static void __healthcheck_description(){
+static void healthcheck_description(void){
     fputs(
         "Set HEALTHCHECK instruction in Dockerfile.\n"
     , stdout);
 }
 
-static void __help_description(){
+static void help_description(void){
     fputs(
         "Show requested information for some dit commands.\n"
     , stdout);
 }
 
-static void __ignore_description(){
+static void ignore_description(void){
     fputs(
         "Edit set of commands that should not be reflected in "DOCKER_OR_HISTORY", individually.\n"
     , stdout);
 }
 
-static void __inspect_description(){
+static void inspect_description(void){
     fputs(
         "List information about the files under some directories in a tree format.\n"
     , stdout);
 }
 
-static void __label_description(){
+static void label_description(void){
     fputs(
         "Edit list of LABEL/EXPOSE instructions in Dockerfile.\n"
     , stdout);
 }
 
-static void __onbuild_description(){
+static void onbuild_description(void){
     fputs(
         "Append ONBUILD instructions in Dockerfile.\n"
     , stdout);
 }
 
-static void __optimize_description(){
+static void optimize_description(void){
     fputs(
         "Generate Dockerfile as the result of refactoring and optimization based on its best practices.\n"
     , stdout);
 }
 
-static void __reflect_description(){
+static void reflect_description(void){
     fputs(
         "Append the contents of some files to "DOCKER_OR_HISTORY".\n"
     , stdout);
 }
 
-static void __setcmd_description(){
+static void setcmd_description(void){
     fputs(
         "Set CMD/ENTRYPOINT instruction in Dockerfile.\n"
     , stdout);
@@ -667,12 +665,12 @@ static void __setcmd_description(){
 ******************************************************************************/
 
 
-static void __dit_example(){
+static void dit_example(void){
     fputs("dit example\n", stdout);
 }
 
 
-static void __config_example(){
+static void config_example(void){
     fputs(
         "dit config                 Display the current settings.\n"
         "dit config no-reflect      Replace the settings with 'd=no-reflect h=no-reflect'.\n"
@@ -682,17 +680,17 @@ static void __config_example(){
 }
 
 
-static void __convert_example(){
+static void convert_example(void){
     fputs("convert example\n", stdout);
 }
 
 
-static void __cp_example(){
+static void cp_example(void){
     fputs("cp example\n", stdout);
 }
 
 
-static void __erase_example(){
+static void erase_example(void){
     fputs(
         "dit erase -dh                   Delete the lines added just before.\n"
         "dit erase -diy -E '^ONBUILD'    Delete all ONBUILD instructions from Dockerfile.\n"
@@ -702,12 +700,12 @@ static void __erase_example(){
 }
 
 
-static void __healthcheck_example(){
+static void healthcheck_example(void){
     fputs("healthcheck example\n", stdout);
 }
 
 
-static void __help_example(){
+static void help_example(void){
     fputs(
         "dit help              Display the detailed manual for the main interface of the dit commands.\n"
         "dit help -e inspect   Display the example of use for 'inspect'.\n"
@@ -717,12 +715,12 @@ static void __help_example(){
 }
 
 
-static void __ignore_example(){
+static void ignore_example(void){
     fputs("ignore example\n", stdout);
 }
 
 
-static void __inspect_example(){
+static void inspect_example(void){
     fputs(
         "dit inspect -S                 List the files under the current directory sorted by their size.\n"
         "dit inspect --sort=ext /dit    List the files under '/dit' sorted by their extension.\n"
@@ -732,22 +730,22 @@ static void __inspect_example(){
 }
 
 
-static void __label_example(){
+static void label_example(void){
     fputs("label example\n", stdout);
 }
 
 
-static void __onbuild_example(){
+static void onbuild_example(void){
     fputs("onbuild example\n", stdout);
 }
 
 
-static void __optimize_example(){
+static void optimize_example(void){
     fputs("optimize example\n", stdout);
 }
 
 
-static void __reflect_example(){
+static void reflect_example(void){
     fputs(
         "dit reflect          Error in noraml use, but used internally for logging.\n"
         "dit reflect -d in    Reflect the contents of './in' in Dockerfile.\n"
@@ -757,6 +755,6 @@ static void __reflect_example(){
 }
 
 
-static void __setcmd_example(){
+static void setcmd_example(void){
     fputs("setcmd example\n", stdout);
 }

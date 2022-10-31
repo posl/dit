@@ -29,11 +29,11 @@
 #define CONF_EXCEED_STAT  (CONF_MODES_NUM * CONF_MODES_NUM)
 
 
-static int __parse_opts(int argc, char **argv, bool *opt);
-static int __config_contents(int code, ...);
+static int parse_opts(int argc, char **argv, unsigned int *opt);
+static int config_contents(unsigned int code, ...);
 
-static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
-static int __receive_mode_integer(int c, int spare);
+static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
+static int receive_mode_integer(int c, int spare);
 
 
 /** array of strings representing each mode in alphabetical order */
@@ -70,17 +70,17 @@ static const int idx2mode[CONF_MODES_NUM] = {4, 0, 2, 3, 1};
  */
 int config(int argc, char **argv){
     int i;
-    bool reset_flag;
+    unsigned int reset_flag;
 
-    if ((i = __parse_opts(argc, argv, &reset_flag)))
+    if ((i = parse_opts(argc, argv, &reset_flag)))
         i = (i < 0) ? FAILURE : SUCCESS;
     else
         switch ((argc - optind)){
             case 0:
-                i = __config_contents(CONF_RESET_OR_SHOW(reset_flag));
+                i = config_contents(CONF_RESET_OR_SHOW(reset_flag));
                 break;
             case 1:
-                if ((i = __config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) > 0)
+                if ((i = config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) > 0)
                     xperror_config_arg(argv[optind]);
                 break;
             default:
@@ -109,7 +109,7 @@ int config(int argc, char **argv){
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_opts(int argc, char **argv, bool *opt){
+static int parse_opts(int argc, char **argv, unsigned int *opt){
     const char *short_opts = "r";
 
     const struct option long_opts[] = {
@@ -146,7 +146,7 @@ static int __parse_opts(int argc, char **argv, bool *opt){
  * @param[out] ...  if necessary, string for determining the modes and variable to store them
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
-static int __config_contents(int code, ...){
+static int config_contents(unsigned int code, ...){
     bool reset_flag, write_flag, has_arg;
 
     reset_flag = code & CONF_ISRSTFLG;
@@ -181,7 +181,7 @@ static int __config_contents(int code, ...){
             va_list sp;
             va_start(sp, code);
 
-            if ((__receive_mode(va_arg(sp, const char *), &mode2d, &mode2h))){
+            if ((receive_mode(va_arg(sp, const char *), &mode2d, &mode2h))){
                 if (write_flag){
                     signed char d;
                     if (c != (d = CONF_STAT_FORMULA(mode2d, mode2h)))
@@ -229,7 +229,7 @@ static int __config_contents(int code, ...){
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
-    return __config_contents(CONF_GET_FROM_CONVERT, config_arg, p_mode2d, p_mode2h);
+    return config_contents(CONF_GET_FROM_CONVERT, config_arg, p_mode2d, p_mode2h);
 }
 
 
@@ -248,14 +248,14 @@ int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p
  * @param[out] p_mode2h  variable to store the mode used when reflecting in history-file
  * @return bool  successful or not
  */
-static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
+static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
     if (config_arg){
         size_t size;
         size = strlen(config_arg) + 1;
 
-        char *config_arg_copy, tmp[size];
-        config_arg_copy = tmp;
-        memcpy(config_arg_copy, config_arg, (sizeof(char) * size));
+        char *arg_copy, tmp[size];
+        arg_copy = tmp;
+        memcpy(arg_copy, config_arg, (sizeof(char) * size));
 
         char *token;
         int mode2d, mode2h, mode, offset, target_c, i;
@@ -263,15 +263,15 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
         mode2d = *p_mode2d;
         mode2h = *p_mode2h;
 
-        while ((token = strtok(config_arg_copy, ","))){
-            config_arg_copy = NULL;
+        while ((token = strtok(arg_copy, ","))){
+            arg_copy = NULL;
             mode = -1;
             offset = 0;
             target_c = 'b';
 
             if (! (i = strlen(token) - 2)){
-                if ((i = __receive_mode_integer(token[0], mode2d)) >= 0){
-                    if ((mode = __receive_mode_integer(token[1], mode2h)) >= 0){
+                if ((i = receive_mode_integer(token[0], mode2d)) >= 0){
+                    if ((mode = receive_mode_integer(token[1], mode2h)) >= 0){
                         mode2d = i;
                         mode2h = mode;
                         continue;
@@ -291,7 +291,7 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
             }
 
             token += offset;
-            if ((i < 0) && ((mode = __receive_mode_integer(token[0], -2)) < -1))
+            if ((i < 0) && ((mode = receive_mode_integer(token[0], -2)) < -1))
                 continue;
             if ((mode < 0) && ((i = receive_expected_string(token, mode_reprs, CONF_MODES_NUM, 2)) >= 0))
                 mode = idx2mode[i];
@@ -326,7 +326,7 @@ static bool __receive_mode(const char *config_arg, int * restrict p_mode2d, int 
  * @param[in]  spare  integer to return if an underscore is passed
  * @return int  the resulting integer, spare integer, or -1
  */
-static int __receive_mode_integer(int c, int spare){
+static int receive_mode_integer(int c, int spare){
     int i;
     if ((i = c - '0') >= 0){
         if (i < CONF_MODES_NUM)

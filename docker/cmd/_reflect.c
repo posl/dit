@@ -18,8 +18,8 @@
 #define REFLECT_FILE_P "/dit/tmp/reflect-report.prov"
 #define REFLECT_FILE_R "/dit/tmp/reflect-report.real"
 
-#define update_provisional_report(curr_reflecteds)  __manage_provisional_report(curr_reflecteds, "r+w\0")
-#define reset_provisional_report(prov_reflecteds)  __manage_provisional_report(prov_reflecteds, "r\0w\0")
+#define update_provisional_report(curr_reflecteds)  manage_provisional_report(curr_reflecteds, "r+w\0")
+#define reset_provisional_report(prov_reflecteds)  manage_provisional_report(prov_reflecteds, "r\0w\0")
 
 
 /** Data type for storing the results of option parse */
@@ -30,17 +30,17 @@ typedef struct {
 } refl_opts;
 
 
-static int __parse_opts(int argc, char **argv, refl_opts *opt);
-static int __do_reflect(int argc, char **argv, refl_opts *opt);
+static int parse_opts(int argc, char **argv, refl_opts *opt);
+static int do_reflect(int argc, char **argv, refl_opts *opt);
 
-static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, int *p_errid);
-static int __reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag);
+static int reflect_file(const char *src_file, int target_c, const refl_opts *opt, int *p_errid);
+static int reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag);
 
-static int __init_dockerfile(FILE *fp);
-static int __check_dockerfile_instruction(char *line, bool onbuild_flag);
+static int init_dockerfile(FILE *fp);
+static int check_dockerfile_instruction(char *line, bool onbuild_flag);
 
-static int __record_reflected_lines();
-static int __manage_provisional_report(unsigned short reflecteds[2], const char *mode);
+static int record_reflected_lines(void);
+static int manage_provisional_report(unsigned short reflecteds[2], const char *mode);
 
 
 extern const char * const blank_args[ARGS_NUM];
@@ -72,10 +72,10 @@ int reflect(int argc, char **argv){
         int i;
         refl_opts opt;
 
-        if (! (i = __parse_opts(argc, argv, &opt))){
+        if (! (i = parse_opts(argc, argv, &opt))){
             if (((argc -= optind) <= 0) || (opt.target_c != 'b')){
                 argv += optind;
-                exit_status = __do_reflect(argc, argv, &opt);
+                exit_status = do_reflect(argc, argv, &opt);
             }
             else
                 xperror_too_many_args(-1);
@@ -84,7 +84,7 @@ int reflect(int argc, char **argv){
             exit_status = SUCCESS;
     }
     else
-        exit_status = __record_reflected_lines();
+        exit_status = record_reflected_lines();
 
     if (exit_status){
         if (exit_status < 0){
@@ -109,7 +109,7 @@ int reflect(int argc, char **argv){
  *
  * @note the arguments are expected to be passed as-is from main function.
  */
-static int __parse_opts(int argc, char **argv, refl_opts *opt){
+static int parse_opts(int argc, char **argv, refl_opts *opt){
     const char *short_opts = "dhpsv";
 
     int flag;
@@ -187,7 +187,7 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
  * @note if no non-optional arguments, use the convert-file prepared by this tool and reset it after use.
  * @note 'opt->target_c' keeps updating in the loop to represent the next 'target_c'.
  */
-static int __do_reflect(int argc, char **argv, refl_opts *opt){
+static int do_reflect(int argc, char **argv, refl_opts *opt){
     int target_c, errid, tmp, exit_status = SUCCESS;
     const char *src_file;
     FILE *fp;
@@ -219,7 +219,7 @@ static int __do_reflect(int argc, char **argv, refl_opts *opt){
         }
 
         errid = 0;
-        if ((tmp = __reflect_file(src_file, target_c, opt, &errid)) && (exit_status >= 0))
+        if ((tmp = reflect_file(src_file, target_c, opt, &errid)) && (exit_status >= 0))
             exit_status = tmp;
 
         if (argc <= 0){
@@ -261,7 +261,7 @@ static int __do_reflect(int argc, char **argv, refl_opts *opt){
  * @note whether there is an error when opening the source file is not reflected in the return value.
  * @note if the content of 'p_errid' is -1 after this call, processing used the same source should be aborted.
  */
-static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, int *p_errid){
+static int reflect_file(const char *src_file, int target_c, const refl_opts *opt, int *p_errid){
     static bool first_blank = true;
 
     char *line;
@@ -288,7 +288,7 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
             else
                 first_blank = true;
         }
-        if ((tmp = __reflect_line(line, target_c, opt->target_c, opt->verbose, false))){
+        if ((tmp = reflect_line(line, target_c, opt->target_c, opt->verbose, false))){
             if (exit_status >= 0)
                 exit_status = tmp;
             if (tmp != UNEXPECTED_ERROR)
@@ -319,7 +319,7 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
  *
  * @attention this function must be called until NULL is passed to 'line' to close the destination file.
  */
-static int __reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag){
+static int reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag){
     static FILE *fp = NULL;
     static unsigned short curr_reflecteds[2] = {0};
     static int prev_target_c = '\0';
@@ -328,11 +328,12 @@ static int __reflect_line(char *line, int target_c, int next_target_c, bool verb
 
     if (line){
         const char *dest_file, *format = "ONBUILD %s\n";
-        int target_id, size;
+        unsigned int target_id;
+        int size;
 
         do {
             if (target_c == 'd'){
-                if ((exit_status = __check_dockerfile_instruction(line, onbuild_flag)) &&
+                if ((exit_status = check_dockerfile_instruction(line, onbuild_flag)) &&
                     (exit_status != UNEXPECTED_ERROR))
                         break;
                 dest_file = DOCKER_FILE_DRAFT;
@@ -348,7 +349,7 @@ static int __reflect_line(char *line, int target_c, int next_target_c, bool verb
                 xperror_standards(errno, dest_file);
                 break;
             }
-            if ((size <= 0) && (! target_id) && ((curr_reflecteds[0] += __init_dockerfile(fp)) != 3)){
+            if ((size <= 0) && (! target_id) && ((curr_reflecteds[0] += init_dockerfile(fp)) != 3)){
                 exit_status = UNEXPECTED_ERROR + ERROR_EXIT;
                 break;
             }
@@ -400,7 +401,7 @@ static int __reflect_line(char *line, int target_c, int next_target_c, bool verb
  * @attention internally, it may use 'xfgets_for_loop' with a depth of 1.
  */
 int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag){
-    return __reflect_line(line, 'd', '\0', verbose, onbuild_flag);
+    return reflect_line(line, 'd', '\0', verbose, onbuild_flag);
 }
 
 
@@ -419,7 +420,7 @@ int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag){
  *
  * @note reflect FROM, SHELL and WORKDIR instructions exactly one by one in this order, otherwise an error.
  */
-static int __init_dockerfile(FILE *fp){
+static int init_dockerfile(FILE *fp){
     char *line;
     int errid = 0, reflected = 0;
 
@@ -454,7 +455,7 @@ static int __init_dockerfile(FILE *fp){
  *
  * TODO: error checking function by parsing
  */
-static int __check_dockerfile_instruction(char *line, bool onbuild_flag){
+static int check_dockerfile_instruction(char *line, bool onbuild_flag){
     static bool cmd_ent_duplicates[2] = {true, true};
 
     const char *err_desc;
@@ -467,14 +468,10 @@ static int __check_dockerfile_instruction(char *line, bool onbuild_flag){
             NULL;
 
     if (! err_desc){
-        const int cmd_ent_ids[2] = {
-            ID_CMD,
-            ID_ENTRYPOINT
-        };
-        const char * const cmd_ent_patterns[2] = {
-            "^CMD",
-            "^ENTRYPOINT"
-        };
+        const int cmd_ent_ids[2] = {ID_CMD, ID_ENTRYPOINT};
+
+        char patterns_str[] = "^CMD^ENTRYPOINT";
+        char *cmd_ent_patterns[2] = {patterns_str, (patterns_str + 4)};
 
         for (int i = 0; i < 2; i++)
             if (instr_id == cmd_ent_ids[i]){
@@ -513,7 +510,7 @@ static int __check_dockerfile_instruction(char *line, bool onbuild_flag){
  *
  * @note some functions detect errors when initializing each file, but they are ignored.
  */
-static int __record_reflected_lines(){
+static int record_reflected_lines(void){
     int exit_status, tmp;
 
     unsigned short prov_reflecteds[2] = {0};
@@ -554,7 +551,7 @@ static int __record_reflected_lines(){
  * @attention 'mode' of length 4 should be specified to read and write sequentially with one call.
  * @attention unless the end of 'mode' is '\0' at the last call, cannot release the file handler.
  */
-static int __manage_provisional_report(unsigned short reflecteds[2], const char *mode){
+static int manage_provisional_report(unsigned short reflecteds[2], const char *mode){
     static FILE *fp = NULL;
 
     int mode_c, keep_c, exit_status = SUCCESS;
@@ -564,8 +561,8 @@ static int __manage_provisional_report(unsigned short reflecteds[2], const char 
     array_for_write = reflecteds;
 
     do {
-        mode_c = *(mode++);
-        keep_c = *(mode++);
+        mode_c = (unsigned char) *(mode++);
+        keep_c = (unsigned char) *(mode++);
 
         if (! fp){
             fm[0] = mode_c;
@@ -618,7 +615,7 @@ static int __manage_provisional_report(unsigned short reflecteds[2], const char 
  * @attention the file handler cannot be released without calling 'write_provisional_report' after this call.
  */
 int read_provisional_report(unsigned short prov_reflecteds[2]){
-    return __manage_provisional_report(prov_reflecteds, "r+");
+    return manage_provisional_report(prov_reflecteds, "r+");
 }
 
 
@@ -631,5 +628,5 @@ int read_provisional_report(unsigned short prov_reflecteds[2]){
  * @note basically read the current values by 'read_provisional_report' before calling this function.
  */
 int write_provisional_report(unsigned short prov_reflecteds[2]){
-    return __manage_provisional_report(prov_reflecteds, "w\0");
+    return manage_provisional_report(prov_reflecteds, "w\0");
 }

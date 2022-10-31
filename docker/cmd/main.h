@@ -128,19 +128,19 @@ int setcmd(int argc, char **argv);
     * Help Functions that display each Manual
 ******************************************************************************/
 
-void config_manual();
-void convert_manual();
-void cp_manual();
-void erase_manual();
-void healthcheck_manual();
-void help_manual();
-void ignore_manual();
-void inspect_manual();
-void label_manual();
-void onbuild_manual();
-void optimize_manual();
-void reflect_manual();
-void setcmd_manual();
+void config_manual(void);
+void convert_manual(void);
+void cp_manual(void);
+void erase_manual(void);
+void healthcheck_manual(void);
+void help_manual(void);
+void ignore_manual(void);
+void inspect_manual(void);
+void label_manual(void);
+void onbuild_manual(void);
+void optimize_manual(void);
+void reflect_manual(void);
+void setcmd_manual(void);
 
 
 /******************************************************************************
@@ -149,7 +149,7 @@ void setcmd_manual();
 
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
 
-int delete_from_dockerfile(const char * const patterns[], size_t size, bool verbose, bool assume_c);
+int delete_from_dockerfile(char **patterns, size_t size, bool verbose, bool assume_c);
 int update_erase_logs(unsigned short prov_reflecteds[2]);
 
 int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag);
@@ -186,7 +186,7 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
 ******************************************************************************/
 
 int receive_positive_integer(const char *target, int *left);
-int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode);
+int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode);
 char *receive_dockerfile_instruction(char *line, int *p_id);
 
 
@@ -195,7 +195,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id);
 ******************************************************************************/
 
 int check_file_size(const char *file_name);
-int check_last_exit_status();
+int check_last_exit_status(void);
 
 
 #endif

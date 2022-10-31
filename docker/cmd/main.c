@@ -25,7 +25,7 @@ typedef struct {
 } xfgets_info;
 
 
-static int (* const __get_dit_cmd(const char *target))(int, char **);
+static int (* const get_dit_cmd(const char *target))(int, char **);
 
 
 /** array of strings in alphabetical order representing each dit command */
@@ -123,7 +123,7 @@ int main(int argc, char **argv){
         program_name = *(++argv);
 
         int (* cmd)(int, char **);
-        if ((cmd = __get_dit_cmd(program_name)))
+        if ((cmd = get_dit_cmd(program_name)))
             return cmd(argc, argv);
 
         const char *arg;
@@ -147,7 +147,7 @@ int main(int argc, char **argv){
  * @param[in]  target  target string
  * @return int(* const)(int, char**)  function of the desired dit command or NULL
  */
-static int (* const __get_dit_cmd(const char *target))(int, char **){
+static int (* const get_dit_cmd(const char *target))(int, char **){
     int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
         config,
         convert,
@@ -232,14 +232,14 @@ void xperror_invalid_arg(int code_c, int state, const char * restrict desc, cons
 /**
  * @brief print the valid arguments to stderr.
  *
- * @param[in]  expected  array of expected strings
+ * @param[in]  reprs  array of expected strings
  * @param[in]  size  array size
  */
-void xperror_valid_args(const char * const expected[], size_t size){
+void xperror_valid_args(const char * const reprs[], size_t size){
     fputs("Valid arguments are:\n", stderr);
 
     for (int i = 0; i < size; i++)
-        fprintf(stderr, "  - '%s'\n", expected[i]);
+        fprintf(stderr, "  - '%s'\n", reprs[i]);
 }
 
 
@@ -467,12 +467,14 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
  * @attention expected string must not contain lowercase letters.
  */
 int xstrcmp_upper_case(const char * restrict target, const char * restrict expected){
-    int c;
-    while (! (c = toupper(*target) - *(expected++)))
-        if (! *(target++))
-            return 0;
+    int c, d;
 
-    return c;
+    do {
+        c = (unsigned char) *(target++);
+        d = (unsigned char) *(expected++);
+    } while ((! (d = toupper(c) - d)) && c);
+
+    return d;
 }
 
 
@@ -494,21 +496,25 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
  * @note when specifying a range by using a hyphen and omitting an integer, it is interpreted as specifying 0.
  */
 int receive_positive_integer(const char *target, int *left){
-    int curr = -1, prev;
+    int curr = -1;
 
     if (target){
+        int c, prev;
+
         curr = 0;
+        c = (unsigned char) *target;
+
         do {
-            if (isdigit(*target)){
+            if (isdigit(c)){
                 if (curr <= (INT_MAX / 10)){
                     prev = curr * 10;
-                    curr = prev + (*target - '0');
+                    curr = prev + (c - '0');
 
                     if (curr >= prev)
                         continue;
                 }
             }
-            else if (left && (*target == '-')){
+            else if (left && (c == '-')){
                 *left = curr;
                 left = NULL;
                 curr = 0;
@@ -516,8 +522,9 @@ int receive_positive_integer(const char *target, int *left){
             }
             curr = -1;
             break;
-        } while (*(++target));
+        } while ((c = (unsigned char) *(++target)));
     }
+
     return curr;
 }
 
@@ -526,18 +533,18 @@ int receive_positive_integer(const char *target, int *left){
  * @brief find the passed string in array of expected strings.
  *
  * @param[in]  target  target string
- * @param[in]  expected  array of expected strings
+ * @param[in]  reprs  array of expected strings
  * @param[in]  size  array size
  * @param[in]  mode  mode of comparison (bit 1: perform uppercase conversion, bit 2: accept forward match)
- * @return int  index number of the corresponding string, -1 (ambiguous) or others (invalid)
+ * @return int  index number of the corresponding string, -1 (ambiguous) or -2 (invalid)
  *
  * @note make efficient by applying binary search sequentially from the first character of target string.
  * @attention array of expected strings must be pre-sorted alphabetically.
  */
-int receive_expected_string(const char *target, const char * const expected[], size_t size, int mode){
+int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode){
     if (target && (size > 0)){
-        const char *expected_copy[size];
-        memcpy(expected_copy, expected, (sizeof(const char *) * size));
+        const char *expecteds[size];
+        memcpy(expecteds, reprs, (sizeof(const char *) * size));
 
         bool upper_case, forward_match, break_flag = false;
         int min, max, tmp, c, mid;
@@ -549,7 +556,7 @@ int receive_expected_string(const char *target, const char * const expected[], s
         max = size - 1;
         tmp = -max;
 
-        while ((c = *(target++))){
+        while ((c = (unsigned char) *(target++))){
             if (upper_case)
                 c = toupper(c);
 
@@ -557,20 +564,20 @@ int receive_expected_string(const char *target, const char * const expected[], s
                 if (tmp < 0){
                     mid = (min + max) / 2;
 
-                    tmp = *(expected_copy[mid]++) - c;
+                    tmp = c - ((unsigned char) *(expecteds[mid]++));
                     if (tmp){
-                        if (tmp < 0)
+                        if (tmp > 0)
                             min = mid + 1;
                         else
                             max = mid - 1;
                     }
                     else {
                         tmp = mid;
-                        while ((--tmp >= min) && (c == *(expected_copy[tmp]++)));
+                        while ((--tmp >= min) && (c == ((unsigned char) *(expecteds[tmp]++))));
                         min = ++tmp;
 
                         tmp = mid;
-                        while ((++tmp <= max) && (c == *(expected_copy[tmp]++)));
+                        while ((++tmp <= max) && (c == ((unsigned char) *(expecteds[tmp]++))));
                         max = --tmp;
 
                         break_flag = true;
@@ -586,12 +593,12 @@ int receive_expected_string(const char *target, const char * const expected[], s
 
             if (break_flag)
                 break_flag = false;
-            else if (c != *(expected_copy[min]++))
+            else if (c != ((unsigned char) *(expecteds[min]++)))
                 return -2;
         }
 
         if (! tmp)
-            return (forward_match || (! *(expected_copy[min]))) ? min : -2;
+            return (forward_match || (! *(expecteds[min]))) ? min : -2;
     }
     return -1;
 }
@@ -612,7 +619,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
     size_t instr_len = 0;
 
     tmp = line;
-    while (! isspace(*(tmp++)))
+    while (! isspace((unsigned char) *(tmp++)))
         instr_len++;
 
     char instr[instr_len + 1];
@@ -627,7 +634,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
         tmp = NULL;
 
     if (tmp)
-        while (isspace(*tmp))
+        while (isspace((unsigned char) *tmp))
             tmp++;
 
     return tmp;
@@ -670,18 +677,19 @@ int check_file_size(const char *file_name){
  * @brief check the exit status of last executed command line.
  *
  * @return int  the resulting integer or -1
+ *
+ * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
  */
-int check_last_exit_status(){
-    FILE *fp;
-    int i = -1;
+int check_last_exit_status(void){
+    const char *line;
+    int errid = 0, i = -1;
 
-    if ((fp = fopen(EXIT_STATUS_FILE, "r"))){
-        unsigned int u;
+    while ((line = xfgets_for_loop(EXIT_STATUS_FILE, false, &errid))){
+        errid = -1;
 
-        if ((fscanf(fp, "%u", &u) == 1) && (! (u >> 8)))
-            i = u;
-
-        fclose(fp);
+        if (((i = receive_positive_integer(line, NULL)) >= 0) && (i >= 256))
+            i = -1;
     }
+
     return i;
 }
