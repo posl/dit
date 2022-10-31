@@ -25,18 +25,19 @@
 /** Data type for storing the results of option parse */
 typedef struct {
     int target_c;    /** character representing destination file ('d', 'h' or 'b') */
-    int blank_c;     /** how to handle the blank lines ('p', 's' or 't') */
+    int blank_c;     /** how to handle the empty lines ('p', 's' or 't') */
+    bool verbose;    /** whether to display reflected lines on screen */
 } refl_opts;
 
 
 static int __parse_opts(int argc, char **argv, refl_opts *opt);
-
 static int __do_reflect(int argc, char **argv, refl_opts *opt);
+
 static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, int *p_errid);
 static int __reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag);
-static int __init_dockerfile(FILE *fp);
 
-static const char *__check_dockerfile_instruction(char *line, bool onbuild_flag);
+static int __init_dockerfile(FILE *fp);
+static int __check_dockerfile_instruction(char *line, bool onbuild_flag);
 
 static int __record_reflected_lines();
 static int __manage_provisional_report(unsigned short reflecteds[2], const char *mode);
@@ -44,6 +45,8 @@ static int __manage_provisional_report(unsigned short reflecteds[2], const char 
 
 extern const char * const blank_args[ARGS_NUM];
 extern const char * const target_args[ARGS_NUM];
+
+extern const char * const docker_instr_reprs[DOCKER_INSTRS_NUM];
 
 
 
@@ -107,18 +110,20 @@ int reflect(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int __parse_opts(int argc, char **argv, refl_opts *opt){
-    const char *short_opts = "dhps";
+    const char *short_opts = "dhpsv";
 
     int flag;
     const struct option long_opts[] = {
-        { "help",   no_argument,        NULL,  1    },
-        { "blank",  required_argument, &flag, true  },
-        { "target", required_argument, &flag, false },
-        {  0,        0,                  0,    0    }
+        { "verbose", no_argument,        NULL, 'v'   },
+        { "help",    no_argument,        NULL,  1    },
+        { "blank",   required_argument, &flag, true  },
+        { "target",  required_argument, &flag, false },
+        {  0,         0,                  0,    0    }
     };
 
     opt->target_c = '\0';
     opt->blank_c = 't';
+    opt->verbose = false;
 
     int c, i, *ptr;
     const char * const *valid_args = NULL;
@@ -134,6 +139,9 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
             case 'p':
             case 's':
                 opt->blank_c = c;
+                break;
+            case 'v':
+                opt->verbose = true;
                 break;
             case 1:
                 reflect_manual();
@@ -174,21 +182,21 @@ static int __parse_opts(int argc, char **argv, refl_opts *opt){
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ * @return int  0 (success), 1 (possible error) or negative integer (unexpected error)
  *
  * @note if no non-optional arguments, use the convert-file prepared by this tool and reset it after use.
  * @note 'opt->target_c' keeps updating in the loop to represent the next 'target_c'.
  */
 static int __do_reflect(int argc, char **argv, refl_opts *opt){
-    int target_c, errid, break_flag, exit_status = SUCCESS;
+    int target_c, errid, tmp, exit_status = SUCCESS;
     const char *src_file;
     FILE *fp;
 
     do {
         target_c = opt->target_c;
 
-        if (argc-- > 0){
-            if (! argc)
+        if (argc > 0){
+            if (! (--argc))
                 opt->target_c = '\0';
 
             src_file = *(argv++);
@@ -211,24 +219,21 @@ static int __do_reflect(int argc, char **argv, refl_opts *opt){
         }
 
         errid = 0;
-        if ((break_flag = __reflect_file(src_file, target_c, opt, &errid))){
-            if (exit_status >= 0)
-                exit_status = break_flag;
-        }
+        if ((tmp = __reflect_file(src_file, target_c, opt, &errid)) && (exit_status >= 0))
+            exit_status = tmp;
 
-        if (argc < 0){
+        if (argc <= 0){
             if ((fp = fopen(src_file, "w")))
                 fclose(fp);
             else
                 exit_status = UNEXPECTED_ERROR;
         }
         else if (errid){
-            if (errid > 0)
-                xperror_standards(errid, src_file);
-            if (break_flag)
+            if (errid < 0)
                 break;
             if (! exit_status)
                 exit_status = POSSIBLE_ERROR;
+            xperror_standards(errid, src_file);
         }
     } while (opt->target_c);
 
@@ -250,11 +255,11 @@ static int __do_reflect(int argc, char **argv, refl_opts *opt){
  * @param[in]  target_c  character representing destination file ('d' or 'h')
  * @param[in]  opt  variable to store the results of option parse
  * @param[out] p_errid  variable for recording error that occur, if necessary
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ * @return int  0 (success), 1 (possible error) or negative integer (unexpected error)
  *
- * @note squeezing blank lines is done across multiple source files.
- * @note file open error are not reflected in the return value.
- * @note the return value is non-zero only when processing should be aborted.
+ * @note squeezing repeated empty lines is done across multiple source files.
+ * @note whether there is an error when opening the source file is not reflected in the return value.
+ * @note if the content of 'p_errid' is -1 after this call, processing used the same source should be aborted.
  */
 static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, int *p_errid){
     static bool first_blank = true;
@@ -283,11 +288,11 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
             else
                 first_blank = true;
         }
-        if ((tmp = __reflect_line(line, target_c, opt->target_c, false, false))){
-            if (! *p_errid)
-                *p_errid = -1;
+        if ((tmp = __reflect_line(line, target_c, opt->target_c, opt->verbose, false))){
             if (exit_status >= 0)
                 exit_status = tmp;
+            if (tmp != UNEXPECTED_ERROR)
+                *p_errid = -1;
         }
     } while (line);
 
@@ -305,30 +310,31 @@ static int __reflect_file(const char *src_file, int target_c, refl_opts *opt, in
  * @param[in]  next_target_c  the next 'target_c' if there are files waiting to be processed or '\0'
  * @param[in]  verbose  whether to display reflected lines on screen
  * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note if the destination file is too large to be represented by int type, exit with the error.
+ * @note if both files are destination, it will be indicated when reflecting the first line in each.
  * @note record the number of reflected lines after there are no more lines to be reflected.
+ * @note if the return value is -1, an internal file error has occurred, but processing can be continued.
  *
  * @attention this function must be called until NULL is passed to 'line' to close the destination file.
  */
 static int __reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag){
     static FILE *fp = NULL;
     static unsigned short curr_reflecteds[2] = {0};
+    static int prev_target_c = '\0';
 
     int exit_status = SUCCESS;
 
     if (line){
-        const char *err_desc, *dest_file, *format = "ONBUILD %s\n";
+        const char *dest_file, *format = "ONBUILD %s\n";
         int target_id, size;
 
         do {
             if (target_c == 'd'){
-                if ((err_desc = __check_dockerfile_instruction(line, onbuild_flag))){
-                    exit_status = POSSIBLE_ERROR;
-                    xperror_message(line, err_desc);
-                    break;
-                }
+                if ((exit_status = __check_dockerfile_instruction(line, onbuild_flag)) &&
+                    (exit_status != UNEXPECTED_ERROR))
+                        break;
                 dest_file = DOCKER_FILE_DRAFT;
                 target_id = 0;
             }
@@ -338,12 +344,12 @@ static int __reflect_line(char *line, int target_c, int next_target_c, bool verb
             }
 
             if (((size = check_file_size(dest_file)) == -2) || (! (fp || (fp = fopen(dest_file, "a"))))){
-                exit_status = POSSIBLE_ERROR;
+                exit_status = exit_status ? (UNEXPECTED_ERROR + ERROR_EXIT) : POSSIBLE_ERROR;
                 xperror_standards(errno, dest_file);
                 break;
             }
             if ((size <= 0) && (! target_id) && ((curr_reflecteds[0] += __init_dockerfile(fp)) != 3)){
-                exit_status = UNEXPECTED_ERROR;
+                exit_status = UNEXPECTED_ERROR + ERROR_EXIT;
                 break;
             }
 
@@ -353,8 +359,15 @@ static int __reflect_line(char *line, int target_c, int next_target_c, bool verb
             curr_reflecteds[target_id]++;
             fprintf(fp, format, line);
 
-            if (verbose)
+            if (verbose){
+                if (prev_target_c != target_c){
+                    if ((target_c != next_target_c) && (next_target_c != prev_target_c))
+                        fprintf(stdout, ("\n < %s >\n" + (target_id ^ 1)), target_args[target_id + 1]);
+
+                    prev_target_c = target_c;
+                }
                 fprintf(stdout, format, line);
+            }
         } while (0);
     }
     else if (target_c != next_target_c){
@@ -379,7 +392,9 @@ static int __reflect_line(char *line, int target_c, int next_target_c, bool verb
  * @param[in]  line  target line
  * @param[in]  verbose  whether to display reflected lines on screen
  * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
+ *
+ * @note if the return value is -1, an internal file error has occurred, but processing can be continued.
  *
  * @attention this function must be called until NULL is passed to 'line' to close the destination file.
  * @attention internally, it may use 'xfgets_for_loop' with a depth of 1.
@@ -389,6 +404,11 @@ int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag){
 }
 
 
+
+
+/******************************************************************************
+    * Functions related to Dockerfile
+******************************************************************************/
 
 
 /**
@@ -422,29 +442,23 @@ static int __init_dockerfile(FILE *fp){
 }
 
 
-
-
-/******************************************************************************
-    * Check Part
-******************************************************************************/
-
-
 /**
  * @brief check the validity of the target line as Dockerfile instruction.
  *
  * @param[in]  line  target line
  * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
- * @return int  the description of the error that occurred or NULL
+ * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note satisfy the restriction that each of CMD and ENTRYPOINT instructions is one or less in Dockerfile.
+ * @note if the return value is -1, an internal file error has occurred, but processing can be continued.
  *
  * TODO: error checking function by parsing
  */
-static const char *__check_dockerfile_instruction(char *line, bool onbuild_flag){
+static int __check_dockerfile_instruction(char *line, bool onbuild_flag){
     static bool cmd_ent_duplicates[2] = {true, true};
 
     const char *err_desc;
-    int instr_id = -1;
+    int instr_id = -1, exit_status = SUCCESS;
 
     err_desc =
         (! (receive_dockerfile_instruction(line, &instr_id))) ? "Invalid Instruction" :
@@ -453,15 +467,19 @@ static const char *__check_dockerfile_instruction(char *line, bool onbuild_flag)
             NULL;
 
     if (! err_desc){
-        const int instr_ids[2] = {
+        const int cmd_ent_ids[2] = {
             ID_CMD,
             ID_ENTRYPOINT
         };
+        const char * const cmd_ent_patterns[2] = {
+            "^CMD",
+            "^ENTRYPOINT"
+        };
 
-        for (int i = 0; i < 2; i++){
-            if (instr_id == instr_ids[i]){
+        for (int i = 0; i < 2; i++)
+            if (instr_id == cmd_ent_ids[i]){
                 if (cmd_ent_duplicates[i]){
-                    // TODO: waiting the implementation of erase commnad
+                    exit_status = delete_from_dockerfile(cmd_ent_patterns, 2, false, 'Y');
                     // TODO: waiting the implementation of setcmd commnad
 
                     cmd_ent_duplicates[0] = false;
@@ -471,10 +489,13 @@ static const char *__check_dockerfile_instruction(char *line, bool onbuild_flag)
                 else
                     cmd_ent_duplicates[i] = true;
             }
-        }
+    }
+    else {
+        exit_status = POSSIBLE_ERROR;
+        xperror_message(line, err_desc);
     }
 
-    return err_desc;
+    return exit_status;
 }
 
 
@@ -488,18 +509,22 @@ static const char *__check_dockerfile_instruction(char *line, bool onbuild_flag)
 /**
  * @brief record the number of reflected lines in various files.
  *
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
  *
  * @note some functions detect errors when initializing each file, but they are ignored.
  */
 static int __record_reflected_lines(){
-    int tmp, exit_status = SUCCESS;
+    int exit_status, tmp;
 
     unsigned short prov_reflecteds[2] = {0};
-    tmp = reset_provisional_report(prov_reflecteds);
+    exit_status = reset_provisional_report(prov_reflecteds);
 
-    // TODO: waiting the implementation of erase commnad
-    // tmp |= reflect_erase_file()
+    tmp = update_erase_logs(prov_reflecteds);
+    if (! exit_status)
+        exit_status = tmp;
+
+    if (exit_status && (! check_file_size(VERSION_FILE)))
+        exit_status = SUCCESS;
 
     FILE *fp;
     if ((fp = fopen(REFLECT_FILE_R, "w"))){
@@ -509,9 +534,6 @@ static int __record_reflected_lines(){
     else
         exit_status = UNEXPECTED_ERROR;
 
-    if (tmp && check_file_size(VERSION_FILE)){
-        exit_status |= tmp;
-    }
     return exit_status;
 }
 
@@ -535,8 +557,8 @@ static int __record_reflected_lines(){
 static int __manage_provisional_report(unsigned short reflecteds[2], const char *mode){
     static FILE *fp = NULL;
 
-    char mode_c, keep_c, fm[] = "rb+";
-    int exit_status = SUCCESS;
+    int mode_c, keep_c, exit_status = SUCCESS;
+    char fm[] = "rb+";
     unsigned short array_for_read[2], *array_for_write;
 
     array_for_write = reflecteds;
@@ -548,33 +570,30 @@ static int __manage_provisional_report(unsigned short reflecteds[2], const char 
         if (! fp){
             fm[0] = mode_c;
             fm[2] = keep_c;
-
-            if (! (fp = fopen(REFLECT_FILE_P, fm))){
-                if (! (*mode))
-                    return UNEXPECTED_ERROR;
-
-                exit_status = UNEXPECTED_ERROR;
-                continue;
-            }
+            fp = fopen(REFLECT_FILE_P, fm);
         }
 
-        if (mode_c == 'r'){
-            if (fread(array_for_read, sizeof(unsigned short), 2, fp) == 2){
-                reflecteds[0] += array_for_read[0];
-                reflecteds[1] += array_for_read[1];
+        if (fp){
+            if (mode_c == 'r'){
+                if (fread(array_for_read, sizeof(unsigned short), 2, fp) == 2){
+                    reflecteds[0] += array_for_read[0];
+                    reflecteds[1] += array_for_read[1];
+                }
+                else
+                    exit_status = UNEXPECTED_ERROR;
             }
             else
-                exit_status = UNEXPECTED_ERROR;
-        }
-        else
-            fwrite(array_for_write, sizeof(unsigned short), 2, fp);
+                fwrite(array_for_write, sizeof(unsigned short), 2, fp);
 
-        if (! keep_c){
-            fclose(fp);
-            fp = NULL;
+            if (! keep_c){
+                fclose(fp);
+                fp = NULL;
+            }
+            else
+                fseek(fp, 0, SEEK_SET);
         }
         else
-            fseek(fp, 0, SEEK_SET);
+            exit_status = UNEXPECTED_ERROR;
 
         if (*mode){
             if (! keep_c){
@@ -595,7 +614,7 @@ static int __manage_provisional_report(unsigned short reflecteds[2], const char 
  * @param[out] prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
  * @return int  0 (success) or -1 (unexpected error)
  *
- * @attention 'prov_reflecteds' must be initialized with 0 before the first call.
+ * @attention each element of 'prov_reflecteds' must be initialized with 0 before calling this function.
  * @attention the file handler cannot be released without calling 'write_provisional_report' after this call.
  */
 int read_provisional_report(unsigned short prov_reflecteds[2]){
@@ -609,7 +628,7 @@ int read_provisional_report(unsigned short prov_reflecteds[2]){
  * @param[in]  prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
  * @return int  0 (success) or -1 (unexpected error)
  *
- * @note basically read the current values by 'read_provisional_report', add some processing and call this.
+ * @note basically read the current values by 'read_provisional_report' before calling this function.
  */
 int write_provisional_report(unsigned short prov_reflecteds[2]){
     return __manage_provisional_report(prov_reflecteds, "w\0");

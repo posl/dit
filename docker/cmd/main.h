@@ -9,6 +9,7 @@
 #include <grp.h>
 #include <limits.h>
 #include <pwd.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -35,6 +36,7 @@
 
 #define CMDS_NUM 13
 #define ARGS_NUM 3
+#define DOCKER_INSTRS_NUM 18
 
 
 /******************************************************************************
@@ -147,7 +149,7 @@ void setcmd_manual();
 
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
 
-int delete_from_dockerfile(const char * const beginning_strs[], size_t size, bool verbose, bool assume_c);
+int delete_from_dockerfile(const char * const patterns[], size_t size, bool verbose, bool assume_c);
 int update_erase_logs(unsigned short prov_reflecteds[2]);
 
 int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag);

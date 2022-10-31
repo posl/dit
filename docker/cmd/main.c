@@ -10,11 +10,9 @@
 
 #include "main.h"
 
-#define XFGETS_NESTINGS_MAX 2
-
-#define DOCKER_INSTRS_NUM 18
-
 #define EXIT_STATUS_FILE "/dit/tmp/last-exit-status"
+
+#define XFGETS_NESTINGS_MAX 2
 
 
 /** Data type for storing the information for one loop for 'xfgets_for_loop' */
@@ -74,6 +72,29 @@ const char * const target_args[ARGS_NUM] = {
     "both",
     "dockerfile",
     "history-file"
+};
+
+
+/** array of strings in alphabetical order representing each Dockerfile instruction */
+const char * const docker_instr_reprs[DOCKER_INSTRS_NUM] = {
+    "ADD",
+    "ARG",
+    "CMD",
+    "COPY",
+    "ENTRYPOINT",
+    "ENV",
+    "EXPOSE",
+    "FROM",
+    "HEALTHCHECK",
+    "LABEL",
+    "MAINTAINER",
+    "ONBUILD",
+    "RUN",
+    "SHELL",
+    "STOPSIGNAL",
+    "USER",
+    "VOLUME",
+    "WORKDIR"
 };
 
 
@@ -587,27 +608,6 @@ int receive_expected_string(const char *target, const char * const expected[], s
  * @attention the instruction must not contain unnecessary leading white spaces.
  */
 char *receive_dockerfile_instruction(char *line, int *p_id){
-    const char * const instr_reprs[DOCKER_INSTRS_NUM] = {
-        "ADD",
-        "ARG",
-        "CMD",
-        "COPY",
-        "ENTRYPOINT",
-        "ENV",
-        "EXPOSE",
-        "FROM",
-        "HEALTHCHECK",
-        "LABEL",
-        "MAINTAINER",
-        "ONBUILD",
-        "RUN",
-        "SHELL",
-        "STOPSIGNAL",
-        "USER",
-        "VOLUME",
-        "WORKDIR"
-    };
-
     char *tmp;
     size_t instr_len = 0;
 
@@ -620,10 +620,10 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
     instr[instr_len] = '\0';
 
     if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM)){
-        if (xstrcmp_upper_case(instr, instr_reprs[*p_id]))
+        if (xstrcmp_upper_case(instr, docker_instr_reprs[*p_id]))
             tmp = NULL;
     }
-    else if ((*p_id = receive_expected_string(instr, instr_reprs, DOCKER_INSTRS_NUM, 1)) < 0)
+    else if ((*p_id = receive_expected_string(instr, docker_instr_reprs, DOCKER_INSTRS_NUM, 1)) < 0)
         tmp = NULL;
 
     if (tmp)

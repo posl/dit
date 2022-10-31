@@ -12,29 +12,34 @@
 
 #include "main.h"
 
-#define ERASE_OPTID_LINES 2
-#define ERASE_OPTID_UNDOES 3
-#define ERASE_OPTID_MAX_COUNT 5
-
 #define ERASE_FILE_D "/dit/var/erase.log.dock"
 #define ERASE_FILE_H "/dit/var/erase.log.hist"
 
+#define ERASE_OPTID_NUMBERS 1
+#define ERASE_OPTID_UNDOES 2
+#define ERASE_OPTID_MAX_COUNT 4
+
+#define ERASE_REG_FLAGS  (REG_EXTENDED | REG_NOSUB)
+
 #define getsize_check_list(lines_num)  (((lines_num - 1) >> 5) + 1)
-#define setbit_check_list(check_list, i)  (check_list[(i >> 5)] |= (1 << (i & 0b11111)))
-#define getbit_check_list(check_list, i)  ((check_list[(i >> 5)] >> (i & 0b11111)) & 1)
+#define bit_operation_check_list(list, i, oper)  (list[(i >> 5)] oper (1 << (i & 0b11111)))
+
+#define if_necessary_assign_exit_status(tmp, exit_status) \
+    if (tmp && (exit_status != (UNEXPECTED_ERROR + ERROR_EXIT))) \
+        exit_status = (tmp + exit_status) ? tmp : (UNEXPECTED_ERROR + ERROR_EXIT)
 
 
 /** Data type for storing the results of option parse */
 typedef struct {
-    bool has_delopt;     /** whether to have the options for deletion */
-    int undoes;          /** how many times to undo */
-    int target_c;        /** character representing the files to be edited ('d', 'h' or 'b') */
-    bool ignore_case;    /** whether to ignore case when comparing strings */
-    int max_count;       /** the maximum number of lines to delete, counting from the most recently added */
-    bool reset_flag;     /** whether to reset the log-file (specified by optional arguments) */
-    int blank_c;         /** how to handle the blank lines ('p', 's' or 't') */
-    bool verbose;        /** whether to display deleted lines on screen */
-    int assume_c;        /** the response to delete confirmation ('Y', 'N', 'Q' or '\0') */
+    bool has_delopt;    /** whether to have the options for deletion */
+    int undoes;         /** how many times to undo */
+    int target_c;       /** character representing the files to be edited ('d', 'h' or 'b') */
+    int regex_flags;    /** flags that determine the format of compilation of regular expression */
+    int max_count;      /** the maximum number of lines to delete, counting from the most recently added */
+    bool reset_flag;    /** whether to reset the log-file (specified by optional arguments) */
+    int blank_c;        /** how to handle the empty lines ('p', 's' or 't') */
+    bool verbose;       /** whether to display deleted lines on screen */
+    int assume_c;       /** the response to the delete confirmation ('Y', 'N', 'Q' or '\0') */
 } erase_opts;
 
 
@@ -52,25 +57,27 @@ typedef struct {
 typedef struct {
     char *lines;                 /** sequence of all lines read from the target file */
     unsigned int *check_list;    /** array of bits representing whether to delete the corresponding lines */
+    bool first_mark;             /** whether to mark lines for deletion for the first time */
     erase_logs *logs;            /** variable to store the log-data recorded in the log-file */
 } erase_data;
 
 
-static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data);
+/** Data type for storing the function that determines which lines to delete */
+typedef int (* delopt_func)(int, void *, erase_opts *, erase_data *);
+
+
+static int __parse_opts(int argc, void *argv, erase_opts *opt, erase_data *data);
 static void __display_prev(int target_c);
-static int __do_erase(int argc, void *argv, erase_opts *opt, bool command_line);
 
+static int __do_erase(int argc, void *argv, erase_opts *opt, delopt_func marklines_func);
 static int __construct_erase_data(erase_data *data, int target_c, unsigned short provlogs[2], bool no_delete);
-static void __destruct_erase_data(erase_data *data);
 
-static void __marklines_begining_with(erase_data *data, const char *str, bool ignore_case);
-static void __marklines_containing(erase_data *data, const char *str, bool ignore_case);
-static void __marklines_in_range(erase_data *data, int left, int right);
-static void __marklines_to_undo(erase_data *data, int undoes);
-static void __marklines_in_dockerfile(int size, const char * const strs[], erase_opts *opt, erase_data *data);
+static bool __marklines_containing_pattern(const char *pattern, erase_opts *opt, erase_data *data);
+static bool __marklines_with_numbers(const char *range, erase_opts *opt, erase_data *data);
+static void __marklines_to_undo(erase_opts *opt, erase_data *data);
+static int __marklines_in_dockerfile(int size, void *patterns, erase_opts *opt, erase_data *data);
 
-static int __delete_marked_lines(erase_opts *opt, erase_data *data);
-
+static int __delete_marked_lines(erase_opts *opt, erase_data *data, int flag);
 static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, bool concat_flag);
 
 
@@ -100,8 +107,8 @@ int erase(int argc, char **argv){
     erase_opts opt;
 
     if (! (i = __parse_opts(argc, argv, &opt, NULL))){
-        if (argc == optind)
-            exit_status = __do_erase(argc, argv, &opt, true);
+        if (argc <= optind)
+            exit_status = __do_erase(argc, argv, &opt, __parse_opts);
         else
             xperror_too_many_args(0);
     }
@@ -135,24 +142,23 @@ int erase(int argc, char **argv){
  *
  * @attention options are separated for behavior and for deletion, and must be parsed in that order.
  */
-static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
-    const char *short_opts = "B:C:L:Z::dhim:rstvy";
+static int __parse_opts(int argc, void *argv, erase_opts *opt, erase_data *data){
+    const char *short_opts = "E:N:Z::dhim:rstvy";
 
     int flag;
     const struct option long_opts[] = {
-        { "begin-with",  required_argument,  NULL, 'B' },
-        { "contain",     required_argument,  NULL, 'C' },
-        { "lines",       required_argument,  NULL, 'L' },  // ERASE_OPTID_LINES = 2
-        { "undoes",      optional_argument,  NULL, 'Z' },  // ERASE_OPTID_UNDOES = 3
-        { "ignore-case", no_argument,        NULL, 'i' },
-        { "max-count",   required_argument,  NULL, 'm' },  // ERASE_OPTID_MAX_COUNT = 5
-        { "reset",       no_argument,        NULL, 'r' },
-        { "verbose",     no_argument,        NULL, 'v' },
-        { "help",        no_argument,        NULL,  1  },
-        { "assume",      required_argument, &flag, 'A' },
-        { "blank",       required_argument, &flag, 'B' },
-        { "target",      required_argument, &flag, 'T' },
-        {  0,             0,                  0,    0  }
+        { "extended-regexp", required_argument,  NULL, 'E' },
+        { "numbers",         required_argument,  NULL, 'N' },  // ERASE_OPTID_NUMBERS = 1
+        { "undoes",          optional_argument,  NULL, 'Z' },  // ERASE_OPTID_UNDOES = 2
+        { "ignore-case",     no_argument,        NULL, 'i' },
+        { "max-count",       required_argument,  NULL, 'm' },  // ERASE_OPTID_MAX_COUNT = 4
+        { "reset",           no_argument,        NULL, 'r' },
+        { "verbose",         no_argument,        NULL, 'v' },
+        { "help",            no_argument,        NULL,  1  },
+        { "assume",          required_argument, &flag, 'A' },
+        { "blank",           required_argument, &flag, 'B' },
+        { "target",          required_argument, &flag, 'T' },
+        {  0,                 0,                  0,    0  }
     };
 
     int c, i, err_code = '\0';
@@ -162,7 +168,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         opt->has_delopt = false;
         opt->undoes = 0;
         opt->target_c = '\0';
-        opt->ignore_case = false;
+        opt->regex_flags = ERASE_REG_FLAGS;
         opt->max_count = -1;
         opt->reset_flag = false;
         opt->blank_c = 'p';
@@ -172,19 +178,10 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         int *ptr, mode;
         while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
             switch (c){
-                case 'B':
-                case 'C':
+                case 'E':
+                case 'N':
                     opt->has_delopt = true;
                     break;
-                case 'L':
-                    if ((c = receive_positive_integer(optarg, &i)) >= 0){
-                        opt->has_delopt = true;
-                        break;
-                    }
-                    err_code = 'O';
-                    c = 0;
-                    i = ERASE_OPTID_LINES;
-                    goto err_exit;
                 case 'Z':
                     ptr = &(opt->undoes);
                     i = ERASE_OPTID_UNDOES;
@@ -212,7 +209,7 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
                     assign_both_or_either(opt->target_c, 'd', 'b', 'h');
                     break;
                 case 'i':
-                    opt->ignore_case = true;
+                    opt->regex_flags |= REG_ICASE;
                     break;
                 case 'r':
                     opt->reset_flag = true;
@@ -253,14 +250,15 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
                         break;
                     }
                     err_code = 'O';
-                    goto err_exit;
                 default:
-                    return ERROR_EXIT;
+                    goto err_exit;
             }
         }
 
-        if (! opt->target_c)
+        if (! opt->target_c){
+            err_code = 'T';
             goto err_exit;
+        }
 
         if (! (opt->has_delopt || opt->undoes)){
             if (opt->verbose){
@@ -272,33 +270,29 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
         }
     }
     else {
-        if (opt->undoes)
-            __marklines_to_undo(data, opt->undoes);
+        char short_opts_copy[5];
+        memcpy(short_opts_copy, short_opts, (sizeof(char) * 4));
+        short_opts_copy[4] = '\0';
 
-        if (opt->has_delopt){
-            char short_opts_copy[7];
-            memcpy(short_opts_copy, short_opts, (sizeof(char) * 6));
-            short_opts_copy[6] = '\0';
+        struct option long_opts_copy[3] = {0};
+        memcpy(long_opts_copy, long_opts, (sizeof(struct option) * 2));
 
-            struct option long_opts_copy[4] = {0};
-            memcpy(long_opts_copy, long_opts, (sizeof(struct option) * 3));
+        optind = 1;
+        opterr = 0;
 
-            optind = 1;
-            opterr = 0;
-
-            while ((c = getopt_long(argc, argv, short_opts_copy, long_opts_copy, NULL)) >= 0){
-                switch (c){
-                    case 'B':
-                        __marklines_begining_with(data, optarg, opt->ignore_case);
+        while ((c = getopt_long(argc, argv, short_opts_copy, long_opts_copy, NULL)) >= 0){
+            switch (c){
+                case 'E':
+                    if (__marklines_containing_pattern(optarg, opt, data))
                         break;
-                    case 'C':
-                        __marklines_containing(data, optarg, opt->ignore_case);
+                    goto err_exit;
+                case 'N':
+                    if (__marklines_with_numbers(optarg, opt, data))
                         break;
-                    case 'L':
-                        i = -1;
-                        c = receive_positive_integer(optarg, &i);
-                        __marklines_in_range(data, i, c);
-                }
+                    err_code = 'O';
+                    c = 0;
+                    i = ERASE_OPTID_NUMBERS;
+                    goto err_exit;
             }
         }
     }
@@ -307,14 +301,15 @@ static int __parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data
 
 err_exit:
     if (err_code){
-        xperror_invalid_arg(err_code, c, long_opts[i].name, optarg);
+        if (err_code != 'T'){
+            xperror_invalid_arg(err_code, c, long_opts[i].name, optarg);
 
-        if ((err_code == 'O') && (c < 0))
-            xperror_valid_args(valid_args, ARGS_NUM);
+            if ((err_code == 'O') && (c < 0))
+                xperror_valid_args(valid_args, ARGS_NUM);
+        }
+        else
+            xperror_target_files();
     }
-    else
-        xperror_target_files();
-
     return ERROR_EXIT;
 }
 
@@ -328,26 +323,24 @@ err_exit:
  */
 static void __display_prev(int target_c){
     int next_target_c, offset = 0;
-    const char *line, *src_file, *format = "\n < %s >\n";
+    const char *src_file, *line;
 
     do {
         next_target_c = '\0';
 
         switch (target_c){
             case 'b':
-                offset = 2;
                 next_target_c = 'h';
+                offset = 2;
             case 'd':
-                line = target_args[1];
                 src_file = ERASE_RESULT_FILE_D;
                 break;
             case 'h':
-                line = target_args[2];
                 src_file = ERASE_RESULT_FILE_H;
         }
 
         if (offset)
-            fprintf(stdout, (format + --offset), line);
+            fprintf(stdout, ("\n < %s >\n" + --offset), target_args[2 - offset]);
 
         while ((line = xfgets_for_loop(src_file, false, NULL)))
             fprintf(stdout, "%s\n", line);
@@ -358,6 +351,11 @@ static void __display_prev(int target_c){
 
 
 
+/******************************************************************************
+    * Series of Delete Processing
+******************************************************************************/
+
+
 /**
  * @brief perform the delete processing in order for each target file.
  *
@@ -365,10 +363,12 @@ static void __display_prev(int target_c){
  * @param[out] argv  array of the arguments used to determine which lines to delete
  * @param[out] opt  variable to store the results of option parse
  * @param[in]  command_line  whether to use this function directly from the command line
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
+ *
+ * @note if the return value is -1, an internal file error has occurred, but the deletion was successful.
  */
-static int __do_erase(int argc, void *argv, erase_opts *opt, bool command_line){
-    int next_target_c, tmp, exit_status = SUCCESS;
+static int __do_erase(int argc, void *argv, erase_opts *opt, delopt_func marklines_func){
+    int both_flag = false, tmp, exit_status = SUCCESS;
 
     erase_logs logs;
     erase_data data = { .logs = &logs };
@@ -379,29 +379,80 @@ static int __do_erase(int argc, void *argv, erase_opts *opt, bool command_line){
     do {
         if (opt->target_c == 'b'){
             opt->target_c = 'd';
-            next_target_c = 'h';
+            both_flag = true;
         }
-        else
-            next_target_c = '\0';
+        else if (both_flag)
+            opt->target_c = 'h';
 
         logs.reset_flag = opt->reset_flag;
-        if (! (tmp = __construct_erase_data(&data, opt->target_c, prov_reflecteds, false))){
-            if (data.lines && data.check_list){
-                if (command_line)
-                    __parse_opts(argc, argv, opt, &data);
-                else
-                    __marklines_in_dockerfile(argc, argv, opt, &data);
+        tmp = __construct_erase_data(&data, opt->target_c, prov_reflecteds, false);
 
-                
+        if (data.lines){
+            if (data.check_list){
+                data.first_mark = true;
+
+                if (opt->undoes && (! logs.reset_flag))
+                    __marklines_to_undo(opt, &data);
+                if (opt->has_delopt && marklines_func(argc, argv, opt, &data))
+                    both_flag = -1;
+
+                tmp = __delete_marked_lines(opt, &data, both_flag);
+                if_necessary_assign_exit_status(tmp, exit_status);
+
+                free(data.check_list);
             }
+            else
+                exit_status = UNEXPECTED_ERROR + ERROR_EXIT;
+
+            free(data.lines);
         }
-        else if (exit_status >= 0)
-            exit_status = tmp;
+        else
+            if_necessary_assign_exit_status(tmp, exit_status);
+    } while (both_flag > 0);
 
-        __destruct_erase_data(&data);
-    } while ((opt->target_c = next_target_c));
+    if (write_provisional_report(prov_reflecteds)){
+        if (exit_status >= 0)
+            exit_status = UNEXPECTED_ERROR - exit_status;
+    }
 
-    write_provisional_report(prov_reflecteds);
+    return exit_status;
+}
+
+
+/**
+ * @brief delete the specified lines from Dockerfile, and record this in the log-file.
+ *
+ * @param[in]  patterns  array of strings at the beginning of the line to be deleted
+ * @param[in]  size  array size
+ * @param[in]  verbose  whether to display deleted lines on screen
+ * @param[in]  assume_c  the response to delete confirmation ('Y' or '\0')
+ * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
+ *
+ * @note if the return value is -1, an internal file error has occurred, but the deletion was successful.
+ * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
+ */
+int delete_from_dockerfile(const char * const patterns[], size_t size, bool verbose, bool assume_c){
+    int exit_status = UNEXPECTED_ERROR + ERROR_EXIT;
+
+    erase_opts opt = {
+        .has_delopt = true,
+        .undoes = 0,
+        .target_c = 'd',
+        .regex_flags = (ERASE_REG_FLAGS | REG_ICASE),
+        .max_count = -1,
+        .reset_flag = false,
+        .blank_c = 'p',
+        .verbose = verbose,
+        .assume_c = assume_c
+    };
+
+    if (! patterns){
+        opt.has_delopt = false;
+        opt.undoes = 1;
+    }
+    if (size <= INT_MAX)
+        exit_status = __do_erase(size, patterns, &opt, __marklines_in_dockerfile);
+
     return exit_status;
 }
 
@@ -420,7 +471,7 @@ static int __do_erase(int argc, void *argv, erase_opts *opt, bool command_line){
  * @param[in]  target_c  character representing the target file ('d' or 'h')
  * @param[in]  provlogs  array of length 2 for storing the provisional number of reflected lines
  * @param[in]  no_delete  whether there is no subsequent delete processing
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
+ * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
  *
  * @note each element of 'data' is a non-null value if subsequent deletion operations can be performed.
  * @note only in the above case, terminate normally without calling '__manage_erase_logs'.
@@ -457,21 +508,12 @@ static int __construct_erase_data(erase_data *data, int target_c, unsigned short
 
     if (! exit_status){
         int mode_c = 'w';
+        void *ptr;
 
-        if (data->lines){
-            size_t check_list_size;
-            void *ptr;
-
-            check_list_size = sizeof(unsigned int) * getsize_check_list(lines_num);
-            if ((ptr = malloc(check_list_size))){
-                memset(ptr, 0, check_list_size);
-                data->check_list = (unsigned int *) ptr;
-                mode_c = -1;
-            }
+        if ((data->logs->total = lines_num - *(data->logs->p_provlog)) < 0){
+            data->logs->total = lines_num;
+            *(data->logs->p_provlog) = 0;
         }
-
-        data->logs->total = lines_num - *(data->logs->p_provlog);
-
         if (! (data->logs->reset_flag || __manage_erase_logs(log_file, 'r', data->logs, false))){
             if (! data->logs->reset_flag){
                 if (! (no_delete && *(data->logs->p_provlog)))
@@ -480,13 +522,11 @@ static int __construct_erase_data(erase_data *data, int target_c, unsigned short
             else
                 xperror_individually("the internal log-file is reset");
         }
-        if (data->logs->total < 0){
-            data->logs->total = lines_num;
-            *(data->logs->p_provlog) = 0;
-        }
 
-        if ((mode_c >= 0) && __manage_erase_logs(log_file, mode_c, data->logs, no_delete))
-            exit_status = UNEXPECTED_ERROR;
+        if (data->lines && (ptr = calloc(getsize_check_list(lines_num), sizeof(unsigned int))))
+            data->check_list = (unsigned int *) ptr;
+        else
+            exit_status = __manage_erase_logs(log_file, mode_c, data->logs, no_delete);
     }
     else {
         xperror_standards(exit_status, target_file);
@@ -497,58 +537,87 @@ static int __construct_erase_data(erase_data *data, int target_c, unsigned short
 }
 
 
-
-
 /**
- * @brief release the dynamic memory used for the data commonly used in this command.
+ * @brief reflect the provisional number of reflected lines in log-file for the dit command 'erase'.
  *
- * @param[out] data  variable to store the data commonly used in this command
+ * @param[out] prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
+ * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
+ *
+ * @attention if the provisional number of reflected line is invalid, that part of array may be set to 0.
  */
-static void __destruct_erase_data(erase_data *data){
-    if (data->lines){
-        free(data->lines);
+int update_erase_logs(unsigned short prov_reflecteds[2]){
+    const char *targets = "dh";
+    int tmp, exit_status = SUCCESS;
 
-        if (data->check_list)
-            free(data->check_list);
+    erase_logs logs;
+    erase_data data = { .logs = &logs };
+
+    while (*targets){
+        logs.reset_flag = false;
+        if ((tmp = __construct_erase_data(&data, *(targets++), prov_reflecteds, true)) && (exit_status >= 0))
+            exit_status = tmp;
     }
+
+    return exit_status;
 }
 
 
 
 
 /******************************************************************************
-    * Determine & Mark Part
+    * Mark Part
 ******************************************************************************/
 
 
+/**
+ * @brief mark for deletion the lines containing extended regular expression pattern string.
+ *
+ * @param[in]  pattern  pattern string to determine which lines to delete
+ * @param[in]  opt  variable to store the results of option parse
+ * @param[out] data  variable to store the data commonly used in this command
+ * @return bool  successful or not
+ */
+static bool __marklines_containing_pattern(const char *pattern, erase_opts *opt, erase_data *data){
 
-static void __marklines_begining_with(erase_data *data, const char *str, bool ignore_case){
+}
+
+
+/**
+ * @brief mark for deletion the lines with the specified numbers.
+ *
+ * @param[in]  range  string specifying a range of line numbers to delete
+ * @param[in]  opt  variable to store the results of option parse
+ * @param[out] data  variable to store the data commonly used in this command
+ * @return bool  successful or not
+ */
+static bool __marklines_with_numbers(const char *range, erase_opts *opt, erase_data *data){
+
+}
+
+
+/**
+ * @brief mark for deletion the lines added within the last NUM times.
+ *
+ * @param[in]  opt  variable to store the results of option parse
+ * @param[out] data  variable to store the data commonly used in this command
+ */
+static void __marklines_to_undo(erase_opts *opt, erase_data *data){
 
 }
 
 
 
-static void __marklines_containing(erase_data *data, const char *str, bool ignore_case){
 
-}
-
-
-
-static void __marklines_in_range(erase_data *data, int left, int right){
-
-}
-
-
-
-static void __marklines_to_undo(erase_data *data, int undoes){
-
-}
-
-
-
-
-
-static void __marklines_in_dockerfile(int size, const char * const strs[], erase_opts *opt, erase_data *data){
+/**
+ * @brief mark for deletion the lines in Dockerfile containing any of the specified pattern strings.
+ *
+ * @param[in]  size  the length of below array
+ * @param[in]  patterns  array of pattern strings to determine which lines to delete
+ * @param[in]  opt  variable to store the results of option parse
+ * @param[out] data  variable to store the data commonly used in this command
+ * @return int  0 (parse success) or -1 (error exit)
+ */
+static int __marklines_in_dockerfile(int size, void *patterns, erase_opts *opt, erase_data *data){
 
 }
 
@@ -565,9 +634,12 @@ static void __marklines_in_dockerfile(int size, const char * const strs[], erase
  *
  * @param[in]  opt  variable to store the results of option parse
  * @param[out] data  variable to store the data commonly used in this command
- * @return int  
+ * @param[in]  flag  whether to edit both Dockerfile and history-file or -1
+ * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
+ *
+ * @note if the return value is -1, an internal file error has occurred, but the deletion was successful.
  */
-static int __delete_marked_lines(erase_opts *opt, erase_data *data){
+static int __delete_marked_lines(erase_opts *opt, erase_data *data, int flag){
     const char *target_file, *dest_file, *log_file;
     if (opt->target_c == 'd'){
         target_file = DOCKER_FILE_DRAFT;
@@ -580,41 +652,13 @@ static int __delete_marked_lines(erase_opts *opt, erase_data *data){
         log_file = ERASE_FILE_H;
     }
 
-    
-}
+    int mode_c = 'w';
 
-
-
-
-/**
- * @brief delete the specified lines from Dockerfile, and record this in the log-file.
- *
- * @param[in]  beginning_strs  array of strings at the beginning of the line to be deleted
- * @param[in]  size  array size
- * @param[in]  verbose  whether to display deleted lines on screen
- * @param[in]  assume_c  the response to delete confirmation ('Y', 'N' or '\0')
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
- *
- * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
- */
-int delete_from_dockerfile(const char * const beginning_strs[], size_t size, bool verbose, bool assume_c){
-    erase_opts opt = {
-        .has_delopt = true,
-        .undoes = 0,
-        .target_c = 'd',
-        .ignore_case = true,
-        .max_count = -1,
-        .reset_flag = false,
-        .verbose = verbose,
-        .assume_c = assume_c
-    };
-
-    if (! beginning_strs){
-        opt.has_delopt = false;
-        opt.undoes = 1;
+    if (flag >= 0){
+        
     }
 
-    return __do_erase(size, beginning_strs, &opt, false);
+    __manage_erase_logs(log_file, mode_c, data->logs, false);
 }
 
 
@@ -632,7 +676,7 @@ int delete_from_dockerfile(const char * const beginning_strs[], size_t size, boo
  * @param[in]  mode_c  whether to read, write or do nothing ('r', 'w' or '\0')
  * @param[out] logs  variable to store the log-data recorded in the log-file
  * @param[in]  concat_flag  whether to reflect the provisional number of reflected lines in the log-file
- * @return int  exit status like command's one
+ * @return int  0 (success) or -1 (unexpected error)
  *
  * @note except when reading log-data, release the dynamic memory that is no longer needed.
  * @note when the reset flag is set to false, the array and its size are also set to the correct values.
@@ -645,7 +689,7 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
     if (mode_c){
         fm[0] = mode_c;
         fp = fopen(file_name, fm);
-        exit_status = FAILURE;
+        exit_status = UNEXPECTED_ERROR;
     }
 
     size_t size, total = 0;
@@ -695,6 +739,7 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
                     total = *(logs->p_provlog);
 
                 exit_status = SUCCESS;
+
                 if (concat_flag && total){
                     tmp = div(total - 1, 255);
                     size = tmp.quot + 1;
@@ -707,7 +752,7 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
                         logs->array[logs->size - 1] = tmp.rem + 1;
                     }
                     else
-                        exit_status = FAILURE;
+                        exit_status = UNEXPECTED_ERROR;
                 }
 
                 if (! exit_status){
@@ -724,34 +769,6 @@ static int __manage_erase_logs(const char *file_name, int mode_c, erase_logs *lo
 
     if (fp)
         fclose(fp);
-
-    return exit_status;
-}
-
-
-
-
-/**
- * @brief reflect the provisional number of reflected lines in log-file for the dit command 'erase'.
- *
- * @param[out] prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
- * @return int  0 (success), 1 (error with an obvious reason) or -1 (unexpected error)
- *
- * @attention if the provisional number of reflected line is invalid, that part of array may be set to 0.
- */
-int update_erase_logs(unsigned short prov_reflecteds[2]){
-    const char *targets = "dh";
-    int tmp, exit_status = SUCCESS;
-
-    erase_logs logs;
-    erase_data data = { .logs = &logs };
-
-    while (*targets){
-        logs.reset_flag = false;
-
-        if ((tmp = __construct_erase_data(&data, *(targets++), prov_reflecteds, true)) && (exit_status >= 0))
-            exit_status = tmp;
-    }
 
     return exit_status;
 }
