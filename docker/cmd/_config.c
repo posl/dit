@@ -257,7 +257,7 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
         arg_copy = tmp;
         memcpy(arg_copy, config_arg, (sizeof(char) * size));
 
-        char *token;
+        const char *token;
         int mode2d, mode2h, mode, offset, target_c, i;
 
         mode2d = *p_mode2d;

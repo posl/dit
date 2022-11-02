@@ -369,7 +369,7 @@ static int reflect_line(char *line, int target_c, int next_target_c, bool verbos
                 }
                 fprintf(stdout, format, line);
             }
-        } while (0);
+        } while (false);
     }
     else if (target_c != next_target_c){
         if (fp){
@@ -431,7 +431,7 @@ static int init_dockerfile(FILE *fp){
     };
 
     while ((line = xfgets_for_loop(DOCKER_FILE_BASE, false, &errid))){
-        if ((reflected < 3) && (receive_dockerfile_instruction(line, instr_ids + reflected))){
+        if ((reflected < 3) && (receive_dockerfile_instruction(line, (instr_ids + reflected)))){
             reflected++;
             fprintf(fp, "%s\n", line);
         }
@@ -458,25 +458,29 @@ static int init_dockerfile(FILE *fp){
 static int check_dockerfile_instruction(char *line, bool onbuild_flag){
     static bool cmd_ent_duplicates[2] = {true, true};
 
-    const char *err_desc;
+    const char *errdesc;
     int instr_id = -1, exit_status = SUCCESS;
 
-    err_desc =
-        (! (receive_dockerfile_instruction(line, &instr_id))) ? "Invalid Instruction" :
-        ((instr_id == ID_FROM) || (instr_id == ID_MAINTAINER)) ? "Instruction not Allowed" :
-        (onbuild_flag && (instr_id == ID_ONBUILD)) ? "Instruction Format Error" :
-            NULL;
+    errdesc =
+        (! (receive_dockerfile_instruction(line, &instr_id))) ?
+            "Invalid Instruction" :
+        ((instr_id == ID_FROM) || (instr_id == ID_MAINTAINER)) ?
+            "Instruction not Allowed" :
+        (onbuild_flag && (instr_id == ID_ONBUILD)) ?
+            "Instruction Format Error" :
+        NULL;
 
-    if (! err_desc){
+    if (! errdesc){
         const int cmd_ent_ids[2] = {ID_CMD, ID_ENTRYPOINT};
 
-        char patterns_str[] = "^CMD^ENTRYPOINT";
-        char *cmd_ent_patterns[2] = {patterns_str, (patterns_str + 4)};
+        char tmp[] = "^CMD^ENTRYPOINT";
+        char *cmd_ent_patterns[2] = {tmp, (tmp + 4)};
 
-        for (int i = 0; i < 2; i++)
+        int i = 1;
+        do
             if (instr_id == cmd_ent_ids[i]){
                 if (cmd_ent_duplicates[i]){
-                    exit_status = delete_from_dockerfile(cmd_ent_patterns, 2, false, 'Y');
+                    // exit_status = delete_from_dockerfile(cmd_ent_patterns, 2, false, 'Y');
                     // TODO: waiting the implementation of setcmd commnad
 
                     cmd_ent_duplicates[0] = false;
@@ -486,10 +490,11 @@ static int check_dockerfile_instruction(char *line, bool onbuild_flag){
                 else
                     cmd_ent_duplicates[i] = true;
             }
+        while (i--);
     }
     else {
         exit_status = POSSIBLE_ERROR;
-        xperror_message(line, err_desc);
+        xperror_message(line, errdesc);
     }
 
     return exit_status;
@@ -601,7 +606,7 @@ static int manage_provisional_report(unsigned short reflecteds[2], const char *m
         }
         else
             return exit_status;
-    } while (1);
+    } while (true);
 }
 
 

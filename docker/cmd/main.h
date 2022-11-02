@@ -185,7 +185,7 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
     * String Recognizers
 ******************************************************************************/
 
-int receive_positive_integer(const char *target, int *left);
+int receive_positive_integer(const char *target, int *p_left);
 int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode);
 char *receive_dockerfile_instruction(char *line, int *p_id);
 

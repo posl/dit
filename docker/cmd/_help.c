@@ -123,7 +123,7 @@ int help(int argc, char **argv){
         }
         else
             return i;
-    } while (1);
+    } while (true);
 }
 
 
@@ -404,7 +404,7 @@ void erase_manual(void){
         "Delete the lines that match the specified conditions from "DOCKER_OR_HISTORY".\n"
         "\n"
         "Options for Deletion:\n"
-        "  -E, --extended-regexp=PTN     delete the lines containing the pattern\n"
+        "  -E, --extended-regexp=PTN     delete the lines containing extended regular expression pattern\n"
         "  -N, --numbers=ARG[,ARG]...    delete the lines with the numbers specified by ARGs:\n"
         "                                  NUM (unique specification), [NUM]-[NUM] (range specification)\n"
         "  -Z, --undoes[=NUM]            delete the lines added within the last NUM (1 by default) times\n"
@@ -428,22 +428,25 @@ void erase_manual(void){
         "      --help                    " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
-        "  - When no Options for Deletion are given, if '-v' is given, it displays the lines deleted by the\n"
-        "    previous dit command 'erase', and exit normally, otherwise it behaves as if '-Z' is given.\n"
+        "  - When no Options for Deletion are given, if '-v' is given, it displays the previous\n"
+        "    deleted lines and exit normally, otherwise it behaves as if '-Z' is given.\n"
         "  - If multiple Options for Deletion are given, the specified conditions are ANDed together.\n"
-        "  - The pattern string for '-E' must be extended regular expression of 255 characters or less.\n"
         "  - The line numbers for '-N' start from 1, and 0 is the same as specifying nothing.\n"
-        "  - In the range specification of '-N', if nothing is specified for NUM,\n"
-        "    the first or last line number will be assigned depending on the position.\n"
-        "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
-        "  - The target "SPECIFIED_BY_TARGET".\n"
+        "  - In the range specification of '-N', if nothing is specified for NUM, the first or last\n"
+        "    line number will be assigned depending on the position, and if left NUM is greater than\n"
+        "    right NUM, it is interpreted as two range specifications, each without NUM on one side.\n"
         "  - The internal log-files that record the number of reflected lines are used by '-Z', and\n"
         "    if there is an inconsiestency between one of that files and the target file, it is reset.\n"
         "  - When the number of reflected lines is 0, the internal log-files are not updated at all.\n"
         "  - The internal log-files are not saved across interruptions such as exiting the container.\n"
+        "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
+        "  - The target "SPECIFIED_BY_TARGET".\n"
         "  - The argument for '--assume' "CAN_BE_TRUNCATED" "CASE_INSENSITIVE".\n"
         "  - By default, Y/n confirmation is performed using standard error output and standard input\n"
         "    as to whether it is okay to delete the lines that match the specified conditions.\n"
+        "\n"
+        "We take no responsibility for using regular expression pattern that uses excessive resources.\n"
+        "See man page of 'REGEX' for details.\n"
     , stdout);
 }
 
@@ -695,7 +698,7 @@ static void erase_example(void){
         "dit erase -dh                   Delete the lines added just before.\n"
         "dit erase -diy -E '^ONBUILD'    Delete all ONBUILD instructions from Dockerfile.\n"
         "dit erase -hm10 -N -            Delete last 10 lines from history-file.\n"
-        "dit erase -v --target both      Display the lines deleted by the previous 'erase'.\n"
+        "dit erase -v --target both      Display the previous deleted lines.\n"
     , stdout);
 }
 

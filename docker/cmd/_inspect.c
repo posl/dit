@@ -127,7 +127,7 @@ int inspect(int argc, char **argv){
         }
         else
             return i;
-    } while (1);
+    } while (true);
 }
 
 
@@ -257,7 +257,7 @@ static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const c
                     if ((dir = opendir(ipath->ptr))){
                         ipath_len += name_len;
 
-                        if (concat_inf_path(ipath, ipath_len - 1, "/", 2)){
+                        if (concat_inf_path(ipath, (ipath_len - 1), "/", 2)){
                             struct dirent *entry;
                             file_node *tmp;
 

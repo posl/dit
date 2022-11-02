@@ -173,8 +173,8 @@ static int (* const get_dit_cmd(const char *target))(int, char **){
         FILE *fp;
         int mode;
 
-        i = 2;
-        while (i--){
+        i = 1;
+        do {
             mode = _IOLBF;
 
             if (i){
@@ -186,7 +186,7 @@ static int (* const get_dit_cmd(const char *target))(int, char **){
                 fp = stderr;
 
             setvbuf(fp, NULL, mode, 0);
-        }
+        } while (i--);
     }
 
     return cmd;
@@ -453,7 +453,7 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
             start = p_info->dest;
 
         return start;
-    } while (1);
+    } while (true);
 }
 
 
@@ -489,13 +489,13 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
  * @brief receive the passed string as a positive integer or a set of two positive integer.
  *
  * @param[in]  target  target string
- * @param[out] left  if enable a range specification by using a hyphen, variable to store the left integer
+ * @param[out] p_left  if enable a range specification by using a hyphen, variable to store the left integer
  * @return int  the resulting (right) integer or -1
  *
  * @note receive an integer that can be expressed as "/^[0-9]+$/" in a regular expression.
  * @note when specifying a range by using a hyphen and omitting an integer, it is interpreted as specifying 0.
  */
-int receive_positive_integer(const char *target, int *left){
+int receive_positive_integer(const char *target, int *p_left){
     int curr = -1;
 
     if (target){
@@ -514,9 +514,9 @@ int receive_positive_integer(const char *target, int *left){
                         continue;
                 }
             }
-            else if (left && (c == '-')){
-                *left = curr;
-                left = NULL;
+            else if (p_left && (c == '-')){
+                *p_left = curr;
+                p_left = NULL;
                 curr = 0;
                 continue;
             }
