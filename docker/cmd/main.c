@@ -175,15 +175,14 @@ static int (* const get_dit_cmd(const char *target))(int, char **){
 
         i = 1;
         do {
-            mode = _IOLBF;
-
             if (i){
                 fp = stdout;
-                if (cmd == inspect)
-                    mode = _IOFBF;
+                mode = (cmd == inspect) ? _IOFBF : _IOLBF;
             }
-            else
+            else {
                 fp = stderr;
+                mode = _IONBF;
+            }
 
             setvbuf(fp, NULL, mode, 0);
         } while (i--);

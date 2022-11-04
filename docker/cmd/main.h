@@ -63,7 +63,7 @@
 
 #define assign_both_or_either(target, a, b, c)  (target = (target == (a)) ? (b) : (c))
 
-#define check_string_of_length1(str, c)  ((str[0] == c) && (! str[1]))
+#define check_string_of_length1(str, c)  ((str[0] == (c)) && (! str[1]))
 #define check_string_isstdin(file_name)  check_string_of_length1(file_name, '-')
 
 
@@ -149,7 +149,7 @@ void setcmd_manual(void);
 
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
 
-int delete_from_dockerfile(char **patterns, size_t size, bool verbose, bool assume_c);
+int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assume_c);
 int update_erase_logs(unsigned short prov_reflecteds[2]);
 
 int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag);
