@@ -16,7 +16,7 @@ NR == 1 {
         }
     }
     else
-        print "dit: cannot get the valid history number" > "/dev/stderr"
+        printf "dit: invalid history number: '%s'\n", M > "/dev/stderr"
     exit 1
 }
 
@@ -25,7 +25,9 @@ NR != 1 {
 }
 
 END {
+    close(HNF)
     print N > HNF
-    if (N == 0)
+
+    if (! N)
         exit 1
 }
