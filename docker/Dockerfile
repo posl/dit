@@ -26,7 +26,8 @@ RUN curl -L "https://github.com/ncopa/su-exec/archive/${COMMIT_ID}.tar.gz" | tar
 
 # generate the dit command
 COPY ./cmd ./
-RUN gcc -O2 -march=native -o /usr/local/bin/dit *.c
+RUN make && \
+    make clean
 
 
 
