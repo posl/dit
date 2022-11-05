@@ -90,7 +90,7 @@ chmod a=rx \
 #
 
 echo '0' > /dit/tmp/last-exit-status
-echo '0' > /dit/tmp/last-history-number
+echo '-1' > /dit/tmp/last-history-number
 
 dit config -r
 dit ignore -dhr
