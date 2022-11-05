@@ -9,7 +9,7 @@ if ( apt-get --version > /dev/null 2>&1 ); then
 
 elif ( yum --version > /dev/null 2>&1 ); then
     yum update -y
-    yum install -y "$1"
+    yum install -y "$@"
     yum clean all
     rm -rf /var/cache/yum
 
