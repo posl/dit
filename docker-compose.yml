@@ -1,14 +1,17 @@
 version: "3.8"
 
-# user-defined variables (in order: base-image name, base-image version, image name and shared directory)
+# user-specified build ARGs  (can also be overwritten by '--build-arg key=val')
 x-var0: &BASE_NAME
   debian
 x-var1: &BASE_VERSION
   latest
+
+# user-defined variables  (cannot be edited on the command line when using 'docker-compose')
 x-var2: &IMAGE_NAME
   debian-dit
 x-var3: &SHARED_DIR
   ./app
+
 
 services:
   dit:
