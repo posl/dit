@@ -25,7 +25,7 @@ typedef struct {
 } xfgets_info;
 
 
-static int (* const get_dit_cmd(const char *target))(int, char **);
+static int call_dit_command(int argc, char **argv, int cmd_id);
 
 
 /** array of strings in alphabetical order representing each dit command */
@@ -99,7 +99,7 @@ const char * const docker_instr_reprs[DOCKER_INSTRS_NUM] = {
 
 
 /** string representing a dit command invoked */
-static const char *program_name;
+static const char *program_name = NULL;
 
 
 
@@ -115,25 +115,35 @@ static const char *program_name;
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
  * @return int  command's exit status
+ *
+ * @note leave the command name in a global variable for error message output.
+ * @note if unit tests were performed in 'test', it will not return to this function.
  */
 int main(int argc, char **argv){
-    const char *desc = "command";
+    if (argc > 0){
+         program_name = *argv;
 
-    if (--argc > 0){
-        program_name = *(++argv);
+        const char *target = NULL;
+        int cmd_id = -3;
 
-        int (* cmd)(int, char **);
-        if ((cmd = get_dit_cmd(program_name)))
-            return cmd(argc, argv);
+        if (--argc){
+            target = *(++argv);
+            cmd_id = receive_expected_string(target, cmd_reprs, CMDS_NUM, 0);
+        }
 
-        const char *arg;
-        arg = program_name;
-        program_name = *(--argv);
-        xperror_invalid_arg('C', 1, desc, arg);
-    }
-    else {
-        program_name = *argv;
-        xperror_missing_args(desc, NULL);
+        if (cmd_id >= 0){
+#ifndef NDEBUG
+        test(argc, argv, cmd_id);
+#endif
+            program_name = target;
+            return call_dit_command(argc, argv, cmd_id);
+        }
+
+        const char *desc = "command";
+        if (target)
+            xperror_invalid_arg('C', 1, desc, target);
+        else
+            xperror_missing_args(desc, NULL);
     }
 
     xperror_suggestion(false);
@@ -142,12 +152,20 @@ int main(int argc, char **argv){
 
 
 /**
- * @brief extract the corresponding dit command.
+ * @brief set buffering for standard output, and run the specified dit command.
  *
- * @param[in]  target  target string
- * @return int(* const)(int, char**)  function of the desired dit command or NULL
+ * @param[in]  argc  the number of command line arguments
+ * @param[out] argv  array of strings that are command line arguments
+ * @param[in]  cmd_id  index number corresponding to one of the dit commands
+ * @return int  command's exit status
+ *
+ * @note set full buffering if a large amount of output is expected for the specified command.
  */
-static int (* const get_dit_cmd(const char *target))(int, char **){
+static int call_dit_command(int argc, char **argv, int cmd_id){
+    assert(argc > 0);
+    assert(argv);
+    assert((cmd_id >= 0) && (cmd_id < CMDS_NUM));
+
     int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
         config,
         convert,
@@ -156,7 +174,7 @@ static int (* const get_dit_cmd(const char *target))(int, char **){
         healthcheck,
         help,
         ignore,
-        inspect,
+        inspect,  // cmd_id = 7
         label,
         onbuild,
         optimize,
@@ -164,31 +182,24 @@ static int (* const get_dit_cmd(const char *target))(int, char **){
         setcmd
     };
 
-    int i;
-    int (* cmd)(int, char **) = NULL;
+    int i = 1, mode;
+    FILE *fp;
 
-    if ((i = receive_expected_string(target, cmd_reprs, CMDS_NUM, 0)) >= 0){
-        cmd = cmd_funcs[i];
+    do {
+        if (i){
+            fp = stdout;
+            mode = (cmd_id == 7) ? _IOFBF : _IOLBF;
+        }
+        else {
+            fp = stderr;
+            mode = _IONBF;
+        }
 
-        FILE *fp;
-        int mode;
+        setvbuf(fp, NULL, mode, 0);
+    } while (i--);
 
-        i = 1;
-        do {
-            if (i){
-                fp = stdout;
-                mode = (cmd == inspect) ? _IOFBF : _IOLBF;
-            }
-            else {
-                fp = stderr;
-                mode = _IONBF;
-            }
-
-            setvbuf(fp, NULL, mode, 0);
-        } while (i--);
-    }
-
-    return cmd;
+    assert(i == -1);
+    return cmd_funcs[cmd_id](argc, argv);
 }
 
 

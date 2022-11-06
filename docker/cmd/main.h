@@ -2,6 +2,12 @@
 #define DOCKER_INTERACTIVE_TOOL
 
 
+// if you want to unit test each command, comment out the line immediately after
+#define NDEBUG
+#include "test.h"
+
+
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -198,4 +204,4 @@ int check_file_size(const char *file_name);
 int check_last_exit_status(void);
 
 
-#endif
+#endif // DOCKER_INTERACTIVE_TOOL
