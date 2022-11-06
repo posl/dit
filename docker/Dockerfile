@@ -1,7 +1,7 @@
 ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
 
-FROM ${BASE_NAME}:${BASE_VERSION} as builder
+FROM "${BASE_NAME}:${BASE_VERSION}" as builder
 WORKDIR /dit/src
 
 # install essential packages
@@ -34,7 +34,7 @@ RUN make && \
 ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
 
-FROM ${BASE_NAME}:${BASE_VERSION} as product
+FROM "${BASE_NAME}:${BASE_VERSION}" as product
 
 # load several commands and scripts
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
@@ -49,8 +49,11 @@ RUN /bin/bash --version > /dev/null 2>&1 || \
 ARG BASE_NAME=debian
 ARG BASE_VERSION=latest
 
-ENV BASE_NAME=${BASE_NAME}
-ENV BASE_VERSION=${BASE_VERSION}
+ENV BASE_NAME="${BASE_NAME}"
+ENV BASE_VERSION="${BASE_VERSION}"
+
+# record the default user because it will be switched to a privileged user for a while
+RUN whoami > /dit/etc/default_user
 
 USER root
 ENTRYPOINT [ "/bin/sh", "/dit/etc/dit_entry.sh" ]

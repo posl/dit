@@ -2,7 +2,7 @@
 
 
 #
-# check the shared directory and initialize the base file for Dockerfile
+# check the shared directory, and initialize the base-file for Dockerfile
 #
 
 if [ ! -e /dit/mnt ]; then
@@ -20,7 +20,7 @@ touch \
 cat <<EOF > /dit/etc/Dockerfile.base
 FROM ${BASE_NAME}:${BASE_VERSION}
 SHELL [ "${SHELL:-/bin/sh}", "-c" ]
-WORKDIR $(pwd)
+WORKDIR $( pwd )
 EOF
 
 unset BASE_NAME BASE_VERSION
@@ -33,13 +33,8 @@ unset BASE_NAME BASE_VERSION
 
 chmod a=x /usr/local/bin/dit
 
-chmod a=rw \
-    /dit/mnt/.dit_history \
-    /dit/mnt/.dockerignore \
-    /dit/mnt/Dockerfile \
-    /dit/mnt/Dockerfile.draft
-
 find /dit/etc -type f -exec chmod a=r {} +
+find /dit/mnt -type f -exec chmod a=rw {} +
 
 
 DEFAULT_UMASK_VALUE="$( umask )"
@@ -98,12 +93,19 @@ dit optimize -r
 dit reflect
 
 
+DEFAULT_USER="$( head -n1 /dit/etc/default_user )"
+
 cp -f /dit/etc/dit_profile.sh /etc/profile.d/
 
 rm -f \
+    /dit/etc/default_user \
     /dit/etc/dit_entry.sh \
     /dit/etc/dit_install.sh \
     /dit/etc/dit_profile.sh
 
 
-exec /bin/bash --login
+if [ "${DEFAULT_USER}" != 'root' ]; then
+    su-exec "${DEFAULT_USER}" /bin/bash --login
+else
+    exec /bin/bash --login
+fi
