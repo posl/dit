@@ -351,8 +351,10 @@ static void display_prev(int target_c){
                 src_file = ERASE_RESULT_FILE_H;
         }
 
-        if (offset)
-            fprintf(stdout, ("\n < %s >\n" + --offset), target_args[2 - offset]);
+        if (offset){
+            offset--;
+            fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset]);
+        }
 
         while ((line = xfgets_for_loop(src_file, false, NULL)))
             fprintf(stdout, "%s\n", line);
@@ -529,7 +531,7 @@ static int construct_erase_data(erase_data *data, int target_c, unsigned short p
                     mode_c = '\0';
             }
             else
-                xperror_individually("the internal log-file is reset");
+                xperror_individually("the internal log-file is reset.");
         }
 
         if (data->lines){
@@ -593,7 +595,7 @@ int update_erase_logs(unsigned short prov_reflecteds[2]){
  * @note the actual types are 'size_t', 'const char * const *', 'const erase_opts *' and 'erase_data *'.
  */
 static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, erase_data *data){
-    int i, exit_status = SUCCESS;
+    int exit_status = SUCCESS;
 
     while (size--)
         if (! marklines_containing_pattern(data, *(patterns++), opt->ignore_case)){
@@ -907,12 +909,13 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int flag
  * @note in the first half, empty lines are handled and lines to be deleted are extracted.
  * @note in the second half, confirmation before deleting the extracted lines is performed.
  * @note whether or not to retain empty lines is only affected by 'opt->blank_c'.
+ * @note index numbers pointing to deletion candidates wrap around at values less than their maximum number.
  *
  * @attention 'data' must be reliably constructed before calling this function.
  * @attention must not call this function if the target file does not contain any lines that can be deleted.
  */
 static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
-    size_t marked_num, max_count, truncates_num = 0, deletes_num = 0;
+    int marked_num, max_count, truncates_num = 0, deletes_num = 0;
     const char *line = NULL;
     unsigned int i = 0, idx, mask;
     bool first_blank = true;
@@ -920,11 +923,9 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
     marked_num = popcount_check_list(data->check_list, data->list_size);
     max_count = ((opt->max_count >= 0) && (opt->max_count < marked_num)) ? opt->max_count : marked_num;
 
-    int candidate_idx;
+    int candidate_idx = 0;
     const char *candidate_lines[max_count];
     unsigned int candidate_idxs[max_count];
-
-    
 
     do {
         if (! line)
@@ -969,17 +970,17 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
     } while (++i < data->lines_num);
 
 
-    if ((opt->assume_c != 'Y') && deletes_num){
-        int assume_c, select_idx = -1, bits_num = 0;
-        unsigned int select_list[1], start, end;
-        char answer[5], range[64];
+    if (deletes_num > max_count){
+        deletes_num = max_count;
+        candidate_idx++;
+    }
+    else
+        candidate_idx = 0;
 
-        if (deletes_num > max_count){
-            deletes_num = max_count;
-            candidate_idx++;
-        }
-        else
-            candidate_idx = 0;
+    if (opt->assume_c != 'Y'){
+        int assume_c, select_idx = -1, selects_num = 0;
+        unsigned int select_list[1], start, end = 0;
+        char answer[5] = "", range[64] = "";
 
         i = 0;
         marked_num = deletes_num;
@@ -988,7 +989,7 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
         do {
             if (select_idx >= 0){
                 do {
-                    if (select_idx < bits_num){
+                    if (select_idx < selects_num){
                         mask = 1 << (select_idx++);
 
                         if (*select_list & mask){
@@ -998,7 +999,7 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
                     }
                     else {
                         select_idx = -1;
-                        bits_num = 0;
+                        selects_num = 0;
                     }
                     break;
                 } while (true);
@@ -1009,17 +1010,17 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
                 idx %= max_count;
 
                 if ((assume_c != 'Q') && (select_idx < 0)){
-                    if (! bits_num){
+                    if (! selects_num){
                         start = i - 1;
                         end = start + 10;
 
                         if (end > marked_num)
                             end = marked_num;
-                        fprintf(stderr, "Lines to be Deleted (%u/%u):\n", end, ((unsigned int) marked_num));
+                        fprintf(stderr, "Lines to be Deleted (%u/%d):\n", end, marked_num);
                     }
 
-                    bits_num++;
-                    fprintf(stderr, "%3d  %s\n", bits_num, candidate_lines[idx]);
+                    selects_num++;
+                    fprintf(stderr, "%3d  %s\n", selects_num, candidate_lines[idx]);
 
                     if (i == end){
                         fputc('\n', stderr);
@@ -1027,25 +1028,30 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
                         if (! opt->assume_c){
                             do {
                                 fputs("Do you want to delete all of them? [Y/n]  ", stderr);
-                                fscanf(stdin, "%4[A-Za-z]%*[^\n]", answer);
-                                fscanf(stdin, "%*c");
+                                fscanf(stdin, "%4[^\n]%*[^\n]", answer);
+                                fgetc(stdin);
+
                                 assume_c = receive_expected_string(answer, assume_args, ARGS_NUM, 3);
                             } while (assume_c < 0);
 
                             assume_c = *(assume_args[assume_c]);
                         }
                         switch (assume_c){
+                            case 'Y':
+                                selects_num = 0;
+                                break;
                             case 'N':
                                 fputs(
                                     "Select the lines to delete with numbers.\n"
                                     " (separated by commas, max length is 63)  "
                                 , stderr);
 
-                                fscanf(stdin, "%63[0-9-,]%*[^\n]", range);
-                                fscanf(stdin, "%*c");
-                                *select_list = 0;
-                                receive_range_specification(range, bits_num, select_list);
+                                fscanf(stdin, "%63[^\n]%*[^\n]", range);
+                                fgetc(stdin);
+
                                 select_idx = 0;
+                                *select_list = 0;
+                                receive_range_specification(range, selects_num, select_list);
                             case 'Q':
                                 i = start;
                         }

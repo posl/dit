@@ -208,7 +208,7 @@ static int display_version(void){
     int errid = 0, exit_status = NORMALLY_EXIT;
 
     while ((line = xfgets_for_loop(VERSION_FILE, false, &errid)))
-        fputs(line, stdout);
+        fprintf(stdout, "%s\n", line);
 
     if (errid){
         xperror_internal_file();
