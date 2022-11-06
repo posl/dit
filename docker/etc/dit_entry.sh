@@ -99,13 +99,11 @@ cp -f /dit/etc/dit_profile.sh /etc/profile.d/
 
 rm -f \
     /dit/etc/default_user \
-    /dit/etc/dit_entry.sh \
-    /dit/etc/dit_install.sh \
-    /dit/etc/dit_profile.sh
+    /dit/etc/dit_*.sh \
 
 
 if [ "${DEFAULT_USER}" != 'root' ]; then
-    su-exec "${DEFAULT_USER}" /bin/bash --login
+    su-exec "${DEFAULT_USER}" "$@"
 else
-    exec /bin/bash --login
+    exec "$@"
 fi
