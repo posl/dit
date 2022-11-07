@@ -1,29 +1,18 @@
 version: "3.8"
 
-# user-specified build ARGs  (can also be overwritten by '--build-arg key=val')
-x-var0: &BASE_NAME
-  debian
-x-var1: &BASE_VERSION
-  latest
-
-# user-defined variables  (cannot be edited on the command line when using 'docker-compose')
-x-var2: &IMAGE_NAME
-  debian-dit
-x-var3: &SHARED_DIR
-  ./app
-
 
 services:
   dit:
     build:
       context: ./docker
+      target: "${BUILD_TARGET:?}"
       args:
-        BASE_NAME: *BASE_NAME
-        BASE_VERSION: *BASE_VERSION
-    image: *IMAGE_NAME
+        BASE_NAME: "${BASE_NAME:?}"
+        BASE_VERSION: "${BASE_VERSION:?}"
+    image: "dit-${BASE_NAME}:${IMAGE_TAG:-latest}"
     stdin_open: true
     tty: true
     volumes:
       - type: bind
-        source: *SHARED_DIR
+        source: "${SHARED_DIR:?}"
         target: /dit/mnt
