@@ -10,6 +10,17 @@ if [ ! -e /dit/mnt ]; then
     exit 1
 fi
 
+
+if [ -s /dit/mnt/Dockerfile.draft ]; then
+    PREV_FROM="$( head -n1 /dit/mnt/Dockerfile.draft )"
+    CURR_FROM="FROM ${BASE_NAME}:${BASE_VERSION}"
+
+    if [ "${PREV_FROM}" != "${CURR_FROM}" ]; then
+        echo "dit: base-image inconsistency with the contents of 'Dockerfile.draft'" 1>&2
+        exit 1
+    fi
+fi
+
 touch \
     /dit/mnt/.dit_history \
     /dit/mnt/.dockerignore \
@@ -23,6 +34,7 @@ SHELL [ "${SHELL:-/bin/sh}", "-c" ]
 WORKDIR $( pwd )
 EOF
 
+echo "Entered '${BASE_NAME}:${BASE_VERSION}'."
 unset BASE_NAME BASE_VERSION
 
 
