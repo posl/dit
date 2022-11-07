@@ -36,7 +36,7 @@ typedef struct file_node{
 
     char *link_path;                /** file name of link destination if this is a symbolic link */
     mode_t link_mode;               /** file mode of link destination if this is a symbolic link */
-    bool link_invalid;              /** whether this is a invalid symbolic link */
+    bool link_invalid;              /** whether this is an invalid symbolic link */
 
     struct file_node **children;    /** array for storing the children if this is a directory */
     size_t children_num;            /** the current number of the children */

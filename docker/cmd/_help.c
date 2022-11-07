@@ -17,7 +17,7 @@
 #define HELP_REMARKS_STR "Remarks:\n"
 
 #define DOCKER_OR_HISTORY  "Dockerfile or history-file"
-#define WHEN_REFLECTING  "when reflecting a executed command line"
+#define WHEN_REFLECTING  "when reflecting an executed command line"
 
 #define TARGET_OPTION_ARGS  "  dockerfile (-d), history-file (-h), both (-dh)\n"
 #define BLANK_OPTION_DESC  "replace how to handle the empty lines:\n"
@@ -567,7 +567,7 @@ void reflect_manual(void){
         "  - If both files are destination, the reflection contents cannot be specified by SOURCEs.\n"
         "  - If the size of destination file exceeds the upper limit (2G), it exits with the error.\n"
         "  - When reflecting in Dockerfile, each instruction must be on one line and lines to be reflected\n"
-        "    must not contain unnecessary leading white spaces and a invalid or disallowed instruction.\n"
+        "    must not contain unnecessary leading white spaces and an invalid or disallowed instruction.\n"
         "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is 1 or less.\n"
         "  - Internally, logging such as the number of reflected lines is performed.\n"
     , stdout);

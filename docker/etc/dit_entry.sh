@@ -81,7 +81,7 @@ chmod a=rx \
 
 
 #
-# perform other necessary initializations and enter a login shell
+# initialize or delete the internal files depending on usage, and enter a login shell
 #
 
 echo '0' > /dit/tmp/last-exit-status

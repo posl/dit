@@ -1,6 +1,10 @@
 #!/bin/sh
 
 
+#
+# record an available package manager and use it to install the specified packages
+#
+
 if ( apt-get --version > /dev/null 2>&1 ); then
     readonly PACKAGE_MANAGER='apt-get'
 

@@ -1,3 +1,8 @@
+
+#
+# take the history of the most recently executed command line as input and record its contents
+#
+
 BEGIN {
     N = 0
     HNF = "/dit/tmp/last-history-number"
