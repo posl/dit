@@ -1,5 +1,5 @@
-ARG BASE_NAME=debian
-ARG BASE_VERSION=latest
+ARG BASE_NAME
+ARG BASE_VERSION
 
 FROM "${BASE_NAME}:${BASE_VERSION}" AS builder
 WORKDIR /dit/src
@@ -31,8 +31,8 @@ RUN make && \
 
 
 
-ARG BASE_NAME=debian
-ARG BASE_VERSION=latest
+ARG BASE_NAME
+ARG BASE_VERSION
 
 FROM "${BASE_NAME}:${BASE_VERSION}" AS product
 
@@ -46,15 +46,26 @@ RUN /bin/bash --version > /dev/null 2>&1 || \
         bash && \
     rm -f /dit/etc/package_manager
 
-ARG BASE_NAME=debian
-ARG BASE_VERSION=latest
+ARG BASE_NAME
+ARG BASE_VERSION
 
 ENV BASE_NAME="${BASE_NAME}"
 ENV BASE_VERSION="${BASE_VERSION}"
 
 # record the default user because it will be switched to a privileged user for a while
 RUN whoami > /dit/etc/default_user
-
 USER root
+
 ENTRYPOINT [ "/bin/sh", "/dit/etc/dit_entry.sh" ]
 CMD [ "/bin/bash", "--login" ]
+
+
+
+FROM product AS test
+
+# load test script for each dit command
+WORKDIR /dit/test
+COPY ./test ./
+
+# interactively verify that all dit commands work properly
+CMD [ "/bin/sh", "main.sh" ]
