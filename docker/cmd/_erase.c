@@ -1281,3 +1281,20 @@ static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs
 
     return exit_status;
 }
+
+
+
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void erase_test(void){
+    fputs("erase test\n", stdout);
+}
+
+
+#endif // NDEBUG

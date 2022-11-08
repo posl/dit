@@ -802,3 +802,20 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
             fputc(indicator, stdout);
     }
 }
+
+
+
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void inspect_test(void){
+    fputs("inspect test\n", stdout);
+}
+
+
+#endif // NDEBUG

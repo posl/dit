@@ -336,3 +336,20 @@ static int receive_mode_integer(int c, int spare){
     }
     return -1;
 }
+
+
+
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void config_test(void){
+    fputs("config test\n", stdout);
+}
+
+
+#endif // NDEBUG

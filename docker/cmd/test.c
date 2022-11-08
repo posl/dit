@@ -31,7 +31,7 @@ static bool parse_opts(int argc, char **argv);
  * @param[out] argv  array of strings that are command line arguments
  * @param[in]  cmd_id  index number corresponding to one of the dit commands
  *
- * @note always unit test commonly used functions before unit testing the dit command.
+ * @note always test commonly used functions before testing the dit command.
  * @note if unit tests were performed in this function, it will not return to the caller.
  */
 void test(int argc, char **argv, int cmd_id){
@@ -40,7 +40,7 @@ void test(int argc, char **argv, int cmd_id){
     assert((cmd_id >= 0) && (cmd_id < CMDS_NUM));
 
     if (parse_opts(argc, argv)){
-        int (* const test_funcs[CMDS_NUM])(void) = {
+        void (* const test_funcs[CMDS_NUM])(void) = {
             config_test,
             convert_test,
             cp_test,
@@ -56,10 +56,9 @@ void test(int argc, char **argv, int cmd_id){
             setcmd_test
         };
 
-        int exit_status;
-        exit_status = (dit_test() || test_funcs[cmd_id]()) ? 1 : 0;
-
-        exit(exit_status);
+        dit_test();
+        test_funcs[cmd_id]();
+        exit(0);
     }
 }
 

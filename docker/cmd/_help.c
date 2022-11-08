@@ -771,3 +771,20 @@ static void reflect_example(void){
 static void setcmd_example(void){
     fputs("setcmd example\n", stdout);
 }
+
+
+
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void help_test(void){
+    fputs("help test\n", stdout);
+}
+
+
+#endif // NDEBUG

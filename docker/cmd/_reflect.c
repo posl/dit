@@ -635,3 +635,20 @@ int read_provisional_report(unsigned short prov_reflecteds[2]){
 int write_provisional_report(unsigned short prov_reflecteds[2]){
     return manage_provisional_report(prov_reflecteds, "w\0");
 }
+
+
+
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void reflect_test(void){
+    fputs("reflect test\n", stdout);
+}
+
+
+#endif // NDEBUG

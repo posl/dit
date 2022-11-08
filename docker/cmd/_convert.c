@@ -37,3 +37,20 @@ int convert(int argc, char **argv){
     }
     return 0;
 }
+
+
+
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void convert_test(void){
+    fputs("convert test\n", stdout);
+}
+
+
+#endif // NDEBUG

@@ -15,20 +15,20 @@ void test(int argc, char **argv, int cmd_id);
     * Unit Test Functions
 ******************************************************************************/
 
-int dit_test(void);
-int config_test(void);
-int convert_test(void);
-int cp_test(void);
-int erase_test(void);
-int healthcheck_test(void);
-int help_test(void);
-int ignore_test(void);
-int inspect_test(void);
-int label_test(void);
-int onbuild_test(void);
-int optimize_test(void);
-int reflect_test(void);
-int setcmd_test(void);
+void dit_test(void);
+void config_test(void);
+void convert_test(void);
+void cp_test(void);
+void erase_test(void);
+void healthcheck_test(void);
+void help_test(void);
+void ignore_test(void);
+void inspect_test(void);
+void label_test(void);
+void onbuild_test(void);
+void optimize_test(void);
+void reflect_test(void);
+void setcmd_test(void);
 
 
 #endif // NDEBUG

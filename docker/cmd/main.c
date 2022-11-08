@@ -703,3 +703,20 @@ int check_last_exit_status(void){
 
     return i;
 }
+
+
+
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void dit_test(void){
+    fputs("dit test\n", stdout);
+}
+
+
+#endif // NDEBUG

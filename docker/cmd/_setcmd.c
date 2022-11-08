@@ -38,3 +38,17 @@ int setcmd(int argc, char **argv){
 
 
 
+
+#ifndef NDEBUG
+
+
+/******************************************************************************
+    * Unit Test Functions
+******************************************************************************/
+
+void setcmd_test(void){
+    fputs("setcmd test\n", stdout);
+}
+
+
+#endif // NDEBUG

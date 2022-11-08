@@ -3,7 +3,7 @@
 
 
 // if you want to unit test each command, comment out the line immediately after
-#define NDEBUG
+// #define NDEBUG
 #include "test.h"
 
 
