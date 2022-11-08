@@ -21,13 +21,13 @@ Options:
 
 Targets:
   builder            peek into the stage where the dit command was generated
-  product            start interactive development of your Dockerfile
+  product            start interactive development of your Dockerfile (default)
   test               make sure the dit command works properly
 
 Remarks:
+  - When options with arguments are given, set environment variables used in 'docker-compose.yml'.
   - If no TARGET is specified, it operates as if 'product' is specified.
-  - There is no need to specify TARGET for normal use.
-  - '. ./exec.sh' should not be used as it may leave unnecessary environment variables.
+  - Depending on the specified TARGET, '.dockerignore' is dynamically generated and deleted on exit.
 
 If no options are given, 'docker-compose build' will use the default environment variables.
 See '.env' and 'docker-compose.yml' for details.
@@ -89,17 +89,45 @@ shift "$(( OPTIND - 1 ))"
 # Build & Run
 #
 
-if [ "$#" -eq 1 ]; then
-    export BUILD_TARGET="$1"
+case "$#" in
+    0)
+        BUILD_TARGET='product'
+        ;;
+    1)
+        export BUILD_TARGET="$1"
+        ;;
+    *)
+        echo 'exec.sh: No more than two arguments allowed' 1>&2
+        my_abort
+        ;;
+esac
 
-    if [ "${BUILD_TARGET}" = 'test' ] && [ -z "${IMAGE_TAG}" ]; then
-        export IMAGE_TAG='test'
-    fi
 
-elif [ "$#" -gt 1 ]; then
-    echo 'exec.sh: No more than two arguments allowed' 1>&2
-    my_abort
-fi
+trap 'rm -f docker/.dockerignore' 0 1 2 3 15
+
+case "${BUILD_TARGET}" in
+    builder)
+        {
+            echo 'etc'
+            echo '!etc/dit_install.sh'
+            echo 'test'
+        } > docker/.dockerignore
+        ;;
+    product)
+        {
+            echo 'test'
+        } > docker/.dockerignore
+        ;;
+    test)
+        if [ -z "${IMAGE_TAG}" ]; then
+            export IMAGE_TAG='test'
+        fi
+        ;;
+    *)
+        echo "exec.sh: No such build target: '${BUILD_TARGET}'" 1>&2
+        my_abort
+        ;;
+    esac
 
 
-( [ -n "${NO_BUILD}" ] || docker-compose build ) && exec docker-compose run --rm dit
+( [ -n "${NO_BUILD}" ] || docker-compose build ) && docker-compose run --rm dit
