@@ -5,7 +5,7 @@
 # record an available package manager and use it to install the specified packages
 #
 
-if ( apt-get --version > /dev/null 2>&1 ); then
+if apt-get --version > /dev/null 2>&1; then
     readonly PACKAGE_MANAGER='apt-get'
 
     apt-get update
@@ -13,7 +13,7 @@ if ( apt-get --version > /dev/null 2>&1 ); then
     apt-get clean
     rm -rf /var/lib/apt/lists/*
 
-elif ( yum --version > /dev/null 2>&1 ); then
+elif yum --version > /dev/null 2>&1; then
     readonly PACKAGE_MANAGER='yum'
 
     yum update -y
@@ -21,7 +21,7 @@ elif ( yum --version > /dev/null 2>&1 ); then
     yum clean all
     rm -rf /var/cache/yum
 
-elif ( apk --version > /dev/null 2>&1 ); then
+elif apk --version > /dev/null 2>&1; then
     readonly PACKAGE_MANAGER='apk'
 
     apk update

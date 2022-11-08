@@ -35,10 +35,10 @@ alias \
 #
 
 PROMPT_REFLECT(){
-    if ( history 1 | awk -f /dit/etc/parse_history.awk ); then
+    if history 1 | awk -f /dit/etc/parse_history.awk; then
         echo "$?" > /dit/tmp/last-exit-status
 
-        if ( dit convert -qs ); then
+        if dit convert -qs; then
             dit reflect -dh
         fi
 
@@ -62,7 +62,7 @@ PROMPT_REPORT(){
 export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT
 
 
-if ( unset PROMPT_COMMAND 2> /dev/null ); then
+if unset PROMPT_COMMAND 2> /dev/null; then
     PROMPT_COMMAND='( PROMPT_REFLECT && PROMPT_OPTION ) > /dev/null'
     readonly PROMPT_COMMAND
 fi
