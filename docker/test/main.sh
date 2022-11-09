@@ -1,4 +1,5 @@
 #!/bin/sh
 
 
-echo 'test all dit commands'
+echo
+sh -x _config.sh

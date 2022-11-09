@@ -133,7 +133,7 @@ int main(int argc, char **argv){
 
         if (cmd_id >= 0){
 #ifndef NDEBUG
-        test(argc, argv, cmd_id);
+            test(argc, argv, cmd_id);
 #endif
             program_name = target;
             return call_dit_command(argc, argv, cmd_id);
@@ -188,7 +188,11 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
     do {
         if (i){
             fp = stdout;
-            mode = (cmd_id == 7) ? _IOFBF : _IOLBF;
+            mode = _IOLBF;
+#ifdef NDEBUG
+            if (cmd_id == 7)
+                mode = _IOFBF;
+#endif
         }
         else {
             fp = stderr;

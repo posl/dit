@@ -77,9 +77,11 @@ int config(int argc, char **argv){
     else
         switch ((argc - optind)){
             case 0:
+                assert(CONF_RESET_OR_SHOW(reset_flag) == (reset_flag ? 3 : 0));
                 i = config_contents(CONF_RESET_OR_SHOW(reset_flag));
                 break;
             case 1:
+                assert(CONF_SET_OR_UPDATE(reset_flag) == (reset_flag ? 7 : 6));
                 if ((i = config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) > 0)
                     xperror_config_arg(argv[optind]);
                 break;
@@ -110,6 +112,8 @@ int config(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int parse_opts(int argc, char **argv, unsigned int *opt){
+    assert(opt);
+
     const char *short_opts = "r";
 
     const struct option long_opts[] = {
@@ -133,6 +137,8 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
                 return ERROR_EXIT;
         }
     }
+
+    assert(*opt == ((bool) *opt));
     return SUCCESS;
 }
 
@@ -147,6 +153,8 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
 static int config_contents(unsigned int code, ...){
+    assert(code < 8);
+
     bool reset_flag, write_flag, has_arg;
 
     reset_flag = code & CONF_ISRSTFLG;
@@ -158,8 +166,7 @@ static int config_contents(unsigned int code, ...){
 
     if ((fp = fopen(CONFIG_FILE, (reset_flag ? "wb" : "rb+")))){
         signed char c = CONF_INITIAL_STAT;
-        int mode2d = CONF_DEFAULT_MODE,
-            mode2h = CONF_DEFAULT_MODE;
+        int mode2d = CONF_DEFAULT_MODE, mode2h = CONF_DEFAULT_MODE;
 
         if (! reset_flag){
             if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < CONF_EXCEED_STAT)){
@@ -173,8 +180,11 @@ static int config_contents(unsigned int code, ...){
                 c = CONF_INITIAL_STAT;
             }
 
-            if (! has_arg)
+            if (! has_arg){
+                assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
+                assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
                 fprintf(stdout, "d=%s\nh=%s\n", mode_reprs[mode2idx[mode2d]], mode_reprs[mode2idx[mode2h]]);
+            }
         }
 
         if (has_arg){
@@ -182,6 +192,9 @@ static int config_contents(unsigned int code, ...){
             va_start(sp, code);
 
             if ((receive_mode(va_arg(sp, const char *), &mode2d, &mode2h))){
+                assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
+                assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
+
                 if (write_flag){
                     signed char d;
                     if (c != (d = CONF_STAT_FORMULA(mode2d, mode2h)))
@@ -229,6 +242,10 @@ static int config_contents(unsigned int code, ...){
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
 int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
+    assert(p_mode2d);
+    assert(p_mode2h);
+
+    assert(CONF_GET_FROM_CONVERT == 4);
     return config_contents(CONF_GET_FROM_CONVERT, config_arg, p_mode2d, p_mode2h);
 }
 
@@ -249,6 +266,9 @@ int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p
  * @return bool  successful or not
  */
 static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
+    assert(p_mode2d);
+    assert(p_mode2h);
+
     if (config_arg){
         size_t size;
         size = strlen(config_arg) + 1;
@@ -262,6 +282,8 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
 
         mode2d = *p_mode2d;
         mode2h = *p_mode2h;
+        assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
+        assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
 
         while ((token = strtok(arg_copy, ","))){
             arg_copy = NULL;
@@ -274,6 +296,8 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
                     if ((mode = receive_mode_integer(token[1], mode2h)) >= 0){
                         mode2d = i;
                         mode2h = mode;
+                        assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
+                        assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
                         continue;
                     }
                 }
@@ -297,6 +321,8 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
                 mode = idx2mode[i];
 
             if (mode >= 0){
+                assert((mode >= 0) && (mode < CONF_MODES_NUM));
+
                 switch (target_c){
                     case 'b':
                         mode2h = mode;
@@ -347,8 +373,106 @@ static int receive_mode_integer(int c, int spare){
     * Unit Test Functions
 ******************************************************************************/
 
+
+static void receive_mode_test(void);
+static void receive_mode_integer_test(void);
+
+
 void config_test(void){
-    fputs("config test\n", stdout);
+    do_test(receive_mode_integer_test);
+    do_test(receive_mode_test);
+}
+
+
+
+
+static void receive_mode_test(void){
+    // successful cases
+
+    int mode2d, mode2h, idx;
+    mode2d = CONF_DEFAULT_MODE;
+    mode2h = CONF_DEFAULT_MODE;
+
+    assert(receive_mode("_", &mode2d, &mode2h));
+    assert(mode2d == CONF_DEFAULT_MODE);
+    assert(mode2h == CONF_DEFAULT_MODE);
+
+    assert(receive_mode("0,1,2,3,4", &mode2d, &mode2h));
+    assert(mode2d == 4);
+    assert(mode2h == 4);
+
+    assert(receive_mode("0_", &mode2d, &mode2h));
+    assert(mode2d == 0);
+    assert(mode2h == 4);
+
+    assert(receive_mode("d=2,h=3", &mode2d, &mode2h));
+    assert(mode2d == 2);
+    assert(mode2h == 3);
+
+    assert(receive_mode("h=1,4_", &mode2d, &mode2h));
+    assert(mode2d == 4);
+    assert(mode2h == 1);
+
+    assert(receive_mode("h=no-ig", &mode2d, &mode2h));
+    assert((idx = receive_expected_string("no-ig", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
+    assert(mode2d == 4);
+    assert(mode2h == idx2mode[idx]);
+
+    assert(receive_mode("strict,simple", &mode2d, &mode2h));
+    assert((idx = receive_expected_string("simple", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
+    assert(mode2d == idx2mode[idx]);
+    assert(mode2h == idx2mode[idx]);
+
+    assert(receive_mode("1,d=no-refl", &mode2d, &mode2h));
+    assert((idx = receive_expected_string("no-refl", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
+    assert(mode2d == idx2mode[idx]);
+    assert(mode2h == 1);
+
+    assert(receive_mode("b=norm,3_", &mode2d, &mode2h));
+    assert((idx = receive_expected_string("norm", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
+    assert(mode2d == 3);
+    assert(mode2h == idx2mode[idx]);
+
+    // failure cases
+
+    mode2d = 0;
+    mode2h = 3;
+
+    assert(! receive_mode("m", &mode2d, &mode2h));
+    assert(mode2d == 0);
+    assert(mode2h == 3);
+
+    assert(! receive_mode("0,1,2,3,4,5", &mode2d, &mode2h));
+    assert(mode2d == 0);
+    assert(mode2h == 3);
+
+    assert(! receive_mode("-4", &mode2d, &mode2h));
+    assert(mode2d == 0);
+    assert(mode2h == 3);
+
+    assert(! receive_mode("no-", &mode2d, &mode2h));
+    assert(mode2d == 0);
+    assert(mode2h == 3);
+
+    assert(! receive_mode("d=norm,h=struct", &mode2d, &mode2h));
+    assert(mode2d == 0);
+    assert(mode2h == 3);
+}
+
+
+
+
+static void receive_mode_integer_test(void){
+    // successful cases
+    assert(receive_mode_integer('0', -2) == 0);
+    assert(receive_mode_integer('3', -2) == 3);
+    assert(receive_mode_integer('_', -2) == -2);
+
+    // failure cases
+    assert(receive_mode_integer('5', -2) == -1);
+    assert(receive_mode_integer('i', -2) == -1);
+    assert(receive_mode_integer(' ', -2) == -1);
+    assert(receive_mode_integer(-31, -2) == -1);
 }
 
 
