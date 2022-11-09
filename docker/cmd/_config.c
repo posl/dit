@@ -378,6 +378,8 @@ static void receive_mode_test(void);
 static void receive_mode_integer_test(void);
 
 
+
+
 void config_test(void){
     do_test(receive_mode_integer_test);
     do_test(receive_mode_test);

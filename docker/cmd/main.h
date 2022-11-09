@@ -4,7 +4,6 @@
 
 // if you want to unit test each command, comment out the line immediately after
 // #define NDEBUG
-#include "test.h"
 
 
 #include <assert.h>
@@ -23,6 +22,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include "test.h"
 
 
 
@@ -180,7 +181,7 @@ void xperror_suggestion(bool cmd_flag);
 
 
 /******************************************************************************
-    * Utilitys
+    * Extensions of Standard Library Functions
 ******************************************************************************/
 
 char *xfgets_for_loop(const char *file_name, bool preserve_flag, int *p_errid);
