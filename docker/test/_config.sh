@@ -24,9 +24,14 @@ dit config --unit-tests || exit 1
 #
 do_test(){
     set +x
-    output="$( dit config )"
 
-    for line in ${output}
+    if OUTPUT="$( dit config )"; then
+        echo
+    else
+        read -r REPLY
+    fi
+
+    for line in ${OUTPUT}
     do
         if [ "${line}" = "$1" ]; then
             shift
@@ -35,13 +40,12 @@ do_test(){
         fi
     done
 
-    output="$( od -A n -t uC /dit/var/config.stat | sed 's/^[ \t]*//' )"
+    OUTPUT="$( od -A n -t uC /dit/var/config.stat | sed 's/^[ \t]*//' )"
 
-    if [ "${output}" != "$1" ]; then
+    if [ "${OUTPUT}" != "$1" ]; then
         exit 1
     fi
 
-    echo
     set -x
 }
 
@@ -82,9 +86,8 @@ read -r REPLY
 dit config d=no-ig h=1 && exit 1
 read -r REPLY
 
-: > /dit/var/config.stat
-dit config
-read -r REPLY
+: 'intentionally make an unexpected error' > /dit/var/config.stat
+do_test 'd=normal' 'h=normal' 12
 
 
 

@@ -180,11 +180,8 @@ static int config_contents(unsigned int code, ...){
                 c = CONF_INITIAL_STAT;
             }
 
-            if (! has_arg){
-                assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
-                assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
+            if (! has_arg)
                 fprintf(stdout, "d=%s\nh=%s\n", mode_reprs[mode2idx[mode2d]], mode_reprs[mode2idx[mode2h]]);
-            }
         }
 
         if (has_arg){
@@ -192,9 +189,6 @@ static int config_contents(unsigned int code, ...){
             va_start(sp, code);
 
             if ((receive_mode(va_arg(sp, const char *), &mode2d, &mode2h))){
-                assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
-                assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
-
                 if (write_flag){
                     signed char d;
                     if (c != (d = CONF_STAT_FORMULA(mode2d, mode2h)))
@@ -389,9 +383,10 @@ void config_test(void){
 
 
 static void receive_mode_test(void){
+    int mode2d, mode2h, idx;
+
     // successful cases
 
-    int mode2d, mode2h, idx;
     mode2d = CONF_DEFAULT_MODE;
     mode2h = CONF_DEFAULT_MODE;
 
@@ -434,6 +429,7 @@ static void receive_mode_test(void){
     assert((idx = receive_expected_string("norm", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
     assert(mode2d == 3);
     assert(mode2h == idx2mode[idx]);
+
 
     // failure cases
 

@@ -1043,7 +1043,7 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt){
                             case 'N':
                                 fputs(
                                     "Select the lines to delete with numbers.\n"
-                                    " (separated by commas, max length is 63)  "
+                                    " (separated by commas, length within 63)  "
                                 , stderr);
 
                                 fscanf(stdin, "%63[^\n]%*[^\n]", range);
