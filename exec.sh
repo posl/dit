@@ -8,7 +8,7 @@
 my_usage(){
     cat <<EOF
 Usages:
-  sh exec.sh [OPTION]... [TARGET]
+  sh exec.sh [OPTION]... [BUILD_TARGET] [TEST_TARGET]...
 Build the image for 'dit', and run a container based on the created image.
 
 Options:
@@ -19,15 +19,16 @@ Options:
   -r                 just run 'docker-compose run'
   -h                 display this help, and exit normally
 
-Targets:
+Build targets:
   builder            peek into the stage where the dit command was generated
   product            start interactive development of your Dockerfile (default)
   test               make sure the dit command works properly
 
 Remarks:
   - When options with arguments are given, set environment variables used in 'docker-compose.yml'.
-  - If no TARGET is specified, it operates as if 'product' is specified.
-  - Depending on the specified TARGET, '.dockerignore' is dynamically generated and deleted on exit.
+  - If no BUILD_TARGET is specified, it operates as if 'product' is specified.
+  - Depending on the specified BUILD_TARGET, '.dockerignore' is dynamically generated and deleted on exit.
+  - When BUILD_TARGET is 'test', TEST_TARGETs can be specified to limit the commands to be tested.
 
 If no options are given, 'docker-compose build' will use the default environment variables.
 See '.env' and 'docker-compose.yml' for details.
@@ -89,18 +90,12 @@ shift "$(( OPTIND - 1 ))"
 # Build & Run
 #
 
-case "$#" in
-    0)
-        BUILD_TARGET='product'
-        ;;
-    1)
-        export BUILD_TARGET="$1"
-        ;;
-    *)
-        echo 'exec.sh: No more than two arguments allowed' 1>&2
-        my_abort
-        ;;
-esac
+if [ "$#" -ge 1 ]; then
+    export BUILD_TARGET="$1"
+    shift
+else
+    BUILD_TARGET='product'
+fi
 
 
 trap 'rm -f docker/.dockerignore' 0 1 2 3 15
@@ -119,6 +114,18 @@ case "${BUILD_TARGET}" in
         } > docker/.dockerignore
         ;;
     test)
+        if [ "$#" -ge 1 ]; then
+            {
+                echo 'test'
+                echo '!test/main.sh'
+
+                for cmd in "$@"
+                do
+                    echo "!test/_${cmd}.sh"
+                done
+            } > docker/.dockerignore
+        fi
+
         if [ -z "${IMAGE_TAG}" ]; then
             export IMAGE_TAG='test'
         fi

@@ -5,21 +5,26 @@
 
 
 /******************************************************************************
-    * commonly used Functions
+    * commonly used Macros
 ******************************************************************************/
+
+#define TMP_FILE "/dit/tmp/for-test"
+
 
 #define do_test(func) \
     do { \
-        fprintf(stdout, "Testing %s:%u: "#func" ...\n", __FILE__, __LINE__); \
+        fprintf(stderr, "Testing %s:%u: "#func" ...\n", __FILE__, __LINE__); \
         func(); \
-        fputs("Passed all unit tests.\n\n", stdout); \
+        fputs("Passed all tests!\n\n", stderr); \
     } while(false)
+
+#define no_test()  fputs("No unit test.\n\n", stderr)
 
 
 
 
 /******************************************************************************
-    * Interface for Unit Test
+    * Interface for all Unit Tests
 ******************************************************************************/
 
 void test(int argc, char **argv, int cmd_id);

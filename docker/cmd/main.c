@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the main function and the utilitys commonly used in files for each dit command.
+ * @brief Described the main function and the utilities commonly used in files for each dit command.
  * @author Tsukasa Inada
  * @date 2022/07/18
  */
@@ -121,7 +121,8 @@ static const char *program_name = NULL;
  */
 int main(int argc, char **argv){
     if (argc > 0){
-         program_name = *argv;
+        assert(argv);
+        program_name = *argv;
 
         const char *target = NULL;
         int cmd_id = -3;
@@ -131,10 +132,14 @@ int main(int argc, char **argv){
             cmd_id = receive_expected_string(target, cmd_reprs, CMDS_NUM, 0);
         }
 
-        if (cmd_id >= 0){
 #ifndef NDEBUG
+        srand((unsigned int) time(NULL));
+
+        if (argc)
             test(argc, argv, cmd_id);
 #endif
+
+        if (cmd_id >= 0){
             program_name = target;
             return call_dit_command(argc, argv, cmd_id);
         }
@@ -225,7 +230,11 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
  * @note the return value of 'receive_expected_string' can be used as it is for 'state'.
  */
 void xperror_invalid_arg(int code_c, int state, const char * restrict desc, const char * restrict arg){
-    const char *format = "", *addition = "", *adjective;
+    assert((code_c == 'O') || (code_c == 'N') || (code_c == 'C'));
+    assert(desc);
+    assert(arg);
+
+    const char *format, *addition = "", *adjective;
 
     switch (code_c){
         case 'O':
@@ -234,11 +243,13 @@ void xperror_invalid_arg(int code_c, int state, const char * restrict desc, cons
             break;
         case 'N':
             addition = " number of";
-        case 'C':
+        default:
             format = "%s: %s%s %s: '%s'\n";
     }
-    adjective = (state ? ((state == -1) ? "ambiguous" : "invalid") : "unrecognized");
 
+    adjective = state ? ((state == -1) ? "ambiguous" : "invalid") : "unrecognized";
+
+    assert(program_name);
     fprintf(stderr, format, program_name, adjective, addition, desc, arg);
 }
 
@@ -250,6 +261,8 @@ void xperror_invalid_arg(int code_c, int state, const char * restrict desc, cons
  * @param[in]  size  array size
  */
 void xperror_valid_args(const char * const reprs[], size_t size){
+    assert(reprs);
+
     fputs("Valid arguments are:\n", stderr);
 
     for (int i = 0; i < size; i++)
@@ -268,6 +281,8 @@ void xperror_valid_args(const char * const reprs[], size_t size){
  * @note if 'desc' is NULL, print an error message about specifying the target file.
  */
 void xperror_missing_args(const char * restrict desc, const char * restrict before_arg){
+    assert(desc || (! before_arg));
+
     char format[] = "%s: missing %s operand after '%s'\n";
     int offset = 0;
 
@@ -279,10 +294,12 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
         offset = 22;
 
     if (offset){
+        assert(offset < (sizeof(format) - 1));
         format[offset++] = '\n';
         format[offset] = '\0';
     }
 
+    assert(program_name);
     fprintf(stderr, format, program_name, desc, before_arg);
 }
 
@@ -296,16 +313,21 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
  * @attention if 'limit' is 2 or more, it does not work as expected.
  */
 void xperror_too_many_args(int limit){
+    assert(limit < 2);
+
     char format[] = "%s: No %sarguments allowed when reflecting in both files\n";
     const char *adjective = "";
 
-    if (limit >= 0){
-        if (limit > 0)
+    switch (limit){
+        case 1:
             adjective = "more than two ";
-        format[26] = '\n';
-        format[27] = '\0';
+        case 0:
+            assert(sizeof(format) > 27);
+            format[26] = '\n';
+            format[27] = '\0';
     }
 
+    assert(program_name);
     fprintf(stderr, format, program_name, adjective);
 }
 
@@ -319,17 +341,21 @@ void xperror_too_many_args(int limit){
  * @param[in]  addition  additional information, if any
  *
  * @note if 'msg' is NULL, print an error message about manipulating an internal file.
+ * @attention if 'msg' is NULL, 'addition' must also be NULL.
  */
 void xperror_message(const char * restrict msg, const char * restrict addition){
+    assert(msg || (! addition));
+
     int offset = 0;
 
-    if (! msg)
-        msg = "unexpected error while manipulating an internal file";
     if (! addition){
+        if (! msg)
+            msg = "unexpected error while manipulating an internal file";
         offset = 4;
         addition = msg;
     }
 
+    assert(program_name);
     fprintf(stderr, ("%s: %s: %s\n" + offset), program_name, addition, msg);
 }
 
@@ -341,7 +367,9 @@ void xperror_message(const char * restrict msg, const char * restrict addition){
  */
 void xperror_suggestion(bool cmd_flag){
     const char *tmp1, *tmp2;
+
     if (cmd_flag){
+        assert(program_name);
         tmp1 = program_name;
         tmp2 = " --";
     }
@@ -355,7 +383,7 @@ void xperror_suggestion(bool cmd_flag){
 
 
 /******************************************************************************
-    * Utilitys
+    * Extensions of Standard Library Functions
 ******************************************************************************/
 
 
@@ -387,12 +415,15 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
     p_info = info_list + info_idx;
 
     if ((info_idx < 0) || (p_info->src_file != src_file)){
-        FILE *fp;
+        FILE *fp = stdin;
         errno = 0;
 
-        if ((info_idx < (XFGETS_NESTINGS_MAX - 1)) && (fp = src_file ? fopen(src_file, "r") : stdin)){
+        if ((info_idx < (XFGETS_NESTINGS_MAX - 1)) && ((! src_file) || (fp = fopen(src_file, "r")))){
             info_idx++;
             p_info++;
+
+            assert((info_idx >= 0) && (info_idx < XFGETS_NESTINGS_MAX));
+            assert(p_info == (info_list + info_idx));
 
             p_info->src_file = src_file;
             p_info->fp = fp;
@@ -481,8 +512,10 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
  * @attention expected string must not contain lowercase letters.
  */
 int xstrcmp_upper_case(const char * restrict target, const char * restrict expected){
-    int c, d;
+    assert(target);
+    assert(expected);
 
+    int c, d;
     do {
         c = (unsigned char) *(target++);
         d = (unsigned char) *(expected++);
@@ -507,7 +540,7 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
  * @return int  the resulting (right) integer or -1
  *
  * @note receive an integer that can be expressed as "/^[0-9]+$/" in a regular expression.
- * @note when specifying a range by using a hyphen and omitting an integer, it is interpreted as specifying 0.
+ * @note when omitting an integer in the range specification, it is interpreted as specifying 0.
  */
 int receive_positive_integer(const char *target, int *p_left){
     int curr = -1;
@@ -556,6 +589,9 @@ int receive_positive_integer(const char *target, int *p_left){
  * @attention array of expected strings must be pre-sorted alphabetically.
  */
 int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode){
+    assert(reprs);
+    assert(mode < 4);
+
     if (target && (size > 0)){
         const char *expecteds[size];
         memcpy(expecteds, reprs, (sizeof(const char *) * size));
@@ -625,10 +661,14 @@ int receive_expected_string(const char *target, const char * const reprs[], size
  * @param[out] p_id  variable to store index number of the instruction to be compared
  * @return char*  substring that is the argument for the instruction in the target line or NULL
  *
+ * @note if the content of 'p_id' is an index number, compare only with corresponding instruction.
  * @note when there is a corresponding instruction, its index number is stored in 'p_id'.
  * @attention the instruction must not contain unnecessary leading white spaces.
  */
 char *receive_dockerfile_instruction(char *line, int *p_id){
+    assert(line);
+    assert(p_id);
+
     char *tmp;
     size_t instr_len = 0;
 
@@ -671,6 +711,8 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
  * @note if the file is too large, set an error number indicating that.
  */
 int check_file_size(const char *file_name){
+    assert(file_name);
+
     struct stat file_stat;
     int i = -1;
 
@@ -701,7 +743,7 @@ int check_last_exit_status(void){
     while ((line = xfgets_for_loop(EXIT_STATUS_FILE, false, &errid))){
         errid = -1;
 
-        if (((i = receive_positive_integer(line, NULL)) >= 0) && (i >= 256))
+        if ((i = receive_positive_integer(line, NULL)) >= 256)
             i = -1;
     }
 
@@ -718,8 +760,393 @@ int check_last_exit_status(void){
     * Unit Test Functions
 ******************************************************************************/
 
+
+static void xfgets_for_loop_test(void);
+static void xstrcmp_upper_case_test(void);
+
+static void receive_positive_integer_test(void);
+static void receive_expected_string_test(void);
+static void receive_dockerfile_instruction_test(void);
+
+static void check_file_size_test(void);
+static void check_last_exit_status_test(void);
+
+
+
+
 void dit_test(void){
-    fputs("dit test\n", stdout);
+    do_test(xfgets_for_loop_test);
+    do_test(xstrcmp_upper_case_test);
+
+    do_test(receive_positive_integer_test);
+    do_test(receive_expected_string_test);
+    do_test(receive_dockerfile_instruction_test);
+
+    do_test(check_file_size_test);
+    do_test(check_last_exit_status_test);
+}
+
+
+
+
+static void xfgets_for_loop_test(void){
+    FILE *fp;
+    int errid = 0;
+
+
+    // when specifying an empty file
+
+    assert((fp = fopen(TMP_FILE, "w")));
+    assert(! fclose(fp));
+
+    assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+    assert(! errid);
+
+
+    // when specifying the file whose contents do not end with a newline
+
+    const char *line = "tonari no kyaku ha yoku kaki kuu kyaku da";
+
+    assert((fp = fopen(TMP_FILE, "w")));
+    assert(fputs(line, fp) != EOF);
+    assert(! fclose(fp));
+
+    assert(! strcmp(xfgets_for_loop(TMP_FILE, false, &errid), line));
+    assert(! errid);
+
+    assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+    assert(! errid);
+
+
+    // when accepting input from standard input while reading 'r' lines of a non-empty file
+
+    const char * const *tmp;
+    size_t n;
+
+    const char * lines[6] = {
+        "abc",
+        "def ghij",
+        "kl mn",
+        "op qr",
+        "stu v w xyz",
+        NULL
+    };
+
+    assert((fp = fopen(TMP_FILE, "w")));
+    for (tmp = lines; *tmp; tmp++)
+        assert(fprintf(fp, "%s\n", *tmp) >= 0);
+    assert(! fclose(fp));
+
+    n = rand();
+    n %= 6;
+
+    for (tmp = lines;; tmp++){
+        if (n--){
+            assert(! strcmp(xfgets_for_loop(TMP_FILE, false, &errid), *tmp));
+            assert(! errid);
+        }
+        else {
+            fputs("Checking if it works the same as 'cat -' ...\n", stderr);
+
+            while ((line = xfgets_for_loop(NULL, false, NULL)))
+                assert(fprintf(stdout, "%s\n", line) >= 0);
+
+            fputs("If everything is fine, press enter to proceed: ", stderr);
+
+            switch (fgetc(stdin)){
+                case '\n':
+                    fputs("Done!\n", stderr);
+                    break;
+                case EOF:
+                    clearerr(stdin);
+                    assert(false);
+                default:
+                    fscanf(stdin, "%*[^\n]%*c");
+                    assert(false);
+            }
+
+            errid = -1;
+            assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+            assert(errid == -1);
+            break;
+        }
+    }
+
+
+    // when specifying a non-existing file
+
+    assert(! remove(TMP_FILE));
+    assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+    assert(errid == ENOENT);
+}
+
+
+
+
+static void xstrcmp_upper_case_test(void){
+    // equal
+    assert(! xstrcmp_upper_case("none", "NONE"));
+    assert(! xstrcmp_upper_case("hoGe-PIyO", "HOGE-PIYO"));
+    assert(! xstrcmp_upper_case("f.lwhaeopyr;pfqwnel.FGQHP934", "F.LWHAEOPYR;PFQWNEL.FGQHP934"));
+
+    // lower than
+    assert(xstrcmp_upper_case("Quit", "YES") < 0);
+    assert(xstrcmp_upper_case("niPPon", "NIPPORI") < 0);
+    assert(xstrcmp_upper_case("fasldhfoNLASOL>NAZHO", "FASLFN/L?EF=ONLAS|OLX{ZHO") < 0);
+    assert(xstrcmp_upper_case("SaKurA", "SAKURA, HIRAHIRA") < 0);
+
+    // greater than
+    assert(xstrcmp_upper_case("SIGKILL", "SIGINT") > 0);
+    assert(xstrcmp_upper_case("Super Sento", "SUPER MARKET") > 0);
+    assert(xstrcmp_upper_case(";LZQERXT;,EM;W ; ERGJ'VXWP,9MG", ";LZQERXT;,EM;W 4CQ; ERGJ'VXWP,9MG") > 0);
+    assert(xstrcmp_upper_case("On your marks, Set, Go!", "ON YOUR MARK") > 0);
+}
+
+
+
+
+static void receive_positive_integer_test(void){
+    int left;
+
+    // successful cases
+
+    assert(! receive_positive_integer("0", NULL));
+    assert(receive_positive_integer("23", NULL) == 23);
+    assert(receive_positive_integer("0601", NULL) == 601);
+
+    left = -1;
+    assert(receive_positive_integer("456", &left) == 456);
+    assert(left == -1);
+
+    assert(receive_positive_integer("89-12", &left) == 12);
+    assert(left == 89);
+
+    assert(receive_positive_integer("-2022", &left) == 2022);
+    assert(! left);
+
+    assert(! receive_positive_integer("03629-", &left));
+    assert(left == 3629);
+
+    assert(! receive_positive_integer("-", &left));
+    assert(! left);
+
+
+    // failure cases
+
+    assert(receive_positive_integer("2o1", NULL) == -1);
+    assert(receive_positive_integer("integer", NULL) == -1);
+    assert(receive_positive_integer("-29", NULL) == -1);
+    assert(receive_positive_integer("4294967295", NULL) == -1);
+
+    left = -1;
+    assert(receive_positive_integer("_73", &left) == -1);
+    assert(left == -1);
+
+    assert(receive_positive_integer("3278o-3y28", &left) == -1);
+    assert(left == -1);
+
+    assert(receive_positive_integer("zwei-vier", &left) == -1);
+    assert(left == -1);
+
+
+    assert(receive_positive_integer("7-ten", &left) == -1);
+    assert(left == 7);
+
+    assert(receive_positive_integer("--", &left) == -1);
+    assert(! left);
+}
+
+
+
+
+static void receive_expected_string_test(void){
+    // successful cases
+
+    assert(receive_expected_string("COPY", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_COPY);
+    assert(receive_expected_string("WORKDIR", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_WORKDIR);
+    assert(receive_expected_string("SHELL", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_SHELL);
+    assert(receive_expected_string("LABEL", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_LABEL);
+
+    assert(receive_expected_string("Volume", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_VOLUME);
+    assert(receive_expected_string("from", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_FROM);
+    assert(receive_expected_string("add", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_ADD);
+    assert(receive_expected_string("ExPose", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_EXPOSE);
+
+    assert(receive_expected_string("HEA", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_HEALTHCHECK);
+    assert(receive_expected_string("R", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_RUN);
+    assert(receive_expected_string("ENT", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_ENTRYPOINT);
+    assert(receive_expected_string("AR", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_ARG);
+
+    assert(receive_expected_string("env", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_ENV);
+    assert(receive_expected_string("main", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_MAINTAINER);
+    assert(receive_expected_string("sTo", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_STOPSIGNAL);
+    assert(receive_expected_string("Cmd", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_CMD);
+
+
+    // failure cases
+
+    assert(receive_expected_string("copy", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -2);
+    assert(receive_expected_string("WORK DIR", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -2);
+    assert(receive_expected_string("S", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -1);
+    assert(receive_expected_string("QWERT", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -2);
+
+    assert(receive_expected_string("vol", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -2);
+    assert(receive_expected_string("Form", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -2);
+    assert(receive_expected_string("a", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -1);
+    assert(receive_expected_string("Lap-Top", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -2);
+
+    assert(receive_expected_string("health", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -2);
+    assert(receive_expected_string("Run", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -2);
+    assert(receive_expected_string("EN", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -1);
+    assert(receive_expected_string("STRAW", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -2);
+
+    assert(receive_expected_string("environ", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -2);
+    assert(receive_expected_string("Main Tain", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -2);
+    assert(receive_expected_string("", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -1);
+    assert(receive_expected_string("2.3],fm';", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -2);
+}
+
+
+
+
+static void receive_dockerfile_instruction_test(void){
+    char *line;
+    int instr_id;
+
+    // successful cases
+
+    line = "ADD abc.tar.gz ./";
+    instr_id = ID_ADD;
+    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 4));
+    assert(instr_id == ID_ADD);
+
+    line = "HealthCheck\tCmd sh /bin/check-running";
+    instr_id = ID_HEALTHCHECK;
+    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 12));
+    assert(instr_id == ID_HEALTHCHECK);
+
+    line = "EXPOSE  80/tcp 80/udp";
+    instr_id = -1;
+    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 8));
+    assert(instr_id == ID_EXPOSE);
+
+    line = "OnBuild\tWorkDir /";
+    instr_id = -1;
+    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 8));
+    assert(instr_id == ID_ONBUILD);
+
+
+    // failure cases
+
+    instr_id = ID_FROM;
+    assert(! receive_dockerfile_instruction("form alpine:latest", &instr_id));
+
+    instr_id = ID_STOPSIGNAL;
+    assert(! receive_dockerfile_instruction("SIGNAL SIGINT", &instr_id));
+
+    instr_id = ID_ADD;
+    assert(! receive_dockerfile_instruction("COPY ./etc/dit_install.sh /dit/etc/", &instr_id));
+
+    instr_id = -1;
+    assert(! receive_dockerfile_instruction("setcmd [ \"/bin/bash\", \"--login\" ]", &instr_id));
+
+    instr_id = -1;
+    assert(! receive_dockerfile_instruction("LAVEL author inada tsukasa", &instr_id));
+
+    instr_id = -1;
+    assert(! receive_dockerfile_instruction("ENT dit inspect", &instr_id));
+}
+
+
+
+
+static void check_file_size_test(void){
+    FILE *fp;
+    size_t size;
+
+    // when specifying an empty file
+
+    assert((fp = fopen(TMP_FILE, "wb")));
+    assert(! fclose(fp));
+
+    assert(! check_file_size(TMP_FILE));
+
+
+    // when specifying a non-empty file
+
+    assert((fp = fopen(TMP_FILE, "wb")));
+
+    size = rand();
+    size = size % 50 + 1;
+    assert(fwrite("123456789 123456789 123456789 123456789 123456789", sizeof(char), size, fp) == size);
+
+    assert(! fclose(fp));
+
+    size *= sizeof(char);
+    assert(check_file_size(TMP_FILE) == size);
+
+
+    // when specifying a file that is too large
+
+    if (system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE" bs=1M count=2K"))){
+        assert(check_file_size(TMP_FILE) == -2);
+        assert(errno == EFBIG);
+    }
+
+
+    // when specifying a non-existing file
+
+    assert(! remove(TMP_FILE));
+    assert(check_file_size(TMP_FILE) == -1);
+    assert(errno == ENOENT);
+}
+
+
+
+
+static void check_last_exit_status_test(void){
+    int last_exit_status, tmp;
+    FILE *fp;
+    unsigned int i;
+
+    // if the exit status of last executed command line is valid
+
+    last_exit_status = check_last_exit_status();
+    assert((last_exit_status >= 0) && (last_exit_status < 256));
+
+
+    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
+
+    i = rand();
+    i %= 256;
+    assert(fprintf(fp, "%u\n", i) >= 0);
+    assert(fputs("abc\n", fp) != EOF);
+
+    assert(! fclose(fp));
+
+    tmp = check_last_exit_status();
+    assert((tmp >= 0) && (tmp < 256));
+
+
+    // if the exit status of last executed command line is invalid
+
+    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
+    assert(fprintf(fp, "%u\n", (i + 256)) >= 0);
+    assert(! fclose(fp));
+    assert(check_last_exit_status() == -1);
+
+
+    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
+    assert(fputs("huga\n", fp) != EOF);
+    assert(! fclose(fp));
+    assert(check_last_exit_status() == -1);
+
+
+    // restore the contents of the file
+
+    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
+    assert(fprintf(fp, "%d\n", last_exit_status) >= 0);
+    assert(! fclose(fp));
 }
 
 
