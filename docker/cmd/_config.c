@@ -329,7 +329,7 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
                     case 'd':
                         mode2d = mode;
                         break;
-                    case 'h':
+                    default:
                         mode2h = mode;
                 }
             }

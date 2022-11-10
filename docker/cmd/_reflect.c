@@ -213,7 +213,7 @@ static int do_reflect(int argc, char **argv, refl_opts *opt){
                 case 'd':
                     src_file = CONVERT_RESULT_FILE_D;
                     break;
-                case 'h':
+                default:
                     src_file = CONVERT_RESULT_FILE_H;
             }
         }

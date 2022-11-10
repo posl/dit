@@ -251,7 +251,7 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
                             valid_args = blank_args;
                             mode = 2;
                             break;
-                        case 'T':
+                        default:
                             ptr = &(opt->target_c);
                             valid_args = target_args;
                             mode = 2;
@@ -347,7 +347,7 @@ static void display_prev(int target_c){
             case 'd':
                 src_file = ERASE_RESULT_FILE_D;
                 break;
-            case 'h':
+            default:
                 src_file = ERASE_RESULT_FILE_H;
         }
 
