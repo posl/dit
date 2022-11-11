@@ -76,7 +76,7 @@ static void reflect_example(void);
 static void setcmd_example(void);
 
 
-extern const char * const cmd_reprs[3];
+extern const char * const cmd_reprs[CMDS_NUM];
 
 
 
@@ -96,11 +96,16 @@ extern const char * const cmd_reprs[3];
  * @note treated like a normal main function.
  */
 int help(int argc, char **argv){
-    int i;
+    int i, exit_status = SUCCESS;
     help_conts code;
 
-    if ((i = parse_opts(argc, argv, &code)))
-        return (i < 0) ? FAILURE : SUCCESS;
+    if ((i = parse_opts(argc, argv, &code))){
+        if (i < 0){
+            exit_status = FAILURE;
+            xperror_suggestion(true);
+        }
+        return exit_status;
+    }
 
     const char *target = NULL;
     char newlines[] = "\n\n\n";
@@ -114,15 +119,16 @@ int help(int argc, char **argv){
 
     do {
         if (! display_help(code, target))
-            i = FAILURE;
+            exit_status = FAILURE;
 
+        assert(argc > 0);
         if (--argc){
             target = *(++argv);
             newlines[1] = (code != manual) ? '\0' : '\n';
             fputs(newlines, stdout);
         }
         else
-            return i;
+            return exit_status;
     } while (true);
 }
 
@@ -140,6 +146,8 @@ int help(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int parse_opts(int argc, char **argv, help_conts *opt){
+    assert(opt);
+
     const char *short_opts = "ademV";
 
     const struct option long_opts[] = {
@@ -175,11 +183,11 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
                 help_manual();
                 return NORMALLY_EXIT;
             default:
-                xperror_suggestion(true);
                 return ERROR_EXIT;
         }
     }
 
+    assert((*opt >= 0) && (*opt < HELP_CONTENTS_NUM));
     return SUCCESS;
 }
 
@@ -188,13 +196,14 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
  * @brief list all dit commands available.
  *
  * @note display the commands in the same order as 'dit help'.
- * @note array for reordering the commands is in reverse order for looping efficiency.
  */
 static void display_cmd_list(void){
-    const int cmd_rearange[CMDS_NUM] = {5, 7, 3, 11, 9, 4, 12, 8, 2, 6, 0, 10, 1};
+    const int cmd_rearange[] = {1, 10, 0, 6, 2, 8, 12, 4, 9, 11, 3, 7, 5, -1};
 
-    for (int i = CMDS_NUM; i--;)
-        fprintf(stdout, "%s\n", cmd_reprs[cmd_rearange[i]]);
+    for (const int *tmp = cmd_rearange; *tmp >= 0; tmp++){
+        assert(*tmp < CMDS_NUM);
+        fprintf(stdout, "%s\n", cmd_reprs[*tmp]);
+    }
 }
 
 
@@ -230,6 +239,8 @@ static int display_version(void){
  * @note "cfg" and "hc", which are default aliases of 'config' and 'heatlthcheck', are supported.
  */
 static bool display_help(help_conts code, const char *target){
+    assert((code >= 0) && (code < HELP_CONTENTS_NUM));
+
     const char *topic;
     void (* help_func)(void);
 
@@ -288,13 +299,14 @@ static bool display_help(help_conts code, const char *target){
             receive_expected_string(target, cmd_reprs, CMDS_NUM, 2);
 
         if (i >= 0){
+            assert(i < CMDS_NUM);
             topic = cmd_reprs[i];
             help_func = cmd_helps[code][i];
         }
         else {
             xperror_invalid_arg('C', i, "dit command", target);
             xperror_suggestion(false);
-            return FAILURE;
+            return false;
         }
     }
     else {
@@ -312,7 +324,7 @@ static bool display_help(help_conts code, const char *target){
         fprintf(stdout, " < %s >\n", topic);
     help_func();
 
-    return SUCCESS;
+    return true;
 }
 
 
@@ -345,7 +357,7 @@ static void dit_manual(void){
         "  healthcheck    set HEALTHCHECK instruction\n"
         "  onbuild        append ONBUILD instructions\n"
         "\n"
-        "utilitys:\n"
+        "utilities:\n"
         "  reflect        append the contents of some files to "DOCKER_OR_HISTORY"\n"
         "  erase          delete some lines from "DOCKER_OR_HISTORY"\n"
         "  inspect        show some directory trees with details about each file\n"
@@ -388,12 +400,18 @@ void config_manual(void){
 
 
 void convert_manual(void){
-    fputs("convert manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit convert [OPTION]...\n"
+    , stdout);
 }
 
 
 void cp_manual(void){
-    fputs("cp manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit cp [OPTION]...\n"
+    , stdout);
 }
 
 
@@ -446,7 +464,7 @@ void erase_manual(void){
         "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
         "  - The target "SPECIFIED_BY_TARGET".\n"
         "  - The deletion of empty lines is not performed unless '-st' or '--blank' is given, and\n"
-        "    is always performed when one of the options is given, except when an error occurs.\n"
+        "    is always performed first when one of the options is given, except when an error occurs.\n"
         "  - The argument for '--assume' "CAN_BE_TRUNCATED" "CASE_INSENSITIVE".\n"
         "  - By default, Y/n confirmation is performed using standard error output and standard input\n"
         "    as to whether it is okay to delete all the lines that match the specified conditions.\n"
@@ -462,7 +480,10 @@ void erase_manual(void){
 
 
 void healthcheck_manual(void){
-    fputs("healthcheck manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit healthcheck [OPTION]...\n"
+    , stdout);
 }
 
 
@@ -490,7 +511,10 @@ void help_manual(void){
 
 
 void ignore_manual(void){
-    fputs("ignore manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit ignore [OPTION]...\n"
+    , stdout);
 }
 
 
@@ -527,17 +551,26 @@ void inspect_manual(void){
 
 
 void label_manual(void){
-    fputs("label manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit label [OPTION]...\n"
+    , stdout);
 }
 
 
 void onbuild_manual(void){
-    fputs("onbuild manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit onbuild [OPTION]...\n"
+    , stdout);
 }
 
 
 void optimize_manual(void){
-    fputs("optimize manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit optimize [OPTION]...\n"
+    , stdout);
 }
 
 
@@ -575,7 +608,10 @@ void reflect_manual(void){
 
 
 void setcmd_manual(void){
-    fputs("setcmd manual\n", stdout);
+    fputs(
+        HELP_USAGES_STR
+        "  dit setcmd [OPTION]...\n"
+    , stdout);
 }
 
 
@@ -679,7 +715,12 @@ static void setcmd_description(void){
 
 
 static void dit_example(void){
-    fputs("dit example\n", stdout);
+    fputs(
+        "dit cp       \n"
+        "dit setcmd   \n"
+        "dit erase    \n"
+        "dit optimize \n"
+    , stdout);
 }
 
 
@@ -694,12 +735,22 @@ static void config_example(void){
 
 
 static void convert_example(void){
-    fputs("convert example\n", stdout);
+    fputs(
+        "dit convert \n"
+        "dit convert \n"
+        "dit convert \n"
+        "dit convert \n"
+    , stdout);
 }
 
 
 static void cp_example(void){
-    fputs("cp example\n", stdout);
+    fputs(
+        "dit cp \n"
+        "dit cp \n"
+        "dit cp \n"
+        "dit cp \n"
+    , stdout);
 }
 
 
@@ -714,7 +765,12 @@ static void erase_example(void){
 
 
 static void healthcheck_example(void){
-    fputs("healthcheck example\n", stdout);
+    fputs(
+        "dit healthcheck \n"
+        "dit healthcheck \n"
+        "dit healthcheck \n"
+        "dit healthcheck \n"
+    , stdout);
 }
 
 
@@ -729,7 +785,12 @@ static void help_example(void){
 
 
 static void ignore_example(void){
-    fputs("ignore example\n", stdout);
+    fputs(
+        "dit ignore \n"
+        "dit ignore \n"
+        "dit ignore \n"
+        "dit ignore \n"
+    , stdout);
 }
 
 
@@ -744,17 +805,32 @@ static void inspect_example(void){
 
 
 static void label_example(void){
-    fputs("label example\n", stdout);
+    fputs(
+        "dit label \n"
+        "dit label \n"
+        "dit label \n"
+        "dit label \n"
+    , stdout);
 }
 
 
 static void onbuild_example(void){
-    fputs("onbuild example\n", stdout);
+    fputs(
+        "dit onbuild \n"
+        "dit onbuild \n"
+        "dit onbuild \n"
+        "dit onbuild \n"
+    , stdout);
 }
 
 
 static void optimize_example(void){
-    fputs("optimize example\n", stdout);
+    fputs(
+        "dit optimize \n"
+        "dit optimize \n"
+        "dit optimize \n"
+        "dit optimize \n"
+    , stdout);
 }
 
 
@@ -769,7 +845,12 @@ static void reflect_example(void){
 
 
 static void setcmd_example(void){
-    fputs("setcmd example\n", stdout);
+    fputs(
+        "dit setcmd \n"
+        "dit setcmd \n"
+        "dit setcmd \n"
+        "dit setcmd \n"
+    , stdout);
 }
 
 
@@ -782,8 +863,9 @@ static void setcmd_example(void){
     * Unit Test Functions
 ******************************************************************************/
 
+
 void help_test(void){
-    fputs("help test\n", stdout);
+    no_test();
 }
 
 
