@@ -82,7 +82,7 @@ void test(int argc, char **argv, int cmd_id){
  * @note reset updated global variables so that it does not affect subsequent option parse.
  */
 static bool parse_opts(int argc, char **argv){
-    const char *short_opts = "";
+    const char *short_opts = "+";
 
     int flag = false;
     const struct option long_opts[] = {
