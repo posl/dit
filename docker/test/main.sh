@@ -2,7 +2,7 @@
 
 
 #
-# run a test for each dit command
+# run test codes for each dit command
 #
 
 echo

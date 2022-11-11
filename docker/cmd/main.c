@@ -596,7 +596,7 @@ int receive_expected_string(const char *target, const char * const reprs[], size
         const char *expecteds[size];
         memcpy(expecteds, reprs, (sizeof(const char *) * size));
 
-        bool upper_case, forward_match, break_flag = false;
+        bool upper_case, forward_match, break_flag;
         int min, max, tmp, c, mid;
 
         upper_case = mode & 0b01;
@@ -609,6 +609,8 @@ int receive_expected_string(const char *target, const char * const reprs[], size
         while ((c = (unsigned char) *(target++))){
             if (upper_case)
                 c = toupper(c);
+
+            break_flag = false;
 
             while (tmp){
                 if (tmp < 0){
@@ -641,9 +643,7 @@ int receive_expected_string(const char *target, const char * const reprs[], size
                     return -2;
             }
 
-            if (break_flag)
-                break_flag = false;
-            else if (c != ((unsigned char) *(expecteds[min]++)))
+            if (! (break_flag || (c == ((unsigned char) *(expecteds[min]++)))))
                 return -2;
         }
 

@@ -98,7 +98,7 @@ else
 fi
 
 
-trap 'rm -f docker/.dockerignore' 0 1 2 3 15
+trap 'rm -f docker/.dockerignore' EXIT
 
 case "${BUILD_TARGET}" in
     builder)

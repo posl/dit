@@ -40,7 +40,7 @@ do_test(){
         fi
     done
 
-    OUTPUT="$( od -A n -t uC /dit/var/config.stat | sed 's/^[ \t]*//' )"
+    OUTPUT="$( od -An -tuC /dit/var/config.stat | sed 's/^[ \t]*//' )"
 
     if [ "${OUTPUT}" != "$1" ]; then
         exit 1
@@ -71,6 +71,9 @@ do_test 'd=no-ignore' 'h=strict' 21
 dit config --reset d=0 || exit 1
 do_test 'd=no-reflect' 'h=normal' 2
 
+dit config --help | head -n2 | grep -F '  dit config [OPTION]...' || exit 1
+echo
+
 
 # failure cases
 
@@ -88,12 +91,3 @@ read -r REPLY
 
 : 'intentionally make an unexpected error' > /dit/var/config.stat
 do_test 'd=normal' 'h=normal' 12
-
-
-
-#
-# Visual Tests
-#
-
-dit config --help | head -n2
-read -r REPLY
