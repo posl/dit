@@ -187,7 +187,6 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
         }
     }
 
-    assert((*opt >= 0) && (*opt < HELP_CONTENTS_NUM));
     return SUCCESS;
 }
 

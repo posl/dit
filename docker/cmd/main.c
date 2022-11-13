@@ -122,7 +122,9 @@ static const char *program_name = NULL;
 int main(int argc, char **argv){
     if (argc > 0){
         assert(argv);
+
         program_name = *argv;
+        assert(program_name);
 
         const char *target = NULL;
         int cmd_id = -3;
@@ -141,6 +143,8 @@ int main(int argc, char **argv){
 
         if (cmd_id >= 0){
             program_name = target;
+            assert(program_name);
+
             return call_dit_command(argc, argv, cmd_id);
         }
 
@@ -249,7 +253,6 @@ void xperror_invalid_arg(int code_c, int state, const char * restrict desc, cons
 
     adjective = state ? ((state == -1) ? "ambiguous" : "invalid") : "unrecognized";
 
-    assert(program_name);
     fprintf(stderr, format, program_name, adjective, addition, desc, arg);
 }
 
@@ -265,8 +268,8 @@ void xperror_valid_args(const char * const reprs[], size_t size){
 
     fputs("Valid arguments are:\n", stderr);
 
-    for (int i = 0; i < size; i++)
-        fprintf(stderr, "  - '%s'\n", reprs[i]);
+    for (const char * const *tmp = reprs; size--; tmp++)
+        fprintf(stderr, "  - '%s'\n", *tmp);
 }
 
 
@@ -294,12 +297,10 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
         offset = 22;
 
     if (offset){
-        assert(offset < (sizeof(format) - 1));
         format[offset++] = '\n';
         format[offset] = '\0';
     }
 
-    assert(program_name);
     fprintf(stderr, format, program_name, desc, before_arg);
 }
 
@@ -327,7 +328,6 @@ void xperror_too_many_args(int limit){
             format[27] = '\0';
     }
 
-    assert(program_name);
     fprintf(stderr, format, program_name, adjective);
 }
 
@@ -355,7 +355,6 @@ void xperror_message(const char * restrict msg, const char * restrict addition){
         addition = msg;
     }
 
-    assert(program_name);
     fprintf(stderr, ("%s: %s: %s\n" + offset), program_name, addition, msg);
 }
 
@@ -369,7 +368,6 @@ void xperror_suggestion(bool cmd_flag){
     const char *tmp1, *tmp2;
 
     if (cmd_flag){
-        assert(program_name);
         tmp1 = program_name;
         tmp2 = " --";
     }
@@ -590,6 +588,7 @@ int receive_positive_integer(const char *target, int *p_left){
  */
 int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode){
     assert(reprs);
+    assert((size - 1) <= INT_MAX);
     assert(mode < 4);
 
     if (target && (size > 0)){
