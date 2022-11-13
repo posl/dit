@@ -698,7 +698,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
 
 
 /******************************************************************************
-    * Check Functions
+    * Get Methods
 ******************************************************************************/
 
 
@@ -710,7 +710,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
  *
  * @note if the file is too large, set an error number indicating that.
  */
-int check_file_size(const char *file_name){
+int get_file_size(const char *file_name){
     assert(file_name);
 
     struct stat file_stat;
@@ -736,7 +736,7 @@ int check_file_size(const char *file_name){
  *
  * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
  */
-int check_last_exit_status(void){
+int get_last_exit_status(void){
     const char *line;
     int errid = 0, i = -1;
 
@@ -768,8 +768,8 @@ static void receive_positive_integer_test(void);
 static void receive_expected_string_test(void);
 static void receive_dockerfile_instruction_test(void);
 
-static void check_file_size_test(void);
-static void check_last_exit_status_test(void);
+static void get_file_size_test(void);
+static void get_last_exit_status_test(void);
 
 
 
@@ -789,8 +789,8 @@ void dit_test(void){
     do_test(receive_expected_string_test);
     do_test(receive_dockerfile_instruction_test);
 
-    do_test(check_file_size_test);
-    do_test(check_last_exit_status_test);
+    do_test(get_file_size_test);
+    do_test(get_last_exit_status_test);
 }
 
 
@@ -1067,7 +1067,7 @@ static void receive_dockerfile_instruction_test(void){
 
 
 
-static void check_file_size_test(void){
+static void get_file_size_test(void){
     FILE *fp;
     size_t size;
 
@@ -1076,7 +1076,7 @@ static void check_file_size_test(void){
     assert((fp = fopen(TMP_FILE, "wb")));
     assert(! fclose(fp));
 
-    assert(! check_file_size(TMP_FILE));
+    assert(! get_file_size(TMP_FILE));
 
 
     // when specifying a non-empty file
@@ -1090,13 +1090,13 @@ static void check_file_size_test(void){
     assert(! fclose(fp));
 
     size *= sizeof(char);
-    assert(check_file_size(TMP_FILE) == size);
+    assert(get_file_size(TMP_FILE) == size);
 
 
     // when specifying a file that is too large
 
     if (system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE" bs=1M count=2K"))){
-        assert(check_file_size(TMP_FILE) == -2);
+        assert(get_file_size(TMP_FILE) == -2);
         assert(errno == EFBIG);
     }
 
@@ -1104,21 +1104,21 @@ static void check_file_size_test(void){
     // when specifying a non-existing file
 
     assert(! remove(TMP_FILE));
-    assert(check_file_size(TMP_FILE) == -1);
+    assert(get_file_size(TMP_FILE) == -1);
     assert(errno == ENOENT);
 }
 
 
 
 
-static void check_last_exit_status_test(void){
+static void get_last_exit_status_test(void){
     int last_exit_status, tmp;
     FILE *fp;
     unsigned int i;
 
     // if the exit status of last executed command line is valid
 
-    last_exit_status = check_last_exit_status();
+    last_exit_status = get_last_exit_status();
     assert((last_exit_status >= 0) && (last_exit_status < 256));
 
 
@@ -1131,7 +1131,7 @@ static void check_last_exit_status_test(void){
 
     assert(! fclose(fp));
 
-    tmp = check_last_exit_status();
+    tmp = get_last_exit_status();
     assert((tmp >= 0) && (tmp < 256));
 
 
@@ -1140,13 +1140,13 @@ static void check_last_exit_status_test(void){
     assert((fp = fopen(EXIT_STATUS_FILE, "w")));
     assert(fprintf(fp, "%u\n", (i + 256)) >= 0);
     assert(! fclose(fp));
-    assert(check_last_exit_status() == -1);
+    assert(get_last_exit_status() == -1);
 
 
     assert((fp = fopen(EXIT_STATUS_FILE, "w")));
     assert(fputs("huga\n", fp) != EOF);
     assert(! fclose(fp));
-    assert(check_last_exit_status() == -1);
+    assert(get_last_exit_status() == -1);
 
 
     // restore the contents of the file

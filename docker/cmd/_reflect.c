@@ -68,7 +68,7 @@ extern const char * const docker_instr_reprs[DOCKER_INSTRS_NUM];
 int reflect(int argc, char **argv){
     int exit_status = FAILURE;
 
-    if ((argc > 1) || check_file_size(REFLECT_FILE_R)){
+    if ((argc > 1) || get_file_size(REFLECT_FILE_R)){
         int i;
         refl_opts opt;
 
@@ -200,7 +200,7 @@ static int do_reflect(int argc, char **argv, refl_opts *opt){
                 opt->target_c = '\0';
 
             src_file = *(argv++);
-            if (check_string_isstdin(src_file))
+            if (check_if_stdin(src_file))
                 src_file = NULL;
         }
         else {
@@ -344,7 +344,7 @@ static int reflect_line(char *line, int target_c, int next_target_c, bool verbos
                 target_id = 1;
             }
 
-            if (((size = check_file_size(dest_file)) == -2) || (! (fp || (fp = fopen(dest_file, "a"))))){
+            if (((size = get_file_size(dest_file)) == -2) || (! (fp || (fp = fopen(dest_file, "a"))))){
                 exit_status = exit_status ? (UNEXPECTED_ERROR + ERROR_EXIT) : POSSIBLE_ERROR;
                 xperror_standards(errno, dest_file);
                 break;
@@ -525,7 +525,7 @@ static int record_reflected_lines(void){
     if (! exit_status)
         exit_status = tmp;
 
-    if (exit_status && (! check_file_size(VERSION_FILE)))
+    if (exit_status && (! get_file_size(VERSION_FILE)))
         exit_status = SUCCESS;
 
     FILE *fp;

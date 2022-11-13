@@ -71,8 +71,8 @@
 
 #define assign_both_or_either(target, a, b, c)  (target = (target == (a)) ? (b) : (c))
 
-#define check_string_of_length1(str, c)  ((str[0] == (c)) && (! str[1]))
-#define check_string_isstdin(file_name)  check_string_of_length1(file_name, '-')
+#define strchrcmp(str, c)  ((str[0] == (c)) && (! str[1]))
+#define check_if_stdin(file_name)  strchrcmp(file_name, '-')
 
 
 /******************************************************************************
@@ -199,11 +199,11 @@ char *receive_dockerfile_instruction(char *line, int *p_id);
 
 
 /******************************************************************************
-    * Check Functions
+    * Get Methods
 ******************************************************************************/
 
-int check_file_size(const char *file_name);
-int check_last_exit_status(void);
+int get_file_size(const char *file_name);
+int get_last_exit_status(void);
 
 
 #endif // DOCKER_INTERACTIVE_TOOL
