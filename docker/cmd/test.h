@@ -50,6 +50,13 @@ void reflect_test(void);
 void setcmd_test(void);
 
 
+/******************************************************************************
+    * Utilities
+******************************************************************************/
+
+bool check_if_alphabetical_order(const char * const reprs[], size_t size);
+
+
 #endif // NDEBUG
 
 #endif // DIT_UNIT_TESTS

@@ -103,4 +103,41 @@ static bool parse_opts(int argc, char **argv){
 }
 
 
+
+
+/******************************************************************************
+    * Utilities
+******************************************************************************/
+
+
+/**
+ * @brief check if array of strings is in alphabetical order.
+ *
+ * @param[in]  reprs  array of expected strings
+ * @param[in]  size  array size
+ * @return bool  the resulting boolean
+ *
+ * @note even if there are duplications between strings, it is regarded as an error.
+ */
+bool check_if_alphabetical_order(const char * const reprs[], size_t size){
+    assert(reprs);
+
+    if (size > 1){
+        const char * const *tmp;
+        const char *repr;
+
+        tmp = reprs;
+        size--;
+
+        do {
+            repr = *(tmp++);
+            if (strcmp(repr, *tmp) >= 0)
+                return false;
+        } while (--size);
+    }
+
+    return true;
+}
+
+
 #endif // NDEBUG

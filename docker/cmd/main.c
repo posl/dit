@@ -775,6 +775,13 @@ static void check_last_exit_status_test(void);
 
 
 void dit_test(void){
+    assert(check_if_alphabetical_order(cmd_reprs, CMDS_NUM));
+    assert(check_if_alphabetical_order(assume_args, ARGS_NUM));
+    assert(check_if_alphabetical_order(blank_args, ARGS_NUM));
+    assert(check_if_alphabetical_order(display_args, ARGS_NUM));
+    assert(check_if_alphabetical_order(target_args, ARGS_NUM));
+    assert(check_if_alphabetical_order(docker_instr_reprs, DOCKER_INSTRS_NUM));
+
     do_test(xfgets_for_loop_test);
     do_test(xstrcmp_upper_case_test);
 
