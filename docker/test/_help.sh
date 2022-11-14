@@ -85,25 +85,12 @@ do_test_example(){
 # Integration Tests
 #
 
-# successful cases
-
 do_test_cmd_list
 do_test_manual
 do_test_example
 
 ( dit help --help || exit 1 ) | head -n2 | grep -F '  dit help [OPTION]...' || exit 1
 echo
-
-
-# failure cases
-
-: 'invalid dit command'
-dit help -m commit && exit 1
-read -r REPLY
-
-: 'ambiguous dit command'
-dit help --exam he && exit 1
-read -r REPLY
 
 
 
@@ -113,23 +100,29 @@ read -r REPLY
 
 # successful cases
 
+: 'show usage examples of commands that should be learned.'
 dit help -e || exit 1
 read -r REPLY
 
+: 'show a short description of the interface of all dit commands.'
 dit help -d || exit 1
 read -r REPLY
 
 
-dit help --d insp || exit 1
+: 'when specifying one command'
+dit help --d inspect || exit 1
 read -r REPLY
 
+: 'when specifying multiple abbreviated commands'
 dit help --desc conv optim refl erase || exit 1
 read -r REPLY
 
+: 'when specifying multiple commands with aliases'
 dit help --description cfg hc || exit 1
 read -r REPLY
 
 
+: 'display the contents of the version-file.'
 echo 'dit version a.b.c' > /dit/etc/dit_version
 dit help -V || exit 1
 read -r REPLY
@@ -137,7 +130,15 @@ read -r REPLY
 
 # failure cases
 
-: 'intentionally make an unexpected error'
+: 'when specifying an invalid command'
+dit help -m commit && exit 1
+read -r REPLY
+
+: 'when specifying an ambiguous command'
+dit help --exam he && exit 1
+read -r REPLY
+
+: 'intentionally make an unexpected error.'
 rm -f /dit/etc/dit_version
 dit help -V && exit 1
 read -r REPLY

@@ -55,8 +55,6 @@ do_test(){
 # Integration Tests
 #
 
-# successful cases
-
 do_test 'd=normal' 'h=normal' 12
 
 dit config _4 || exit 1
@@ -75,19 +73,28 @@ do_test 'd=no-reflect' 'h=normal' 2
 echo
 
 
+
+#
+# Visual Tests
+#
+
 # failure cases
 
+: 'mode integer must be between 0 and 4.'
 dit config 5 && exit 1
 read -r REPLY
 
+: '>  target file must be represented by one of "bdh".'
 dit config a=3 && exit 1
 read -r REPLY
 
+: 'mode string must be uniquely interpretable.'
 dit config -r d=no && exit 1
 read -r REPLY
 
+: 'multiple mode specifications must be separated by commas.'
 dit config d=no-ig h=1 && exit 1
 read -r REPLY
 
-: 'intentionally make an unexpected error' > /dit/var/config.stat
+: 'intentionally make an unexpected error.' > /dit/var/config.stat
 do_test 'd=normal' 'h=normal' 12
