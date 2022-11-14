@@ -97,7 +97,8 @@ static bool parse_opts(int argc, char **argv){
         if (flag)
             break;
 
-    optind = (opterr = 1);
+    optind = 0;
+    opterr = 1;
 
     return (bool) flag;
 }
