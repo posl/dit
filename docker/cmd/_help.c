@@ -163,7 +163,7 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
     *opt = manual;
 
     int c;
-    while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0){
+    while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0)
         switch (c){
             case 'a':
                 display_cmd_list();
@@ -185,7 +185,6 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
             default:
                 return ERROR_EXIT;
         }
-    }
 
     return SUCCESS;
 }

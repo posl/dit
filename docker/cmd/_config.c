@@ -125,7 +125,7 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
     *opt = false;
 
     int c;
-    while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0){
+    while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0)
         switch (c){
             case 'r':
                 *opt = true;
@@ -136,7 +136,6 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
             default:
                 return ERROR_EXIT;
         }
-    }
 
     assert(*opt == ((bool) *opt));
     return SUCCESS;
@@ -324,6 +323,7 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
                         mode2d = mode;
                         break;
                     default:
+                        assert(target_c == 'h');
                         mode2h = mode;
                 }
             }

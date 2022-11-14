@@ -323,7 +323,6 @@ void xperror_too_many_args(int limit){
         case 1:
             adjective = "more than two ";
         case 0:
-            assert(sizeof(format) > 27);
             format[26] = '\n';
             format[27] = '\0';
     }

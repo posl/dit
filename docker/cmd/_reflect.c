@@ -128,7 +128,7 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
     int c, i, *ptr;
     const char * const *valid_args = NULL;
 
-    while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
+    while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0)
         switch (c){
             case 'd':
                 assign_both_or_either(opt->target_c, 'h', 'b', 'd');
@@ -164,7 +164,6 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
             default:
                 return ERROR_EXIT;
         }
-    }
 
     if (opt->target_c)
         return SUCCESS;

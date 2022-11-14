@@ -174,7 +174,7 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
     opt->comp = qcmp_name;
 
     int c, i;
-    while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
+    while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0)
         switch (c){
             case 'C':
                 opt->color = true;
@@ -205,7 +205,6 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
                 xperror_suggestion(true);
                 return ERROR_EXIT;
         }
-    }
 
     opt->color &= isatty(fileno(stdout));
     return SUCCESS;
@@ -875,14 +874,14 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
 ******************************************************************************/
 
 
-static void concat_inf_path_test();
-static void new_file_test();
-static void append_file_test();
+static void concat_inf_path_test(void);
+static void new_file_test(void);
+static void append_file_test(void);
 
-static void fcmp_name_test();
-static void fcmp_size_test();
-static void fcmp_ext_test();
-static void get_file_ext_test();
+static void fcmp_name_test(void);
+static void fcmp_size_test(void);
+static void fcmp_ext_test(void);
+static void get_file_ext_test(void);
 
 
 
@@ -901,9 +900,9 @@ void inspect_test(void){
 
 
 
-static void concat_inf_path_test(){
+static void concat_inf_path_test(void){
     char name[] = " , the temporary file-name for docker-interactive-tool/";
-    size_t name_len = sizeof(name);
+    size_t name_len = sizeof(name) / sizeof(char);
 
     int iter = 0;
     while (((name_len - 1) * (++iter) + 1) <= INSP_INITIAL_PATH_MAX);
@@ -956,7 +955,7 @@ static void concat_inf_path_test(){
 
 
 
-static void new_file_test(){
+static void new_file_test(void){
     uid_t uid;
     gid_t gid;
     file_node *file;
@@ -1070,7 +1069,7 @@ static void new_file_test(){
 
 
 
-static void append_file_test(){
+static void append_file_test(void){
     file_node node, *file;
     int i = 0;
     off_t total_size = 0;
@@ -1114,7 +1113,7 @@ static void append_file_test(){
 
 
 
-static void fcmp_name_test(){
+static void fcmp_name_test(void){
     file_node node1, node2, *file1, *file2;
     file1 = &node1;
     file2 = &node2;
@@ -1167,7 +1166,7 @@ static void fcmp_name_test(){
 
 
 
-static void fcmp_size_test(){
+static void fcmp_size_test(void){
     file_node node1, node2;
 
     // equal
@@ -1189,7 +1188,7 @@ static void fcmp_size_test(){
 
 
 
-static void fcmp_ext_test(){
+static void fcmp_ext_test(void){
     file_node node1, node2;
 
     // equal
@@ -1240,7 +1239,7 @@ static void fcmp_ext_test(){
 
 
 
-static void get_file_ext_test(){
+static void get_file_ext_test(void){
     // equal
     assert(! strcmp(get_file_ext("main.c"), "c"));
     assert(! strcmp(get_file_ext("README.md"), "md"));
