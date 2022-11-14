@@ -112,6 +112,7 @@ cp -f /dit/etc/dit_profile.sh /etc/profile.d/
 rm -f \
     /dit/etc/default_user \
     /dit/etc/dit_*.sh \
+    /dit/etc/package_manager
 
 
 if [ "${DEFAULT_USER}" != 'root' ]; then

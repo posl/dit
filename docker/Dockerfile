@@ -40,21 +40,20 @@ FROM "${BASE_NAME}:${BASE_VERSION}" AS product
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 COPY ./etc/ /dit/etc/
 
-# if there is no bash command, install it
-RUN /bin/bash --version > /dev/null 2>&1 || \
+# record the default user, and install the bash command as needed
+RUN whoami > /dit/etc/default_user && \
+    type /bin/bash > /dev/null 2>&1 || \
     sh /dit/etc/dit_install.sh \
-        bash && \
-    rm -f /dit/etc/package_manager
+        bash
+
+# initialization process is performed by the privileged user
+USER root
 
 ARG BASE_NAME
 ARG BASE_VERSION
 
 ENV BASE_NAME="${BASE_NAME}"
 ENV BASE_VERSION="${BASE_VERSION}"
-
-# record the default user because it will be switched to the privileged user for a while
-RUN whoami > /dit/etc/default_user
-USER root
 
 ENTRYPOINT [ "/bin/sh", "/dit/etc/dit_entry.sh" ]
 CMD [ "/bin/bash", "--login" ]
@@ -63,8 +62,11 @@ CMD [ "/bin/bash", "--login" ]
 
 FROM product AS test
 
-# remain as the privileged user while running test codes
-RUN echo 'root' > /dit/etc/default_user
+# change not to switch user, and install the diff command as needed
+RUN echo 'root' > /dit/etc/default_user && \
+    type diff > /dev/null 2>&1 || \
+    sh /dit/etc/dit_install.sh \
+        diffutils
 
 # load test script for each dit command
 WORKDIR /dit/test
