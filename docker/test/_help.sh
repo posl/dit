@@ -18,8 +18,8 @@ set +x
 OUTPUT=''
 CMDS_NUM=13
 
-TMP_FILE1=_help1.tmp
-TMP_FILE2=_help2.tmp
+TMP1=_help1.tmp
+TMP2=_help2.tmp
 
 trap ': > /dit/etc/dit_version; rm -f _help[1-2].tmp' EXIT
 
@@ -35,18 +35,18 @@ do_test_cmd_list(){
     set +x
 
     OUTPUT="$( dit help -a )" || exit 1
-    : > "${TMP_FILE1}"
+    : > "${TMP1}"
 
     for cmd in ${OUTPUT}
     do
         CMDS_NUM="$(( CMDS_NUM - 1 ))"
-        dit help | grep -En "^  ${cmd}    " >> "${TMP_FILE1}" || exit 1
+        ( dit help || exit 1 ) | grep -En "^  ${cmd}    " >> "${TMP1}" || exit 1
     done
 
     [ "${CMDS_NUM}" -eq 0 ] || exit 1
 
-    sort -nu "${TMP_FILE1}" > "${TMP_FILE2}"
-    diff -u "${TMP_FILE1}" "${TMP_FILE2}" || exit 1
+    sort -nu "${TMP1}" > "${TMP2}"
+    diff -u "${TMP1}" "${TMP2}" || exit 1
 
     echo
     set -x
@@ -71,8 +71,8 @@ do_test_example(){
 
     for cmd in ${OUTPUT}
     do
-        dit help -e "${cmd}" | tee "${TMP_FILE1}" | grep -F " ${cmd} " > "${TMP_FILE2}" || exit 1
-        diff -u "${TMP_FILE1}" "${TMP_FILE2}" || exit 1
+        ( dit help -e "${cmd}" || exit 1) | tee "${TMP1}" | grep -F " ${cmd} " > "${TMP2}" || exit 1
+        diff -u "${TMP1}" "${TMP2}" || exit 1
     done
 
     echo

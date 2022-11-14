@@ -799,13 +799,12 @@ static void xfgets_for_loop_test(void){
     FILE *fp;
     int errid = 0;
 
-
     // when specifying an empty file
 
-    assert((fp = fopen(TMP_FILE, "w")));
+    assert((fp = fopen(TMP_FILE1, "w")));
     assert(! fclose(fp));
 
-    assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+    assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
     assert(! errid);
 
 
@@ -813,14 +812,14 @@ static void xfgets_for_loop_test(void){
 
     const char *line = "tonari no kyaku ha yoku kaki kuu kyaku da";
 
-    assert((fp = fopen(TMP_FILE, "w")));
+    assert((fp = fopen(TMP_FILE1, "w")));
     assert(fputs(line, fp) != EOF);
     assert(! fclose(fp));
 
-    assert(! strcmp(xfgets_for_loop(TMP_FILE, false, &errid), line));
+    assert(! strcmp(xfgets_for_loop(TMP_FILE1, false, &errid), line));
     assert(! errid);
 
-    assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+    assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
     assert(! errid);
 
 
@@ -838,7 +837,7 @@ static void xfgets_for_loop_test(void){
         NULL
     };
 
-    assert((fp = fopen(TMP_FILE, "w")));
+    assert((fp = fopen(TMP_FILE1, "w")));
     for (tmp = lines; *tmp; tmp++)
         assert(fprintf(fp, "%s\n", *tmp) >= 0);
     assert(! fclose(fp));
@@ -848,7 +847,7 @@ static void xfgets_for_loop_test(void){
 
     for (tmp = lines;; tmp++){
         if (n--){
-            assert(! strcmp(xfgets_for_loop(TMP_FILE, false, &errid), *tmp));
+            assert(! strcmp(xfgets_for_loop(TMP_FILE1, false, &errid), *tmp));
             assert(! errid);
         }
         else {
@@ -872,7 +871,7 @@ static void xfgets_for_loop_test(void){
             }
 
             errid = -1;
-            assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+            assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
             assert(errid == -1);
             break;
         }
@@ -881,8 +880,8 @@ static void xfgets_for_loop_test(void){
 
     // when specifying a non-existing file
 
-    assert(! remove(TMP_FILE));
-    assert(! xfgets_for_loop(TMP_FILE, false, &errid));
+    assert(! remove(TMP_FILE1));
+    assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
     assert(errid == ENOENT);
 }
 
@@ -1072,38 +1071,38 @@ static void get_file_size_test(void){
 
     // when specifying an empty file
 
-    assert((fp = fopen(TMP_FILE, "wb")));
+    assert((fp = fopen(TMP_FILE1, "wb")));
     assert(! fclose(fp));
 
-    assert(! get_file_size(TMP_FILE));
+    assert(! get_file_size(TMP_FILE1));
 
 
     // when specifying a non-empty file
 
-    assert((fp = fopen(TMP_FILE, "wb")));
+    assert((fp = fopen(TMP_FILE1, "wb")));
 
     size = rand();
     size = size % 50 + 1;
     assert(fwrite("123456789 123456789 123456789 123456789 123456789", sizeof(char), size, fp) == size);
+    size *= sizeof(char);
 
     assert(! fclose(fp));
 
-    size *= sizeof(char);
-    assert(get_file_size(TMP_FILE) == size);
+    assert(get_file_size(TMP_FILE1) == size);
 
 
     // when specifying a file that is too large
 
-    if (system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE" bs=1M count=2K"))){
-        assert(get_file_size(TMP_FILE) == -2);
+    if (system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K"))){
+        assert(get_file_size(TMP_FILE1) == -2);
         assert(errno == EFBIG);
     }
 
 
     // when specifying a non-existing file
 
-    assert(! remove(TMP_FILE));
-    assert(get_file_size(TMP_FILE) == -1);
+    assert(! remove(TMP_FILE1));
+    assert(get_file_size(TMP_FILE1) == -1);
     assert(errno == ENOENT);
 }
 

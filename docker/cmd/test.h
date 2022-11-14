@@ -8,7 +8,13 @@
     * commonly used Macros
 ******************************************************************************/
 
-#define TMP_FILE "/dit/tmp/for-test"
+#define TMP_DIR "/dit/tmp/"
+
+#define TMP_NAME1 "test1.tmp"
+#define TMP_NAME2 "test2.tmp"
+
+#define TMP_FILE1  TMP_DIR TMP_NAME1
+#define TMP_FILE2  TMP_DIR TMP_NAME2
 
 
 #define do_test(func) \
