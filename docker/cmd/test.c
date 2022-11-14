@@ -130,7 +130,8 @@ bool check_if_alphabetical_order(const char * const reprs[], size_t size){
         size--;
 
         do {
-            repr = *(tmp++);
+            assert((repr = *(tmp++)));
+
             if (strcmp(repr, *tmp) >= 0)
                 return false;
         } while (--size);

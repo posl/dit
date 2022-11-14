@@ -268,8 +268,10 @@ void xperror_valid_args(const char * const reprs[], size_t size){
 
     fputs("Valid arguments are:\n", stderr);
 
-    for (const char * const *tmp = reprs; size--; tmp++)
+    for (const char * const *tmp = reprs; size--; tmp++){
+        assert(*tmp);
         fprintf(stderr, "  - '%s'\n", *tmp);
+    }
 }
 
 
@@ -588,6 +590,7 @@ int receive_positive_integer(const char *target, int *p_left){
 int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode){
     assert(reprs);
     assert((size - 1) <= INT_MAX);
+    assert(check_if_alphabetical_order(reprs, size));
     assert(mode < 4);
 
     if (target && (size > 0)){
@@ -773,13 +776,6 @@ static void get_last_exit_status_test(void);
 
 
 void dit_test(void){
-    assert(check_if_alphabetical_order(cmd_reprs, CMDS_NUM));
-    assert(check_if_alphabetical_order(assume_args, ARGS_NUM));
-    assert(check_if_alphabetical_order(blank_args, ARGS_NUM));
-    assert(check_if_alphabetical_order(display_args, ARGS_NUM));
-    assert(check_if_alphabetical_order(target_args, ARGS_NUM));
-    assert(check_if_alphabetical_order(docker_instr_reprs, DOCKER_INSTRS_NUM));
-
     do_test(xfgets_for_loop_test);
     do_test(xstrcmp_upper_case_test);
 

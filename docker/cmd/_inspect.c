@@ -165,9 +165,6 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
         "size"
     };
 
-    assert(ARGS_NUM == 3);
-    assert(check_if_alphabetical_order(sort_args, ARGS_NUM));
-
     opt->color = false;
     opt->classify = false;
     opt->numeric_id = false;

@@ -375,8 +375,6 @@ static void receive_mode_integer_test(void);
 
 
 void config_test(void){
-    assert(check_if_alphabetical_order(mode_reprs, CONF_MODES_NUM));
-
     do_test(receive_mode_integer_test);
     do_test(receive_mode_test);
 }
