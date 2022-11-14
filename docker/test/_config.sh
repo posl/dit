@@ -40,7 +40,7 @@ do_test(){
         fi
     done
 
-    OUTPUT="$( od -An -tuC /dit/var/config.stat | sed 's/^[ \t]*//' )"
+    OUTPUT="$( od -An -tuC /dit/var/config.stat | awk '{ print $1 }' )"
 
     if [ "${OUTPUT}" != "$1" ]; then
         exit 1
@@ -71,7 +71,7 @@ do_test 'd=no-ignore' 'h=strict' 21
 dit config --reset d=0 || exit 1
 do_test 'd=no-reflect' 'h=normal' 2
 
-dit config --help | head -n2 | grep -F '  dit config [OPTION]...' || exit 1
+( dit config --help || exit 1 ) | head -n2 | grep -F '  dit config [OPTION]...' || exit 1
 echo
 
 

@@ -21,7 +21,7 @@ CMDS_NUM=13
 TMP1=_help1.tmp
 TMP2=_help2.tmp
 
-trap ': > /dit/etc/dit_version; rm -f _help[1-2].tmp' EXIT
+trap ': > /dit/etc/dit_version; rm -f _help[1-2].tmp; echo' EXIT
 
 set -x
 
@@ -58,7 +58,7 @@ do_test_manual(){
 
     for cmd in ${OUTPUT}
     do
-        dit help --man "${cmd}" | head -n2 | grep -F "  dit ${cmd} [OPTION]..." || exit 1
+        ( dit help --man "${cmd}" || exit 1 ) | head -n2 | grep -F "  dit ${cmd} [OPTION]..." || exit 1
     done
 
     echo
@@ -91,7 +91,7 @@ do_test_cmd_list
 do_test_manual
 do_test_example
 
-dit help --help | head -n2 | grep -F '  dit help [OPTION]...' || exit 1
+( dit help --help || exit 1 ) | head -n2 | grep -F '  dit help [OPTION]...' || exit 1
 echo
 
 
