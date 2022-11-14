@@ -10,6 +10,9 @@
 
 #include "main.h"
 
+#define INSP_INITIAL_PATH_MAX 256
+#define INSP_INITIAL_DIRS_MAX 32
+
 #define INSP_EXCESS_STR " #EXCESS"
 
 
@@ -20,7 +23,7 @@ typedef int (* qcmp)(const void *, const void *);
 /** Data type for storing the results of option parse */
 typedef struct {
     bool color;         /** whether to colorize file name based on file mode */
-    bool classify;      /** whether to append indicator to file name based on file mode */
+    bool classify;      /** whether to append i to file name based on file mode */
     bool numeric_id;    /** whether to represent users and groups numerically */
     qcmp comp;          /** comparison function used when qsort */
 } insp_opts;
@@ -75,7 +78,7 @@ static int fcmp_ext(const file_node *file1, const file_node *file2);
 static const char *get_file_ext(const char *name);
 
 static void destruct_dir_tree(file_node *tree, const insp_opts *opt);
-static void destruct_recursive(file_node *file, const insp_opts *opt, unsigned int depth);
+static void destruct_recursive(file_node *file, const insp_opts *opt, size_t depth);
 static void print_file_mode(mode_t mode);
 static void print_file_owner(const file_node *file, bool numeric_id);
 static void print_file_size(off_t size);
@@ -121,6 +124,7 @@ int inspect(int argc, char **argv){
         else
             i = FAILURE;
 
+        assert(argc > 0);
         if (--argc){
             path = *(++argv);
             fputc('\n', stdout);
@@ -142,6 +146,8 @@ int inspect(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int parse_opts(int argc, char **argv, insp_opts *opt){
+    assert(opt);
+
     const char *short_opts = "CFnSX";
 
     const struct option long_opts[] = {
@@ -158,6 +164,9 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
         "name",
         "size"
     };
+
+    assert(ARGS_NUM == 3);
+    assert(check_if_alphabetical_order(sort_args, ARGS_NUM));
 
     opt->color = false;
     opt->classify = false;
@@ -187,7 +196,7 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
                 return NORMALLY_EXIT;
             case 0:
                 if ((c = receive_expected_string(optarg, sort_args, ARGS_NUM, 2)) >= 0){
-                    opt->comp = (c ? ((c == 1) ? qcmp_name : qcmp_size) : qcmp_ext);
+                    opt->comp = c ? ((c == 1) ? qcmp_name : qcmp_size) : qcmp_ext;
                     break;
                 }
                 xperror_invalid_arg('O', c, long_opts[i].name, optarg);
@@ -218,6 +227,9 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
  * @return file_node*  the result of constructing
  */
 static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt){
+    assert(opt);
+    assert(opt->comp);
+
     file_node *tree = NULL;
 
     if (base_path){
@@ -243,9 +255,12 @@ static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt
  * @note at the same time, sort files in directory.
  */
 static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, qcmp comp){
-    file_node *file = NULL;
+    assert(ipath);
+    assert(name);
 
+    file_node *file = NULL;
     size_t name_len;
+
     if (((name_len = strlen(name) + 1) > 0) && concat_inf_path(ipath, ipath_len, name, name_len)){
         char *dest;
         if ((dest = (char *) malloc(sizeof(char) * name_len))){
@@ -263,6 +278,8 @@ static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const c
 
                             while ((entry = readdir(dir))){
                                 name = entry->d_name;
+                                assert(name);
+
                                 if ((name[0] == '.') && (! name[(name[1] != '.') ? 1 : 2]))
                                     continue;
 
@@ -305,23 +322,23 @@ static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const c
  * @note path string of arbitrary length can be achieved.
  */
 static bool concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len){
-    size_t curr_max, needed_len;
-    curr_max = ipath->max;
-    needed_len = ipath_len + suf_len;
+    assert(ipath);
+    assert(ipath->max >= ipath_len);
+    assert(suf);
+    assert((strlen(suf) + 1) == suf_len);
 
-    if (curr_max < needed_len){
-        if (! curr_max)
-            curr_max = 1024;
-
-        size_t prev_max;
-        while (curr_max < needed_len){
-            prev_max = curr_max;
-            curr_max *= 2;
-            if (prev_max >= curr_max)
-                return false;
-        }
-
+    if ((ipath->max - ipath_len) < suf_len){
+        size_t curr_max;
         void *ptr;
+
+        if (! (curr_max = ipath->max))
+            curr_max = INSP_INITIAL_PATH_MAX / 2;
+
+        do
+            if (! (curr_max <<= 1))
+                return false;
+        while ((curr_max - ipath_len) < suf_len);
+
         if ((ptr = realloc(ipath->ptr, (sizeof(char) * curr_max)))){
             ipath->ptr = (char *) ptr;
             ipath->max = curr_max;
@@ -346,6 +363,9 @@ static bool concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, 
  * @return file_node*  new element that makes up the directory tree
  */
 static file_node *new_file(const char * restrict path, char * restrict name){
+    assert(path);
+    assert(name);
+
     file_node *file;
     if ((file = (file_node *) malloc(sizeof(file_node)))){
         file->name = name;
@@ -415,12 +435,16 @@ static file_node *new_file(const char * restrict path, char * restrict name){
  * @note any directory can have a virtually unlimited number of files.
  */
 static bool append_file(file_node *tree, file_node *file){
+    assert(tree);
+    assert(file);
+
     if (tree->children_num == tree->children_max){
         size_t old_size, new_size;
-        old_size = tree->children_max;
-        new_size = old_size ? (old_size * 2) : 32;
-
         void *ptr;
+
+        old_size = tree->children_max;
+        new_size = old_size ? (old_size * 2) : INSP_INITIAL_DIRS_MAX;
+
         if ((old_size < new_size) && (ptr = realloc(tree->children, (sizeof(file_node *) * new_size)))){
             tree->children = (file_node **) ptr;
             tree->children_max = new_size;
@@ -489,11 +513,17 @@ static int qcmp_ext(const void *a, const void *b){
  * @return int  comparison result
  */
 static int fcmp_name(const void *a, const void *b, fcmp addition){
+    assert(a);
+    assert(b);
+
     file_node *file1, *file2;
+    int i;
+
     file1 = *((file_node **) a);
     file2 = *((file_node **) b);
+    assert(file1);
+    assert(file2);
 
-    int i;
     return (addition && (i = addition(file1, file2))) ? i : strcmp(file1->name, file2->name);
 }
 
@@ -506,7 +536,12 @@ static int fcmp_name(const void *a, const void *b, fcmp addition){
  * @return int  comparison result
  */
 static int fcmp_size(const file_node *file1, const file_node *file2){
-    return (int) (file2->size - file1->size);
+    int i = 0;
+
+    if (file1->size != file2->size)
+        i = (file1->size < file2->size) ? 1 : -1;
+
+    return i;
 }
 
 
@@ -533,12 +568,16 @@ static int fcmp_ext(const file_node *file1, const file_node *file2){
  * @return const char*  string representing the file extension
  */
 static const char *get_file_ext(const char *name){
-    const char *ext;
-    ext = name;
+    assert(name);
+
+    const char *ext = NULL;
 
     while (*name)
         if (*(name++) == '.')
             ext = name;
+
+    if (! ext)
+        ext = name;
 
     return ext;
 }
@@ -558,6 +597,9 @@ static const char *get_file_ext(const char *name){
  * @param[in]  opt  variable containing the result of option parse
  */
 static void destruct_dir_tree(file_node *tree, const insp_opts *opt){
+    assert(tree);
+    assert(opt);
+
     fputs(
         "Permission      User     Group      Size\n"
         "=========================================\n"
@@ -576,12 +618,17 @@ static void destruct_dir_tree(file_node *tree, const insp_opts *opt){
  *
  * @note at the same time, release the dynamic memory that is no longer needed.
  * @note if NULL is passed to 'opt', just release the dynamic memory that is never used.
+ *
+ * @attention note that if 'depth' wraps around, the hierarchical representation of directories is disturbed.
  */
-static void destruct_recursive(file_node *file, const insp_opts *opt, unsigned int depth){
-    int i;
+static void destruct_recursive(file_node *file, const insp_opts *opt, size_t depth){
+    assert(file);
+    assert(file->name);
+
+    size_t size;
 
     if (opt){
-        if (! (file->errid && file->noinfo)){
+        if (! file->noinfo){
             print_file_mode(file->mode);
             print_file_owner(file, opt->numeric_id);
             print_file_size(file->size);
@@ -590,7 +637,7 @@ static void destruct_recursive(file_node *file, const insp_opts *opt, unsigned i
             fputs("       ???       ???       ???       ???    ", stdout);
 
         if (depth){
-            for (i = depth; --i;)
+            for (size = depth; --size;)
                 fputs("|   ", stdout);
             fputs("|-- ", stdout);
         }
@@ -612,11 +659,11 @@ static void destruct_recursive(file_node *file, const insp_opts *opt, unsigned i
         free(file->link_path);
 
     if (file->children){
-        i = 0;
+        size = file->children_num;
         depth++;
-        do
-            destruct_recursive(file->children[i++], opt, depth);
-        while (i < file->children_num);
+
+        for (file_node * const *tmp = file->children; size--; tmp++)
+            destruct_recursive(*tmp, opt, depth);
 
         free(file->children);
     }
@@ -633,6 +680,7 @@ static void destruct_recursive(file_node *file, const insp_opts *opt, unsigned i
  */
 static void print_file_mode(mode_t mode){
     char mode_str[11];
+
     mode_str[0] =
         S_ISREG(mode) ? '-' :
         S_ISDIR(mode) ? 'd' :
@@ -667,33 +715,41 @@ static void print_file_mode(mode_t mode){
  * @attention if the id exceeds 8 digits, print a string that represents a numeric excess.
  */
 static void print_file_owner(const file_node *file, bool numeric_id){
+    assert(file);
+    assert((file->uid >= 0) && (file->uid <= UINT_MAX));
+    assert((file->gid >= 0) && (file->gid <= UINT_MAX));
+
+    const char *name;
     int i = 1;
     unsigned int id;
     struct passwd *passwd;
     struct group *group;
-    const char *tmp = NULL;
 
     do {
+        name = NULL;
+
         if (i){
             id = file->uid;
             if ((! numeric_id) && (passwd = getpwuid(id)))
-                tmp = passwd->pw_name;
+                name = passwd->pw_name;
         }
         else {
             id = file->gid;
             if ((! numeric_id) && (group = getgrgid(id)))
-                tmp = group->gr_name;
+                name = group->gr_name;
         }
 
-        if (! (tmp && (strlen(tmp) <= 8))){
+        if (! (name && (strlen(name) <= 8))){
             if (id < 100000000){
                 fprintf(stdout, "%8u  ", id);
                 continue;
             }
-            tmp = INSP_EXCESS_STR;
+            name = INSP_EXCESS_STR;
         }
-        fprintf(stdout, "%8s  ", tmp);
+        fprintf(stdout, "%8s  ", name);
     } while (i--);
+
+    assert(i == -1);
 }
 
 
@@ -705,25 +761,31 @@ static void print_file_owner(const file_node *file, bool numeric_id){
  * @attention cannot be handle file size exceeding the upper limit of integer type.
  */
 static void print_file_size(off_t size){
-    if (size < 1000)
-        fprintf(stdout, "%6d B    ", ((int) size));
-    else {
-        int i = -1, rem;
-        const char *units = "kMGTPEZ";
+    assert(size >= 0);
 
-        do {
-            i++;
-            rem = size % 1000;
-            size /= 1000;
-        } while (size >= 1000);
+    unsigned int i = 0, rem = 0;
+    char unit = '\0';
+    const char *format;
 
-        if (i <= 6){
+    while (size >= 1000){
+        i++;
+        rem = size % 1000;
+        size /= 1000;
+    }
+
+    if (i < 8){
+        if (i){
             rem /= 100;
-            fprintf(stdout, "%3d.%1d %cB    ", ((int) size), rem, units[i]);
+            unit = " kMGTPEZ"[i];
+            format = "%3u.%1u %cB    ";
         }
         else
-            fputs(INSP_EXCESS_STR "    ", stdout);
+            format = "%6u B    ";
+
+        fprintf(stdout, format, ((unsigned int) size), rem, unit);
     }
+    else
+        fputs(INSP_EXCESS_STR "    ", stdout);
 }
 
 
@@ -735,27 +797,28 @@ static void print_file_size(off_t size){
  * @param[in]  link_flag  whether or not to display the information of the link destination
  */
 static void print_file_name(const file_node *file, const insp_opts *opt, bool link_flag){
+    assert(file);
+    assert(opt);
+
     char *name, *tmp;
     mode_t mode;
-    int offset = 0;
+    int i = 0;
     const char *format;
 
     if (! link_flag){
         name = file->name;
         mode = file->mode;
-        offset = 4;
+        i = 4;
     }
     else {
         name = file->link_path;
         mode = file->link_mode;
     }
 
-    tmp = name;
-    while (*tmp){
+    assert(name);
+    for (tmp = name; *tmp; tmp++)
         if (iscntrl((unsigned char) *tmp))
             *tmp = '\?';
-        tmp++;
-    }
 
     if (opt->color){
         tmp =
@@ -787,19 +850,17 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
         format = " -> %s";
     }
 
-    fprintf(stdout, (format + offset), tmp, name);
+    fprintf(stdout, (format + i), tmp, name);
 
     if (opt->classify){
-        int indicator;
-        indicator =
-            (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
+        i = (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
             S_ISDIR(mode) ? '/' :
             S_ISFIFO(mode) ? '|' :
             S_ISSOCK(mode) ? '=' :
                 '\0';
 
-        if (indicator)
-            fputc(indicator, stdout);
+        if (i)
+            fputc(i, stdout);
     }
 }
 
@@ -813,8 +874,382 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
     * Unit Test Functions
 ******************************************************************************/
 
+
+static void concat_inf_path_test();
+static void new_file_test();
+static void append_file_test();
+
+static void fcmp_name_test();
+static void fcmp_size_test();
+static void fcmp_ext_test();
+static void get_file_ext_test();
+
+
+
+
 void inspect_test(void){
-    fputs("inspect test\n", stdout);
+    do_test(concat_inf_path_test);
+    do_test(new_file_test);
+    do_test(append_file_test);
+
+    do_test(fcmp_name_test);
+    do_test(fcmp_size_test);
+    do_test(fcmp_ext_test);
+    do_test(get_file_ext_test);
+}
+
+
+
+
+static void concat_inf_path_test(){
+    char name[] = " , the temporary file-name for docker-interactive-tool/";
+    size_t name_len = sizeof(name);
+
+    int iter = 0;
+    while (((name_len - 1) * (++iter) + 1) <= INSP_INITIAL_PATH_MAX);
+    assert(((name_len - 1) * iter + 1) < (INSP_INITIAL_PATH_MAX * 2));
+
+    int i = 0;
+    inf_path ipath = { .ptr = NULL, .max = 0};
+    size_t ipath_len = 0;
+
+
+    // when concatenating strings in order
+
+    do {
+        name[0] = i + '0';
+        assert(concat_inf_path(&ipath, ipath_len, name, name_len));
+
+        assert(ipath.ptr);
+        assert(! strcmp((ipath.ptr + ipath_len), name));
+
+        ipath_len += (name_len - 1);
+        assert(strlen(ipath.ptr) == ipath_len);
+
+        if (++i < iter)
+            assert(ipath.max == INSP_INITIAL_PATH_MAX);
+        else {
+            assert(ipath.max == (INSP_INITIAL_PATH_MAX * 2));
+            break;
+        }
+    } while (true);
+
+    assert(i == iter);
+
+
+    // when terminating the path string at any point
+
+    i = rand();
+    i %= name_len;
+    assert(concat_inf_path(&ipath, ((size_t) i), "", 1));
+
+    name[0] = '0';
+    name[i] = '\0';
+    assert(! strcmp(ipath.ptr, name));
+
+    assert(ipath.max == (INSP_INITIAL_PATH_MAX * 2));
+
+
+    free(ipath.ptr);
+}
+
+
+
+
+static void new_file_test(){
+    uid_t uid;
+    gid_t gid;
+    file_node *file;
+    mode_t mode;
+
+    uid = getuid();
+    gid = getgid();
+
+
+    // when specifying a regular file
+
+    FILE *fp;
+    size_t size;
+
+    assert((fp = fopen(TMP_FILE1, "wb")));
+
+    size = rand();
+    size = size % 54 + 1;
+    assert(fwrite("ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz", sizeof(char), size, fp) == size);
+    size *= sizeof(char);
+
+    assert(! fclose(fp));
+
+    assert((file = new_file(TMP_FILE1, TMP_NAME1)));
+    assert(! strcmp(file->name, TMP_NAME1));
+
+    mode = file->mode;
+    assert(S_ISREG(mode));
+
+    assert(file->uid == uid);
+    assert(file->gid == gid);
+    assert(file->size == size);
+
+    assert(! (file->link_path || file->link_mode || file->link_invalid));
+    assert(! (file->children || file->children_num || file->children_max));
+    assert(! (file->errid || file->noinfo));
+
+    free(file);
+
+
+    // when specifying a symbolic link
+
+    assert(! symlink(TMP_FILE1, TMP_FILE2));
+
+    assert((file = new_file(TMP_FILE2, TMP_NAME2)));
+    assert(! strcmp(file->name, TMP_NAME2));
+
+    assert(S_ISLNK(file->mode));
+    assert(file->uid == uid);
+    assert(file->gid == gid);
+    assert(file->size == strlen(TMP_FILE1));
+
+    assert(! strcmp(file->link_path, TMP_FILE1));
+    assert(file->link_mode == mode);
+    assert(! file->link_invalid);
+
+    assert(! (file->children || file->children_num || file->children_max));
+    assert(! (file->errid || file->noinfo));
+
+    free(file->link_path);
+    free(file);
+
+
+    // when specifying a non-existing file
+
+    assert(! remove(TMP_FILE1));
+
+    assert((file = new_file(TMP_FILE1, TMP_NAME1)));
+    assert(! strcmp(file->name, TMP_NAME1));
+
+    assert(! (file->mode || file->uid || file->gid || file->size));
+
+    assert(! file->link_path);
+    assert(! file->link_mode);
+    assert(file->link_invalid);
+
+    assert(! (file->children || file->children_num || file->children_max));
+
+    assert(file->errid == ENOENT);
+    assert(file->noinfo);
+
+    free(file);
+
+
+    // when specifying an invalid symbolic link
+
+    assert((file = new_file(TMP_FILE2, TMP_NAME2)));
+    assert(! strcmp(file->name, TMP_NAME2));
+
+    assert(S_ISLNK(file->mode));
+    assert(file->uid == uid);
+    assert(file->gid == gid);
+    assert(file->size == strlen(TMP_FILE1));
+
+    assert(! strcmp(file->link_path, TMP_FILE1));
+    assert(! file->link_mode);
+    assert(file->link_invalid);
+
+    assert(! (file->children || file->children_num || file->children_max));
+
+    assert(file->errid == ENOENT);
+    assert(! file->noinfo);
+
+    free(file->link_path);
+    free(file);
+
+
+    assert(! remove(TMP_FILE2));
+}
+
+
+
+
+static void append_file_test(){
+    file_node node, *file;
+    int i = 0;
+    off_t total_size = 0;
+
+    node.size = 0;
+    node.children = NULL;
+    node.children_num = 0;
+    node.children_max = 0;
+
+
+    // when storing file nodes in order
+
+    do {
+        assert((file = (file_node *) malloc(sizeof(file_node))));
+
+        file->size = rand() / (INSP_INITIAL_DIRS_MAX * 2);
+        assert(append_file(&node, file));
+
+        total_size += file->size;
+        assert(node.size == total_size);
+
+        assert(node.children);
+        assert(node.children[i] == file);
+        assert(node.children_num == (++i));
+
+        free(file);
+
+        if (i <= INSP_INITIAL_DIRS_MAX)
+            assert(node.children_max == INSP_INITIAL_DIRS_MAX);
+        else {
+            assert(node.children_max == (INSP_INITIAL_DIRS_MAX * 2));
+            break;
+        }
+    } while (true);
+
+    assert(i == (INSP_INITIAL_DIRS_MAX + 1));
+
+    free(node.children);
+}
+
+
+
+
+static void fcmp_name_test(){
+    file_node node1, node2, *file1, *file2;
+    file1 = &node1;
+    file2 = &node2;
+
+    // equal
+
+    node1.name = "dit_version";
+    node2.name = "dit_version";
+    assert(! fcmp_name(&file1, &file2, NULL));
+
+    node1.name = "ls";
+    node2.name = "ls";
+    assert(! fcmp_name(&file1, &file2, NULL));
+
+    node1.name = "application.log";
+    node2.name = "application.log";
+    assert(! fcmp_name(&file1, &file2, NULL));
+
+
+    // lower than
+
+    node1.name = "etc";
+    node2.name = "mnt";
+    assert(fcmp_name(&file1, &file2, NULL) < 0);
+
+    node1.name = ".bashrc";
+    node2.name = ".profile";
+    assert(fcmp_name(&file1, &file2, NULL) < 0);
+
+    node1.name = ".";
+    node2.name = "..";
+    assert(fcmp_name(&file1, &file2, NULL) < 0);
+
+
+    // greater than
+
+    node1.name = ".dockerignore";
+    node2.name = ".dit_history";
+    assert(fcmp_name(&file1, &file2, NULL) > 0);
+
+    node1.name = "abc.txt";
+    node2.name = "abc.csv";
+    assert(fcmp_name(&file1, &file2, NULL) > 0);
+
+    node1.name = "123\n456";
+    node2.name = "123\t456";
+    assert(fcmp_name(&file1, &file2, NULL) > 0);
+}
+
+
+
+
+static void fcmp_size_test(){
+    file_node node1, node2;
+
+    // equal
+    node1.size = 32;
+    node2.size = 32;
+    assert(! fcmp_size(&node1, &node2));
+
+    // lower than  (in descending order)
+    node1.size = 1245;
+    node2.size = 672;
+    assert(fcmp_size(&node1, &node2) < 0);
+
+    // greater than  (in descending order)
+    node1.size = 0;
+    node2.size = 7;
+    assert(fcmp_size(&node1, &node2) > 0);
+}
+
+
+
+
+static void fcmp_ext_test(){
+    file_node node1, node2;
+
+    // equal
+
+    node1.name = "config.stat";
+    node2.name = "optimize.stat";
+    assert(! fcmp_ext(&node1, &node2));
+
+    node1.name = "properties.json";
+    node2.name = "tasks.json";
+    assert(! fcmp_ext(&node1, &node2));
+
+    node1.name = "bin";
+    node2.name = "sbin";
+    assert(! fcmp_ext(&node1, &node2));
+
+
+    // lower than
+
+    node1.name = "ignore.list.dock";
+    node2.name = "ignore.list.hist";
+    assert(fcmp_ext(&node1, &node2) < 0);
+
+    node1.name = "build";
+    node2.name = "docker-compose.build.yml";
+    assert(fcmp_ext(&node1, &node2) < 0);
+
+    node1.name = "main.c";
+    node2.name = "main.o";
+    assert(fcmp_ext(&node1, &node2) < 0);
+
+
+    // greater than
+
+    node1.name = "Dockerfile.draft";
+    node2.name = ".dockerignore";
+    assert(fcmp_ext(&node1, &node2) > 0);
+
+    node1.name = "exec.sh";
+    node2.name = "exec.bash";
+    assert(fcmp_ext(&node1, &node2) > 0);
+
+    node1.name = "index.html";
+    node2.name = "html";
+    assert(fcmp_ext(&node1, &node2) > 0);
+}
+
+
+
+
+static void get_file_ext_test(){
+    // equal
+    assert(! strcmp(get_file_ext("main.c"), "c"));
+    assert(! strcmp(get_file_ext("README.md"), "md"));
+
+    assert(! strcmp(get_file_ext(".."), ""));
+    assert(! strcmp(get_file_ext("utils.py.test"), "test"));
+
+    assert(! strcmp(get_file_ext("ISSUE_TEMPLATE"), ""));
+    assert(! strcmp(get_file_ext(".gitignore"), "gitignore"));
 }
 
 

@@ -52,7 +52,7 @@ ARG BASE_VERSION
 ENV BASE_NAME="${BASE_NAME}"
 ENV BASE_VERSION="${BASE_VERSION}"
 
-# record the default user because it will be switched to a privileged user for a while
+# record the default user because it will be switched to the privileged user for a while
 RUN whoami > /dit/etc/default_user
 USER root
 
@@ -62,6 +62,9 @@ CMD [ "/bin/bash", "--login" ]
 
 
 FROM product AS test
+
+# remain as the privileged user while running test codes
+RUN echo 'root' > /dit/etc/default_user
 
 # load test script for each dit command
 WORKDIR /dit/test
