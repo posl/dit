@@ -80,21 +80,21 @@ echo
 
 # failure cases
 
-: 'mode integer must be between 0 and 4.'
+: 'error: mode integer must be between 0 and 4.'
 dit config 5 && exit 1
 read -r REPLY
 
-: '>  target file must be represented by one of "bdh".'
+: 'error: target file must be represented by one of "bdh".'
 dit config a=3 && exit 1
 read -r REPLY
 
-: 'mode string must be uniquely interpretable.'
+: 'error: mode string must be uniquely interpretable.'
 dit config -r d=no && exit 1
 read -r REPLY
 
-: 'multiple mode specifications must be separated by commas.'
+: 'error: multiple mode specifications must be separated by commas.'
 dit config d=no-ig h=1 && exit 1
 read -r REPLY
 
-: 'intentionally make an unexpected error.' > /dit/var/config.stat
+: 'error: if the internal config-file is empty, it should be reset.' > /dit/var/config.stat
 do_test 'd=normal' 'h=normal' 12

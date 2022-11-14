@@ -100,29 +100,29 @@ echo
 
 # successful cases
 
-: 'show usage examples of commands that should be learned.'
+: 'check if usage examples of 4 commands that should be learned are displayed.'
 dit help -e || exit 1
 read -r REPLY
 
-: 'show a short description of the interface of all dit commands.'
+: 'check if a short description of the interface of all dit commands is displayed.'
 dit help -d || exit 1
 read -r REPLY
 
 
-: 'when specifying one command'
+: 'check if a short description of the specified dit command is displayed.'
 dit help --d inspect || exit 1
 read -r REPLY
 
-: 'when specifying multiple abbreviated commands'
+: 'check if short descriptions for some commands specified in abbreviations are displayed.'
 dit help --desc conv optim refl erase || exit 1
 read -r REPLY
 
-: 'when specifying multiple commands with aliases'
+: 'check if short descriptions for some aliased commands are displayed.'
 dit help --description cfg hc || exit 1
 read -r REPLY
 
 
-: 'display the contents of the version-file.'
+: 'check the correctness of version information'
 echo 'dit version a.b.c' > /dit/etc/dit_version
 dit help -V || exit 1
 read -r REPLY
@@ -130,15 +130,15 @@ read -r REPLY
 
 # failure cases
 
-: 'when specifying an invalid command'
+: 'error: an invalid command must not be specified.'
 dit help -m commit && exit 1
 read -r REPLY
 
-: 'when specifying an ambiguous command'
+: 'error: the command must be uniquely interpretable.'
 dit help --exam he && exit 1
 read -r REPLY
 
-: 'intentionally make an unexpected error.'
+: 'error: the internal version-file must not be handled carelessly.'
 rm -f /dit/etc/dit_version
 dit help -V && exit 1
 read -r REPLY
