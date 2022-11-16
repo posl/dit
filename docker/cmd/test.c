@@ -194,7 +194,6 @@ void print_progress_test_loop(int code_c, int type, int count){
 
     switch (code_c){
         case 'S':
-            assert((type == SUCCESS) || (type == FAILURE));
             desc = successful_reprs[(bool) type];
             break;
         case 'C':

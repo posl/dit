@@ -943,6 +943,7 @@ static void receive_positive_integer_test(void){
     int i, left;
     bool range_flag;
 
+
     for (i = 0; table[i].target; i++){
         range_flag = (table[i].left != -2);
         left = -1;
@@ -1003,6 +1004,7 @@ static void receive_expected_string_test(void){
 
     int i, id;
     const char *instr_repr;
+
 
     for (i = 0; table[i].target; i++){
         id = receive_expected_string(table[i].target, docker_instr_reprs, DOCKER_INSTRS_NUM, table[i].mode);
@@ -1065,15 +1067,12 @@ static void receive_dockerfile_instruction_test(void){
         print_progress_test_loop('S', id, i);
         fprintf(stderr, "%-38s", line);
 
-        for (remain = 2;; remain--){
-            if (remain)
-                id = (remain == 2) ? table[i].expected_id : table[i].actual_id ;
-            else
-                break;
-
+        for (remain = 2; remain--;){
+            id = remain ? table[i].expected_id : table[i].actual_id;
             fprintf(stderr, "  %-11s", ((id >= 0) ? docker_instr_reprs[id] : " \?"));
         }
 
+        assert(remain == -1);
         fputc('\n', stderr);
     }
 }

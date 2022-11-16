@@ -910,7 +910,7 @@ void inspect_test(void){
 
 static void concat_inf_path_test(void){
     char name[] = " , the temporary file-name for docker-interactive-tool/";
-    size_t name_len = sizeof(name) / sizeof(char);
+    size_t name_len = sizeof(name) / sizeof(*name);
 
     int iter = 0;
     while (((name_len - 1) * (++iter) + 1) <= INSP_INITIAL_PATH_MAX);
