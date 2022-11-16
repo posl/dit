@@ -343,6 +343,8 @@ static bool concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, 
             return false;
     }
 
+    assert(ipath->ptr);
+
     char *dest;
     dest = ipath->ptr + ipath_len;
     memcpy(dest, suf, (sizeof(char) * suf_len));
@@ -449,6 +451,8 @@ static bool append_file(file_node *tree, file_node *file){
             return false;
     }
 
+    assert(tree->children);
+
     tree->size += file->size;
     tree->children[tree->children_num++] = file;
     return true;
@@ -532,6 +536,9 @@ static int fcmp_name(const void *a, const void *b, fcmp addition){
  * @return int  comparison result
  */
 static int fcmp_size(const file_node *file1, const file_node *file2){
+    assert(file1);
+    assert(file2);
+
     int i = 0;
 
     if (file1->size != file2->size)
@@ -549,7 +556,11 @@ static int fcmp_size(const file_node *file1, const file_node *file2){
  * @return int  comparison result
  */
 static int fcmp_ext(const file_node *file1, const file_node *file2){
+    assert(file1);
+    assert(file2);
+
     const char *ext1, *ext2;
+
     ext1 = get_file_ext(file1->name);
     ext2 = get_file_ext(file2->name);
 

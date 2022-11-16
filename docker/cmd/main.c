@@ -234,21 +234,20 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
  * @note the return value of 'receive_expected_string' can be used as it is for 'state'.
  */
 void xperror_invalid_arg(int code_c, int state, const char * restrict desc, const char * restrict arg){
-    assert((code_c == 'O') || (code_c == 'N') || (code_c == 'C'));
     assert(desc);
-    assert(arg);
 
     const char *format, *addition = "", *adjective;
 
     switch (code_c){
-        case 'O':
-            format = "%s: %s argument '%s' for '--%s'\n";
-            addition = arg;
-            break;
         case 'N':
             addition = " number of";
-        default:
+        case 'C':
             format = "%s: %s%s %s: '%s'\n";
+            break;
+        default:
+            assert(code_c == 'O');
+            format = "%s: %s argument '%s' for '--%s'\n";
+            addition = arg;
     }
 
     adjective = state ? ((state == -1) ? "ambiguous" : "invalid") : "unrecognized";
@@ -613,6 +612,7 @@ int receive_expected_string(const char *target, const char * const reprs[], size
 
             break_flag = false;
 
+            assert(tmp == (min - max));
             while (tmp){
                 if (tmp < 0){
                     mid = (min + max) / 2;
