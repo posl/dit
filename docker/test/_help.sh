@@ -18,10 +18,11 @@ set +x
 OUTPUT=''
 CMDS_NUM=13
 
-TMP1=_help1.tmp
-TMP2=_help2.tmp
 
 trap ': > /dit/etc/dit_version; rm -f _help[1-2].tmp; echo' EXIT
+
+TMP1=_help1.tmp
+TMP2=_help2.tmp
 
 set -x
 

@@ -15,6 +15,8 @@ dit inspect --unit-tests || exit 1
 
 set +x
 
+trap 'rm -fR _inspect[1-3].tmp; echo' EXIT
+
 TMP1=_inspect1.tmp
 TMP2=_inspect2.tmp
 
@@ -36,8 +38,6 @@ ln -s /usr/local/bin/dit dit.link
 
 cd ..
 
-
-trap 'rm -fR _inspect[1-3].tmp; echo' EXIT
 
 echo
 set -x
