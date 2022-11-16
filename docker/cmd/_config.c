@@ -383,94 +383,96 @@ void config_test(void){
 
 
 static void receive_mode_test(void){
-    int mode2d, mode2h, idx;
+    const struct {
+        const char *config_arg;
+        const int stat;
+    }
+    table[] = {
+        { "_",               CONF_INITIAL_STAT       },
+        { "0,1,2,3,4",       CONF_STAT_FORMULA(4, 4) },
+        { "0_",              CONF_STAT_FORMULA(0, 4) },
+        { "d=2,h=3",         CONF_STAT_FORMULA(2, 3) },
+        { "h=1,0_",          CONF_STAT_FORMULA(0, 1) },
+        { "h=no-ig",         CONF_STAT_FORMULA(0, 4) },
+        { "strict,d=simple", CONF_STAT_FORMULA(3, 1) },
+        { "1,,h=no-refl",    CONF_STAT_FORMULA(1, 0) },
+        { "b=norm,3_",       CONF_STAT_FORMULA(3, 2) },
+        { "m",                   -1                  },
+        { "0,1,2,3,4,5",         -1                  },
+        { "-4",                  -1                  },
+        { "no-",                 -1                  },
+        { "d=norm,h=struct",     -1                  },
+        {  0,                     0                  }
+    };
 
-    // successful cases
+    int i, mode2d, mode2h, rand2d, rand2h, type;
+    div_t tmp;
+    char format[] = "%-15s  %d  %d\n";
 
-    mode2d = CONF_DEFAULT_MODE;
-    mode2h = CONF_DEFAULT_MODE;
-
-    assert(receive_mode("_", &mode2d, &mode2h));
-    assert(mode2d == CONF_DEFAULT_MODE);
-    assert(mode2h == CONF_DEFAULT_MODE);
-
-    assert(receive_mode("0,1,2,3,4", &mode2d, &mode2h));
-    assert(mode2d == 4);
-    assert(mode2h == 4);
-
-    assert(receive_mode("0_", &mode2d, &mode2h));
-    assert(mode2d == 0);
-    assert(mode2h == 4);
-
-    assert(receive_mode("d=2,h=3", &mode2d, &mode2h));
-    assert(mode2d == 2);
-    assert(mode2h == 3);
-
-    assert(receive_mode("h=1,4_", &mode2d, &mode2h));
-    assert(mode2d == 4);
-    assert(mode2h == 1);
-
-    assert(receive_mode("h=no-ig", &mode2d, &mode2h));
-    assert((idx = receive_expected_string("no-ig", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
-    assert(mode2d == 4);
-    assert(mode2h == idx2mode[idx]);
-
-    assert(receive_mode("strict,simple", &mode2d, &mode2h));
-    assert((idx = receive_expected_string("simple", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
-    assert(mode2d == idx2mode[idx]);
-    assert(mode2h == idx2mode[idx]);
-
-    assert(receive_mode("1,d=no-refl", &mode2d, &mode2h));
-    assert((idx = receive_expected_string("no-refl", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
-    assert(mode2d == idx2mode[idx]);
-    assert(mode2h == 1);
-
-    assert(receive_mode("b=norm,3_", &mode2d, &mode2h));
-    assert((idx = receive_expected_string("norm", mode_reprs, CONF_MODES_NUM, 2)) >= 0);
-    assert(mode2d == 3);
-    assert(mode2h == idx2mode[idx]);
+    mode2d = (rand2d = CONF_DEFAULT_MODE);
+    mode2h = (rand2h = CONF_DEFAULT_MODE);
 
 
-    // failure cases
+    for (i = 0; table[i].config_arg; i++){
+        type = SUCCESS;
 
-    mode2d = 0;
-    mode2h = 3;
+        if (table[i].stat < 0){
+            mode2d = (rand2d = rand() % CONF_MODES_NUM);
+            mode2h = (rand2h = rand() % CONF_MODES_NUM);
+            type = FAILURE;
+        }
 
-    assert(! receive_mode("m", &mode2d, &mode2h));
-    assert(mode2d == 0);
-    assert(mode2h == 3);
+        assert(receive_mode(table[i].config_arg, &mode2d, &mode2h) == (type == SUCCESS));
 
-    assert(! receive_mode("0,1,2,3,4,5", &mode2d, &mode2h));
-    assert(mode2d == 0);
-    assert(mode2h == 3);
+        if (type == SUCCESS){
+            tmp = div(table[i].stat, CONF_MODES_NUM);
+            assert(mode2d == tmp.quot);
+            assert(mode2h == tmp.rem);
 
-    assert(! receive_mode("-4", &mode2d, &mode2h));
-    assert(mode2d == 0);
-    assert(mode2h == 3);
+            format[5] = ' ';
+            format[6] = ' ';
+        }
+        else {
+            assert(mode2d == rand2d);
+            assert(mode2h == rand2h);
 
-    assert(! receive_mode("no-", &mode2d, &mode2h));
-    assert(mode2d == 0);
-    assert(mode2h == 3);
+            format[5] = '\n';
+            format[6] = '\0';
+        }
 
-    assert(! receive_mode("d=norm,h=struct", &mode2d, &mode2h));
-    assert(mode2d == 0);
-    assert(mode2h == 3);
+        print_progress_test_loop('S', type, i);
+        fprintf(stderr, format, table[i].config_arg, mode2d, mode2h);
+    }
 }
 
 
 
 
 static void receive_mode_integer_test(void){
-    // successful cases
-    assert(receive_mode_integer('0', -2) == 0);
-    assert(receive_mode_integer('3', -2) == 3);
-    assert(receive_mode_integer('_', -2) == -2);
+    const int spare = -2;
 
-    // failure cases
-    assert(receive_mode_integer('5', -2) == -1);
-    assert(receive_mode_integer('i', -2) == -1);
-    assert(receive_mode_integer(' ', -2) == -1);
-    assert(receive_mode_integer(-31, -2) == -1);
+    const struct {
+        const int c;
+        const int result;
+    }
+    table[] = {
+        { '0',   0   },
+        { '3',   3   },
+        { '4',   4   },
+        { '_', spare },
+        { '5',  -1   },
+        { '-',  -1   },
+        { 'i',  -1   },
+        { ' ',  -1   },
+        {  0,    0   }
+    };
+
+    for (int i = 0; table[i].c; i++){
+        assert(receive_mode_integer(table[i].c, spare) == table[i].result);
+
+        print_progress_test_loop('S', ((table[i].result != -1) ? SUCCESS : FAILURE), i);
+        fprintf(stderr, "%c  % d\n", table[i].c, table[i].result);
+    }
 }
 
 

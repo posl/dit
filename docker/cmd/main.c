@@ -884,177 +884,198 @@ static void xfgets_for_loop_test(void){
 
 
 static void xstrcmp_upper_case_test(void){
-    // equal
-    assert(! xstrcmp_upper_case("none", "NONE"));
-    assert(! xstrcmp_upper_case("hoGe-PIyO", "HOGE-PIYO"));
-    assert(! xstrcmp_upper_case("f.lwhaeopyr;pfqwnel.FGQHP934", "F.LWHAEOPYR;PFQWNEL.FGQHP934"));
+    comptest_table table[] = {
+        { { .name = "none"                   }, { .name = "NONE"                      }, COMPTEST_EQUAL   },
+        { { .name = "hoGe-PIyO"              }, { .name = "HOGE-PIYO"                 }, COMPTEST_EQUAL   },
+        { { .name = "f.lwhaeopyr;pfqwnel.FG" }, { .name = "F.LWHAEOPYR;PFQWNEL.FG"    }, COMPTEST_EQUAL   },
+        { { .name = "Quit"                   }, { .name = "YES"                       }, COMPTEST_LESSER  },
+        { { .name = "niPPon"                 }, { .name = "NIPPORI"                   }, COMPTEST_LESSER  },
+        { { .name = "fasldhfoNLASOL>NAZHO"   }, { .name = "FASLFN/L?EF=ONLAS|OLX{ZHO" }, COMPTEST_LESSER  },
+        { { .name = "SIGKILL"                }, { .name = "SIGINT"                    }, COMPTEST_GREATER },
+        { { .name = "Super Sento"            }, { .name = "SUPER MARKET"              }, COMPTEST_GREATER },
+        { { .name = "On your marks, Set, Go" }, { .name = "ON YOUR MARK!"             }, COMPTEST_GREATER },
+        {     0,                                    0,                                      -1            }
+    };
 
-    // lower than
-    assert(xstrcmp_upper_case("Quit", "YES") < 0);
-    assert(xstrcmp_upper_case("niPPon", "NIPPORI") < 0);
-    assert(xstrcmp_upper_case("fasldhfoNLASOL>NAZHO", "FASLFN/L?EF=ONLAS|OLX{ZHO") < 0);
-    assert(xstrcmp_upper_case("SaKurA", "SAKURA, HIRAHIRA") < 0);
+    const char *target, *expected;
 
-    // greater than
-    assert(xstrcmp_upper_case("SIGKILL", "SIGINT") > 0);
-    assert(xstrcmp_upper_case("Super Sento", "SUPER MARKET") > 0);
-    assert(xstrcmp_upper_case(";LZQERXT;,EM;W ; ERGJ'VXWP,9MG", ";LZQERXT;,EM;W 4CQ; ERGJ'VXWP,9MG") > 0);
-    assert(xstrcmp_upper_case("On your marks, Set, Go!", "ON YOUR MARK") > 0);
+    for (int i = 0; table[i].type >= 0; i++){
+        target = table[i].elem1.name;
+        expected = table[i].elem2.name;
+        assert(comptest_result_check(table[i].type, xstrcmp_upper_case(target, expected)));
+
+        print_progress_test_loop('C', table[i].type, i);
+        fprintf(stderr, "%-22s  %s\n", target, expected);
+    }
 }
 
 
 
 
 static void receive_positive_integer_test(void){
-    int left;
+    const struct {
+        const char *target;
+        const int left;
+        const int right;
+    }
+    table[] = {
+        { "0",            -2,    0 },
+        { "23",           -2,   23 },
+        { "0601",         -2,  601 },
+        { "456",          -1,  456 },
+        { "4-17",          4,   17 },
+        { "89-12",        89,   12 },
+        { "-2022",         0, 2022 },
+        { "03629-",     3629,    0 },
+        { "-",             0,    0 },
+        { "2o1",          -2,   -1 },
+        { "int",          -2,   -1 },
+        { "-29",          -2,   -1 },
+        { "4294967295",   -2,   -1 },
+        { "_73",          -1,   -1 },
+        { "3278o-3y28",   -1,   -1 },
+        { "zwei-vier",    -1,   -1 },
+        { "7-ten",         7,   -1 },
+        { "--",            0,   -1 },
+        {  0,              0,    0 }
+    };
 
-    // successful cases
+    int i, left;
+    bool range_flag;
 
-    assert(! receive_positive_integer("0", NULL));
-    assert(receive_positive_integer("23", NULL) == 23);
-    assert(receive_positive_integer("0601", NULL) == 601);
+    for (i = 0; table[i].target; i++){
+        range_flag = (table[i].left != -2);
+        left = -1;
 
-    left = -1;
-    assert(receive_positive_integer("456", &left) == 456);
-    assert(left == -1);
+        assert(receive_positive_integer(table[i].target, (range_flag ? &left : NULL)) == table[i].right);
+        if (range_flag)
+            assert(left == table[i].left);
 
-    assert(receive_positive_integer("89-12", &left) == 12);
-    assert(left == 89);
-
-    assert(receive_positive_integer("-2022", &left) == 2022);
-    assert(! left);
-
-    assert(! receive_positive_integer("03629-", &left));
-    assert(left == 3629);
-
-    assert(! receive_positive_integer("-", &left));
-    assert(! left);
-
-
-    // failure cases
-
-    assert(receive_positive_integer("2o1", NULL) == -1);
-    assert(receive_positive_integer("integer", NULL) == -1);
-    assert(receive_positive_integer("-29", NULL) == -1);
-    assert(receive_positive_integer("4294967295", NULL) == -1);
-
-    left = -1;
-    assert(receive_positive_integer("_73", &left) == -1);
-    assert(left == -1);
-
-    assert(receive_positive_integer("3278o-3y28", &left) == -1);
-    assert(left == -1);
-
-    assert(receive_positive_integer("zwei-vier", &left) == -1);
-    assert(left == -1);
-
-
-    assert(receive_positive_integer("7-ten", &left) == -1);
-    assert(left == 7);
-
-    assert(receive_positive_integer("--", &left) == -1);
-    assert(! left);
+        print_progress_test_loop('S', ((table[i].right != -1) ? SUCCESS : FAILURE), i);
+        fprintf(stderr, "%-10s  % 5d % 5d\n", table[i].target, table[i].left, table[i].right);
+    }
 }
 
 
 
 
 static void receive_expected_string_test(void){
-    // successful cases
+    const struct {
+        const char *target;
+        const unsigned int mode;
+        const int result;
+    }
+    table[] = {
+        { "COPY",      0, ID_COPY        },
+        { "WORKDIR",   0, ID_WORKDIR     },
+        { "SHELL",     0, ID_SHELL       },
+        { "LABEL",     0, ID_LABEL       },
+        { "Volume",    1, ID_VOLUME      },
+        { "from",      1, ID_FROM        },
+        { "add",       1, ID_ADD         },
+        { "ExPose",    1, ID_EXPOSE      },
+        { "HEA",       2, ID_HEALTHCHECK },
+        { "R",         2, ID_RUN         },
+        { "ENT",       2, ID_ENTRYPOINT  },
+        { "AR",        2, ID_ARG         },
+        { "env",       3, ID_ENV         },
+        { "main",      3, ID_MAINTAINER  },
+        { "sTo",       3, ID_STOPSIGNAL  },
+        { "Cmd",       3, ID_CMD         },
+        { "copy",      0,   -2           },
+        { "WORK DIR",  0,   -2           },
+        { "S",         0,   -1           },
+        { "QWERT",     0,   -2           },
+        { "vol"   ,    1,   -2           },
+        { "Form",      1,   -2           },
+        { "a",         1,   -1           },
+        { "Lap-Top",   1,   -2           },
+        { "health",    2,   -2           },
+        { "Run",       2,   -2           },
+        { "EN",        2,   -1           },
+        { "STRAW",     2,   -2           },
+        { "environ",   3,   -2           },
+        { "Main Tain", 3,   -2           },
+        { "",          3,   -1           },
+        { "2.3],fm';", 3,   -2           },
+        {  0,          0,    0           }
+    };
 
-    assert(receive_expected_string("COPY", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_COPY);
-    assert(receive_expected_string("WORKDIR", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_WORKDIR);
-    assert(receive_expected_string("SHELL", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_SHELL);
-    assert(receive_expected_string("LABEL", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == ID_LABEL);
+    int i, id;
+    const char *instr_repr;
 
-    assert(receive_expected_string("Volume", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_VOLUME);
-    assert(receive_expected_string("from", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_FROM);
-    assert(receive_expected_string("add", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_ADD);
-    assert(receive_expected_string("ExPose", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == ID_EXPOSE);
+    for (i = 0; table[i].target; i++){
+        id = receive_expected_string(table[i].target, docker_instr_reprs, DOCKER_INSTRS_NUM, table[i].mode);
+        assert(id == table[i].result);
 
-    assert(receive_expected_string("HEA", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_HEALTHCHECK);
-    assert(receive_expected_string("R", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_RUN);
-    assert(receive_expected_string("ENT", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_ENTRYPOINT);
-    assert(receive_expected_string("AR", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == ID_ARG);
+        if (id >= 0){
+            instr_repr = docker_instr_reprs[id];
+            id = SUCCESS;
+        }
+        else {
+            instr_repr = " \?";
+            id = FAILURE;
+        }
 
-    assert(receive_expected_string("env", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_ENV);
-    assert(receive_expected_string("main", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_MAINTAINER);
-    assert(receive_expected_string("sTo", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_STOPSIGNAL);
-    assert(receive_expected_string("Cmd", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == ID_CMD);
-
-
-    // failure cases
-
-    assert(receive_expected_string("copy", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -2);
-    assert(receive_expected_string("WORK DIR", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -2);
-    assert(receive_expected_string("S", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -1);
-    assert(receive_expected_string("QWERT", docker_instr_reprs, DOCKER_INSTRS_NUM, 0) == -2);
-
-    assert(receive_expected_string("vol", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -2);
-    assert(receive_expected_string("Form", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -2);
-    assert(receive_expected_string("a", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -1);
-    assert(receive_expected_string("Lap-Top", docker_instr_reprs, DOCKER_INSTRS_NUM, 1) == -2);
-
-    assert(receive_expected_string("health", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -2);
-    assert(receive_expected_string("Run", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -2);
-    assert(receive_expected_string("EN", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -1);
-    assert(receive_expected_string("STRAW", docker_instr_reprs, DOCKER_INSTRS_NUM, 2) == -2);
-
-    assert(receive_expected_string("environ", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -2);
-    assert(receive_expected_string("Main Tain", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -2);
-    assert(receive_expected_string("", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -1);
-    assert(receive_expected_string("2.3],fm';", docker_instr_reprs, DOCKER_INSTRS_NUM, 3) == -2);
+        print_progress_test_loop('S', id, i);
+        fprintf(stderr, "%-9s  %s\n", table[i].target, instr_repr);
+    }
 }
 
 
 
 
 static void receive_dockerfile_instruction_test(void){
-    char *line;
-    int instr_id;
+    const struct {
+        char *line;
+        const int expected_id;
+        const int actual_id;
+        const int offset;
+    }
+    table[] = {
+        { "ADD abc.tar.gz ./",                      ID_ADD,         ID_ADD,          4 },
+        { "HealthCheck  Cmd sh /bin/check-running", ID_HEALTHCHECK, ID_HEALTHCHECK, 13 },
+        { "EXPOSE 80/tcp 80/udp",                     -1,           ID_EXPOSE,       7 },
+        { "OnBuild  WorkDir /",                       -1,           ID_ONBUILD,      9 },
+        { "COPY ./etc/dit_install.sh /dit/etc/",    ID_ADD,         ID_COPY,        -1 },
+        { "form alpine:latest",                     ID_FROM,          -1,           -1 },
+        { "setcmd  [ \"/bin/bash\", \"--login\" ]",   -1,             -1,           -1 },
+        { "ENT dit inspect",                          -1,             -1,           -1 },
+        {  0,                                          0,              0,            0 }
+    };
 
-    // successful cases
-
-    line = "ADD abc.tar.gz ./";
-    instr_id = ID_ADD;
-    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 4));
-    assert(instr_id == ID_ADD);
-
-    line = "HealthCheck\tCmd sh /bin/check-running";
-    instr_id = ID_HEALTHCHECK;
-    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 12));
-    assert(instr_id == ID_HEALTHCHECK);
-
-    line = "EXPOSE  80/tcp 80/udp";
-    instr_id = -1;
-    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 8));
-    assert(instr_id == ID_EXPOSE);
-
-    line = "OnBuild\tWorkDir /";
-    instr_id = -1;
-    assert(receive_dockerfile_instruction(line, &instr_id) == (line + 8));
-    assert(instr_id == ID_ONBUILD);
+    int i, id, remain;
+    char *line, *tmp;
 
 
-    // failure cases
+    for (i = 0; (line = table[i].line); i++){
+        id = table[i].expected_id;
+        tmp = receive_dockerfile_instruction(line, &id);
 
-    instr_id = ID_FROM;
-    assert(! receive_dockerfile_instruction("form alpine:latest", &instr_id));
+        if (table[i].offset >= 0){
+            assert(tmp == (line + table[i].offset));
+            assert(id == table[i].actual_id);
+            id = SUCCESS;
+        }
+        else {
+            assert(! tmp);
+            id = FAILURE;
+        }
 
-    instr_id = ID_STOPSIGNAL;
-    assert(! receive_dockerfile_instruction("SIGNAL SIGINT", &instr_id));
+        print_progress_test_loop('S', id, i);
+        fprintf(stderr, "%-38s", line);
 
-    instr_id = ID_ADD;
-    assert(! receive_dockerfile_instruction("COPY ./etc/dit_install.sh /dit/etc/", &instr_id));
+        for (remain = 2;; remain--){
+            if (remain)
+                id = (remain == 2) ? table[i].expected_id : table[i].actual_id ;
+            else
+                break;
 
-    instr_id = -1;
-    assert(! receive_dockerfile_instruction("setcmd [ \"/bin/bash\", \"--login\" ]", &instr_id));
+            fprintf(stderr, "  %-11s", ((id >= 0) ? docker_instr_reprs[id] : " \?"));
+        }
 
-    instr_id = -1;
-    assert(! receive_dockerfile_instruction("LAVEL author inada tsukasa", &instr_id));
-
-    instr_id = -1;
-    assert(! receive_dockerfile_instruction("ENT dit inspect", &instr_id));
+        fputc('\n', stderr);
+    }
 }
 
 

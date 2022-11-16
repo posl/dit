@@ -899,10 +899,10 @@ void inspect_test(void){
     do_test(new_file_test);
     do_test(append_file_test);
 
+    do_test(get_file_ext_test);
     do_test(fcmp_name_test);
     do_test(fcmp_size_test);
     do_test(fcmp_ext_test);
-    do_test(get_file_ext_test);
 }
 
 
@@ -1122,141 +1122,115 @@ static void append_file_test(void){
 
 
 static void fcmp_name_test(void){
-    file_node node1, node2, *file1, *file2;
+    comptest_table table[] = {
+        { { .name = "dit_version"   }, { .name = "dit_version"  }, COMPTEST_EQUAL   },
+        { { .name = "su-exec"       }, { .name = "su-exec"      }, COMPTEST_EQUAL   },
+        { { .name = ".vscode"       }, { .name = ".vscode"      }, COMPTEST_EQUAL   },
+        { { .name = "etc"           }, { .name = "mnt"          }, COMPTEST_LESSER  },
+        { { .name = ".bashrc"       }, { .name = ".profile"     }, COMPTEST_LESSER  },
+        { { .name = "."             }, { .name = ".."           }, COMPTEST_LESSER  },
+        { { .name = ".dockerignore" }, { .name = ".dit_history" }, COMPTEST_GREATER },
+        { { .name = "abc.txt"       }, { .name = "abc.csv"      }, COMPTEST_GREATER },
+        { { .name = "123 456"       }, { .name = "123\t456"     }, COMPTEST_GREATER },
+        {     0,                           0,                         -1            }
+    };
+
+    file_node *file1, *file2, node1, node2;
     file1 = &node1;
     file2 = &node2;
 
-    // equal
+    for (int i = 0; table[i].type >= 0; i++){
+        node1.name = table[i].elem1.name;
+        node2.name = table[i].elem2.name;
+        assert(comptest_result_check(table[i].type, fcmp_name(&file1, &file2, NULL)));
 
-    node1.name = "dit_version";
-    node2.name = "dit_version";
-    assert(! fcmp_name(&file1, &file2, NULL));
-
-    node1.name = "ls";
-    node2.name = "ls";
-    assert(! fcmp_name(&file1, &file2, NULL));
-
-    node1.name = "application.log";
-    node2.name = "application.log";
-    assert(! fcmp_name(&file1, &file2, NULL));
-
-
-    // lower than
-
-    node1.name = "etc";
-    node2.name = "mnt";
-    assert(fcmp_name(&file1, &file2, NULL) < 0);
-
-    node1.name = ".bashrc";
-    node2.name = ".profile";
-    assert(fcmp_name(&file1, &file2, NULL) < 0);
-
-    node1.name = ".";
-    node2.name = "..";
-    assert(fcmp_name(&file1, &file2, NULL) < 0);
-
-
-    // greater than
-
-    node1.name = ".dockerignore";
-    node2.name = ".dit_history";
-    assert(fcmp_name(&file1, &file2, NULL) > 0);
-
-    node1.name = "abc.txt";
-    node2.name = "abc.csv";
-    assert(fcmp_name(&file1, &file2, NULL) > 0);
-
-    node1.name = "123\n456";
-    node2.name = "123\t456";
-    assert(fcmp_name(&file1, &file2, NULL) > 0);
+        print_progress_test_loop('C', table[i].type, i);
+        fprintf(stderr, "%-13s  %s\n", node1.name, node2.name);
+    }
 }
 
 
 
 
 static void fcmp_size_test(void){
+    comptest_table table[] = {
+        { { .size =    0 }, { .size =    0 }, COMPTEST_EQUAL   },
+        { { .size =   32 }, { .size =   32 }, COMPTEST_EQUAL   },
+        { { .size =  195 }, { .size =  195 }, COMPTEST_EQUAL   },
+        { { .size =    8 }, { .size =    0 }, COMPTEST_LESSER  },
+        { { .size = 1270 }, { .size =   15 }, COMPTEST_LESSER  },
+        { { .size = 2048 }, { .size = 1024 }, COMPTEST_LESSER  },
+        { { .size =   60 }, { .size =  122 }, COMPTEST_GREATER },
+        { { .size =  672 }, { .size = 3572 }, COMPTEST_GREATER },
+        { { .size =    5 }, { .size =    6 }, COMPTEST_GREATER },
+        {     0,                0,               -1            }
+    };
+
     file_node node1, node2;
 
-    // equal
-    node1.size = 32;
-    node2.size = 32;
-    assert(! fcmp_size(&node1, &node2));
+    for (int i = 0; table[i].type >= 0; i++){
+        node1.size = table[i].elem1.size;
+        node2.size = table[i].elem2.size;
+        assert(comptest_result_check(table[i].type, fcmp_size(&node1, &node2)));
 
-    // lower than  (in descending order)
-    node1.size = 1245;
-    node2.size = 672;
-    assert(fcmp_size(&node1, &node2) < 0);
-
-    // greater than  (in descending order)
-    node1.size = 0;
-    node2.size = 7;
-    assert(fcmp_size(&node1, &node2) > 0);
+        print_progress_test_loop('C', table[i].type, i);
+        fprintf(stderr, "%4d  %4d\n", ((int) node1.size), ((int) node2.size));
+    }
 }
 
 
 
 
 static void fcmp_ext_test(void){
+    comptest_table table[] = {
+        { { .name = "config.stat"      }, { .name = "optimize.stat"            }, COMPTEST_EQUAL   },
+        { { .name = "properties.json"  }, { .name = "tasks.json"               }, COMPTEST_EQUAL   },
+        { { .name = "bin"              }, { .name = "sbin"                     }, COMPTEST_EQUAL   },
+        { { .name = "ignore.list.dock" }, { .name = "ignore.list.hist"         }, COMPTEST_LESSER  },
+        { { .name = "build"            }, { .name = "docker-compose.build.yml" }, COMPTEST_LESSER  },
+        { { .name = "main.c"           }, { .name = "main.o"                   }, COMPTEST_LESSER  },
+        { { .name = "Dockerfile.draft" }, { .name = ".dockerignore"            }, COMPTEST_GREATER },
+        { { .name = "exec.sh"          }, { .name = "exec.bash"                }, COMPTEST_GREATER },
+        { { .name = "index.html"       }, { .name = "html"                     }, COMPTEST_GREATER },
+        {     0,                              0,                                     -1            }
+    };
+
     file_node node1, node2;
 
-    // equal
+    for (int i = 0; table[i].type >= 0; i++){
+        node1.name = table[i].elem1.name;
+        node2.name = table[i].elem2.name;
+        assert(comptest_result_check(table[i].type, fcmp_ext(&node1, &node2)));
 
-    node1.name = "config.stat";
-    node2.name = "optimize.stat";
-    assert(! fcmp_ext(&node1, &node2));
-
-    node1.name = "properties.json";
-    node2.name = "tasks.json";
-    assert(! fcmp_ext(&node1, &node2));
-
-    node1.name = "bin";
-    node2.name = "sbin";
-    assert(! fcmp_ext(&node1, &node2));
-
-
-    // lower than
-
-    node1.name = "ignore.list.dock";
-    node2.name = "ignore.list.hist";
-    assert(fcmp_ext(&node1, &node2) < 0);
-
-    node1.name = "build";
-    node2.name = "docker-compose.build.yml";
-    assert(fcmp_ext(&node1, &node2) < 0);
-
-    node1.name = "main.c";
-    node2.name = "main.o";
-    assert(fcmp_ext(&node1, &node2) < 0);
-
-
-    // greater than
-
-    node1.name = "Dockerfile.draft";
-    node2.name = ".dockerignore";
-    assert(fcmp_ext(&node1, &node2) > 0);
-
-    node1.name = "exec.sh";
-    node2.name = "exec.bash";
-    assert(fcmp_ext(&node1, &node2) > 0);
-
-    node1.name = "index.html";
-    node2.name = "html";
-    assert(fcmp_ext(&node1, &node2) > 0);
+        print_progress_test_loop('C', table[i].type, i);
+        fprintf(stderr, "%-16s  %s\n", node1.name, node2.name);
+    }
 }
 
 
 
 
 static void get_file_ext_test(void){
-    // equal
-    assert(! strcmp(get_file_ext("main.c"), "c"));
-    assert(! strcmp(get_file_ext("README.md"), "md"));
+    const struct {
+        const char *name;
+        const char *ext;
+    }
+    table[] = {
+        { "main.c",         "c"         },
+        { "README.md",      "md"        },
+        { "..",             ""          },
+        { "utils.py.test",  "test"      },
+        { "ISSUE_TEMPLATE", ""          },
+        { ".gitignore",     "gitignore" },
+        {  0,                0          }
+    };
 
-    assert(! strcmp(get_file_ext(".."), ""));
-    assert(! strcmp(get_file_ext("utils.py.test"), "test"));
+    for (int i = 0; table[i].name; i++){
+        assert(! strcmp(get_file_ext(table[i].name), table[i].ext));
 
-    assert(! strcmp(get_file_ext("ISSUE_TEMPLATE"), ""));
-    assert(! strcmp(get_file_ext(".gitignore"), "gitignore"));
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "%-14s  %s\n", table[i].name, table[i].ext);
+    }
 }
 
 

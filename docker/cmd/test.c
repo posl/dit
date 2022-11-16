@@ -142,4 +142,71 @@ bool check_if_alphabetical_order(const char * const reprs[], size_t size){
 }
 
 
+
+
+/**
+ * @brief check if the comparison result is correct.
+ *
+ * @param[in]  type  the type of comparison result
+ * @param[in]  result  comparison result
+ * @return bool  the resulting boolean
+ */
+bool comptest_result_check(int type, int result){
+    assert((type >= 0) && (type < COMPTESTS_NUM));
+
+    switch (type){
+        case COMPTEST_EQUAL:
+            return (! result);
+        case COMPTEST_LESSER:
+            return (result < 0);
+        case COMPTEST_GREATER:
+            return (result > 0);
+    }
+}
+
+
+
+
+/**
+ * @brief print looping progress information for the test.
+ *
+ * @param[in]  code_c  output code ('S' (success or failure), 'C' (equal, lesser or greater) or others)
+ * @param[in]  type  output type that embody output code above
+ * @param[in]  count  count value during a single loop
+ *
+ * @attention the newline character is not printed to give concrete information after this.
+ */
+void print_progress_test_loop(int code_c, int type, int count){
+    assert(count >= 0);
+
+    const char * const successful_reprs[2] = {
+        "success",
+        "failure"
+    };
+
+    const char * const comptest_reprs[COMPTESTS_NUM] = {
+        "equal",
+        "lesser",
+        "greater"
+    };
+
+    const char *desc = NULL;
+
+    switch (code_c){
+        case 'S':
+            assert((type == SUCCESS) || (type == FAILURE));
+            desc = successful_reprs[(bool) type];
+            break;
+        case 'C':
+            assert((type >= 0) && (type < COMPTESTS_NUM));
+            desc = comptest_reprs[type];
+    }
+
+    if (desc)
+        fprintf(stderr, "%9s case", desc);
+
+    fprintf(stderr, "%4d:  ", count);
+}
+
+
 #endif // NDEBUG

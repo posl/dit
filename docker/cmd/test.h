@@ -8,6 +8,13 @@
     * commonly used Macros
 ******************************************************************************/
 
+#define COMPTESTS_NUM 3
+
+#define COMPTEST_EQUAL    0
+#define COMPTEST_LESSER   1
+#define COMPTEST_GREATER  2
+
+
 #define TMP_DIR "/dit/tmp/"
 
 #define TMP_NAME1 "test1.tmp"
@@ -25,6 +32,25 @@
     } while(false)
 
 #define no_test()  fputs("No unit test.\n\n", stderr)
+
+
+
+
+/******************************************************************************
+    * commonly used Data Types
+******************************************************************************/
+
+typedef const union {
+    char *name;
+    size_t size;
+} comptest_elem;
+
+
+typedef const struct {
+    comptest_elem elem1;
+    comptest_elem elem2;
+    const int type;
+} comptest_table;
 
 
 
@@ -61,6 +87,10 @@ void setcmd_test(void);
 ******************************************************************************/
 
 bool check_if_alphabetical_order(const char * const reprs[], size_t size);
+
+bool comptest_result_check(int type, int result);
+
+void print_progress_test_loop(int code_c, int type, int count);
 
 
 #endif // NDEBUG
