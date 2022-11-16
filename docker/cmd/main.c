@@ -844,6 +844,7 @@ static void xfgets_for_loop_test(void){
         if (n--){
             assert(! strcmp(xfgets_for_loop(TMP_FILE1, false, &errid), *tmp));
             assert(! errid);
+            fprintf(stderr, "  %-11s  (%d lines left)\n", *tmp, ((int) n));
         }
         else {
             fputs("Checking if it works the same as 'cat -' ...\n", stderr);
