@@ -1219,8 +1219,8 @@ static void fcmp_ext_test(void){
 
 static void get_file_ext_test(void){
     const struct {
-        const char *name;
-        const char *ext;
+        const char * const name;
+        const char * const ext;
     }
     // changeable part for updating test cases
     table[] = {

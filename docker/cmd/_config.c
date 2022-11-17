@@ -384,7 +384,7 @@ void config_test(void){
 
 static void receive_mode_test(void){
     const struct {
-        const char *input;
+        const char * const input;
         const int result;
     }
     // changeable part for updating test cases

@@ -823,7 +823,7 @@ static void xfgets_for_loop_test(void){
     const char * const *tmp;
     size_t n;
 
-    const char * lines[6] = {
+    const char * const lines[6] = {
         "abc",
         "def ghij",
         "kl mn",
@@ -916,7 +916,7 @@ static void xstrcmp_upper_case_test(void){
 
 static void receive_positive_integer_test(void){
     const struct {
-        const char *target;
+        const char * const target;
         const int left;
         const int right;
     }
@@ -965,7 +965,7 @@ static void receive_positive_integer_test(void){
 
 static void receive_expected_string_test(void){
     const struct {
-        const char *target;
+        const char * const target;
         const unsigned int mode;
         const int result;
     }
@@ -1033,7 +1033,7 @@ static void receive_expected_string_test(void){
 
 static void receive_dockerfile_instruction_test(void){
     const struct {
-        char *line;
+        char * const line;
         const int expected_id;
         const int actual_id;
         const int offset;
