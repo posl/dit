@@ -384,9 +384,10 @@ void config_test(void){
 
 static void receive_mode_test(void){
     const struct {
-        const char *config_arg;
-        const int stat;
+        const char *input;
+        const int result;
     }
+    // changeable part for updating test cases
     table[] = {
         { "_",               CONF_INITIAL_STAT       },
         { "0,1,2,3,4",       CONF_STAT_FORMULA(4, 4) },
@@ -413,19 +414,19 @@ static void receive_mode_test(void){
     mode2h = (rand2h = CONF_DEFAULT_MODE);
 
 
-    for (i = 0; table[i].config_arg; i++){
+    for (i = 0; table[i].input; i++){
         type = SUCCESS;
 
-        if (table[i].stat < 0){
+        if (table[i].result < 0){
             mode2d = (rand2d = rand() % CONF_MODES_NUM);
             mode2h = (rand2h = rand() % CONF_MODES_NUM);
             type = FAILURE;
         }
 
-        assert(receive_mode(table[i].config_arg, &mode2d, &mode2h) == (type == SUCCESS));
+        assert(receive_mode(table[i].input, &mode2d, &mode2h) == (type == SUCCESS));
 
         if (type == SUCCESS){
-            tmp = div(table[i].stat, CONF_MODES_NUM);
+            tmp = div(table[i].result, CONF_MODES_NUM);
             assert(mode2d == tmp.quot);
             assert(mode2h == tmp.rem);
 
@@ -441,7 +442,7 @@ static void receive_mode_test(void){
         }
 
         print_progress_test_loop('S', type, i);
-        fprintf(stderr, format, table[i].config_arg, mode2d, mode2h);
+        fprintf(stderr, format, table[i].input, mode2d, mode2h);
     }
 }
 
@@ -452,26 +453,29 @@ static void receive_mode_integer_test(void){
     const int spare = -2;
 
     const struct {
-        const int c;
+        const int input;
         const int result;
     }
+    // changeable part for updating test cases
     table[] = {
         { '0',   0   },
+        { '2',   2   },
         { '3',   3   },
         { '4',   4   },
         { '_', spare },
         { '5',  -1   },
         { '-',  -1   },
         { 'i',  -1   },
+        { 'o',  -1   },
         { ' ',  -1   },
         {  0,    0   }
     };
 
-    for (int i = 0; table[i].c; i++){
-        assert(receive_mode_integer(table[i].c, spare) == table[i].result);
+    for (int i = 0; table[i].input; i++){
+        assert(receive_mode_integer(table[i].input, spare) == table[i].result);
 
         print_progress_test_loop('S', ((table[i].result != -1) ? SUCCESS : FAILURE), i);
-        fprintf(stderr, "%c  % d\n", table[i].c, table[i].result);
+        fprintf(stderr, "'%c'  % d\n", table[i].input, table[i].result);
     }
 }
 

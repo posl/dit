@@ -72,11 +72,11 @@ void test(int argc, char **argv, int cmd_id){
 
 
 /**
- * @brief check if command line arguments contain a unit test option.
+ * @brief check if command line arguments contain an unit test option.
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
- * @return bool  whether there was unit test option
+ * @return bool  whether there was an unit test option
  *
  * @note the arguments are expected to be passed as-is from main function.
  * @note reset updated global variables so that it does not affect subsequent option parse.

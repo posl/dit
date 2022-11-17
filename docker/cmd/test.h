@@ -31,7 +31,7 @@
         fputs("Passed all tests!\n\n", stderr); \
     } while(false)
 
-#define no_test()  fputs("No unit test.\n\n", stderr)
+#define no_test()  fputs("No unit tests.\n\n", stderr)
 
 
 

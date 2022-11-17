@@ -2,7 +2,7 @@
 #define DOCKER_INTERACTIVE_TOOL
 
 
-// if you want to unit test each command, comment out the line immediately after
+// if you want to test each command, comment out the line immediately after
 // #define NDEBUG
 
 

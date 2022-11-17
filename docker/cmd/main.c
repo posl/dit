@@ -885,6 +885,7 @@ static void xfgets_for_loop_test(void){
 
 
 static void xstrcmp_upper_case_test(void){
+    // changeable part for updating test cases
     comptest_table table[] = {
         { { .name = "none"                   }, { .name = "NONE"                      }, COMPTEST_EQUAL   },
         { { .name = "hoGe-PIyO"              }, { .name = "HOGE-PIYO"                 }, COMPTEST_EQUAL   },
@@ -919,6 +920,7 @@ static void receive_positive_integer_test(void){
         const int left;
         const int right;
     }
+    // changeable part for updating test cases
     table[] = {
         { "0",            -2,    0 },
         { "23",           -2,   23 },
@@ -967,6 +969,7 @@ static void receive_expected_string_test(void){
         const unsigned int mode;
         const int result;
     }
+    // changeable part for updating test cases
     table[] = {
         { "COPY",      0, ID_COPY        },
         { "WORKDIR",   0, ID_WORKDIR     },
@@ -1035,15 +1038,20 @@ static void receive_dockerfile_instruction_test(void){
         const int actual_id;
         const int offset;
     }
+    // changeable part for updating test cases
     table[] = {
         { "ADD abc.tar.gz ./",                      ID_ADD,         ID_ADD,          4 },
+        { "USER root",                              ID_USER,        ID_USER,         5 },
         { "HealthCheck  Cmd sh /bin/check-running", ID_HEALTHCHECK, ID_HEALTHCHECK, 13 },
         { "EXPOSE 80/tcp 80/udp",                     -1,           ID_EXPOSE,       7 },
+        { "RUN make && make clean",                   -1,           ID_RUN,          4 },
         { "OnBuild  WorkDir /",                       -1,           ID_ONBUILD,      9 },
         { "COPY ./etc/dit_install.sh /dit/etc/",    ID_ADD,         ID_COPY,        -1 },
+        { "MainTainer inada",                       ID_LABEL,       ID_MAINTAINER,  -1 },
         { "form alpine:latest",                     ID_FROM,          -1,           -1 },
-        { "setcmd  [ \"/bin/bash\", \"--login\" ]",   -1,             -1,           -1 },
+        { "  Volume [ \"/myapp\" ]",                  -1,             -1,           -1 },
         { "ENT dit inspect",                          -1,             -1,           -1 },
+        { "setcmd  [ \"/bin/bash\", \"--login\" ]",   -1,             -1,           -1 },
         {  0,                                          0,              0,            0 }
     };
 

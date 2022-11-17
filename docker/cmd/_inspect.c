@@ -924,6 +924,8 @@ static void concat_inf_path_test(void){
     // when concatenating strings in order
 
     do {
+        fprintf(stderr, "  Concatenating the %dth element ...\n", i);
+
         name[0] = i + '0';
         assert(concat_inf_path(&ipath, ipath_len, name, name_len));
 
@@ -1091,6 +1093,8 @@ static void append_file_test(void){
     // when storing file nodes in order
 
     do {
+        fprintf(stderr, "  Appending the %dth element ...\n", i);
+
         assert((file = (file_node *) malloc(sizeof(file_node))));
 
         file->size = rand() / (INSP_INITIAL_DIRS_MAX * 2);
@@ -1100,8 +1104,8 @@ static void append_file_test(void){
         assert(node.size == total_size);
 
         assert(node.children);
-        assert(node.children[i] == file);
-        assert(node.children_num == (++i));
+        assert(node.children[i++] == file);
+        assert(node.children_num == i);
 
         free(file);
 
@@ -1122,6 +1126,7 @@ static void append_file_test(void){
 
 
 static void fcmp_name_test(void){
+    // changeable part for updating test cases
     comptest_table table[] = {
         { { .name = "dit_version"   }, { .name = "dit_version"  }, COMPTEST_EQUAL   },
         { { .name = "su-exec"       }, { .name = "su-exec"      }, COMPTEST_EQUAL   },
@@ -1153,6 +1158,7 @@ static void fcmp_name_test(void){
 
 
 static void fcmp_size_test(void){
+    // changeable part for updating test cases
     comptest_table table[] = {
         { { .size =    0 }, { .size =    0 }, COMPTEST_EQUAL   },
         { { .size =   32 }, { .size =   32 }, COMPTEST_EQUAL   },
@@ -1182,6 +1188,7 @@ static void fcmp_size_test(void){
 
 
 static void fcmp_ext_test(void){
+    // changeable part for updating test cases
     comptest_table table[] = {
         { { .name = "config.stat"      }, { .name = "optimize.stat"            }, COMPTEST_EQUAL   },
         { { .name = "properties.json"  }, { .name = "tasks.json"               }, COMPTEST_EQUAL   },
@@ -1215,6 +1222,7 @@ static void get_file_ext_test(void){
         const char *name;
         const char *ext;
     }
+    // changeable part for updating test cases
     table[] = {
         { "main.c",         "c"         },
         { "README.md",      "md"        },
@@ -1229,7 +1237,7 @@ static void get_file_ext_test(void){
         assert(! strcmp(get_file_ext(table[i].name), table[i].ext));
 
         print_progress_test_loop('\0', -1, i);
-        fprintf(stderr, "%-14s  %s\n", table[i].name, table[i].ext);
+        fprintf(stderr, "%-14s  '%s'\n", table[i].name, table[i].ext);
     }
 }
 
