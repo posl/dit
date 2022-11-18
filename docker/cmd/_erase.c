@@ -31,6 +31,8 @@
 #define getbit_check_list(list, i)  (list[getidx_check_list(i)] & getmask_check_list(i))
 #define invbit_check_list(list, i)  (list[getidx_check_list(i)] ^= getmask_check_list(i))
 
+#define ERASE_CONFIRMATION_MAX 8
+
 
 /** Data type for storing the results of option parse */
 typedef struct {
@@ -85,7 +87,7 @@ static int marklines_with_numbers(erase_data *data, const char *range);
 static void marklines_to_undo(erase_data *data, int undoes);
 
 static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both_flag);
-static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool both_flag);
+static bool confirm_deleted_lines(erase_data *data, const erase_opts *opt, const char *target_file);
 
 static bool receive_range_specification(char *range, int stop, unsigned int *check_list);
 static int popcount_check_list(unsigned int *check_list, size_t size);
@@ -281,7 +283,7 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
             goto errexit;
         }
 
-        if (! (opt->has_delopt || opt->undoes)){
+        if (! (opt->has_delopt || opt->undoes || (opt->blank_c != 'p'))){
             if (opt->verbose){
                 display_prev(opt->target_c);
                 return NORMALLY_EXIT;
@@ -410,7 +412,7 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
         both_flag = true;
     }
 
-    erase_logs logs;
+    erase_logs logs = {0};
     erase_data data = { .logs = &logs };
 
     unsigned short prov_reflecteds[2] = {0};
@@ -496,7 +498,7 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
 
 
 /******************************************************************************
-    * Construct Part
+    * Construct Phase
 ******************************************************************************/
 
 
@@ -512,6 +514,8 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
  * @note each element of 'data' is a non-null value if subsequent deletion operations can be performed.
  * @note only in the above case, terminate normally without calling 'manage_erase_logs'.
  * @note if no changes to the log-file are necessary, just release the log-data at 'manage_erase_logs'.
+ *
+ * @attention 'data->logs->reset_flag' must be appropriately initialized before calling this function.
  */
 static int construct_erase_data(erase_data *data, int target_c, unsigned short provlogs[2], bool no_delete){
     assert(data);
@@ -523,6 +527,8 @@ static int construct_erase_data(erase_data *data, int target_c, unsigned short p
     data->lines_num = 0;
     data->lines = NULL;
     data->check_list = NULL;
+    data->logs->size = 0;
+    data->logs->array = NULL;
 
     if (target_c == 'd'){
         data->logs->p_provlog = provlogs;
@@ -600,7 +606,7 @@ int update_erase_logs(unsigned short prov_reflecteds[2]){
     const char *targets = "dh";
     int tmp, exit_status = SUCCESS;
 
-    erase_logs logs;
+    erase_logs logs = {0};
     erase_data data = { .logs = &logs };
 
     do {
@@ -784,10 +790,10 @@ static int marklines_with_numbers(erase_data *data, const char *range){
             char range_copy[size];
             memcpy(range_copy, range, (sizeof(char) * size));
 
-            unsigned int *tmp;
-            tmp = data->first_mark ? data->check_list : ((unsigned int *) ptr);
+            unsigned int *check_list;
+            check_list = data->first_mark ? data->check_list : ((unsigned int *) ptr);
 
-            if (receive_range_specification(range_copy, data->lines_num, tmp)){
+            if (receive_range_specification(range_copy, data->lines_num, check_list)){
                 exit_status = SUCCESS;
 
                 if (! data->first_mark){
@@ -797,7 +803,7 @@ static int marklines_with_numbers(erase_data *data, const char *range){
                     dest = data->check_list;
 
                     do
-                        *(dest++) &= *(tmp++);
+                        *(dest++) &= *(check_list++);
                     while (--size);
                 }
             }
@@ -831,15 +837,15 @@ static void marklines_to_undo(erase_data *data, int undoes){
 
     if (undoes > 0){
         if ((! data->logs->reset_flag) && (data->logs->size > 0)){
-            assert((data->logs->total > 0) && (data->logs->total < INT_MAX));
+            assert(data->logs->total > 0);
             assert(data->logs->size < INT_MAX);
             assert(data->logs->array);
 
             unsigned int i;
-            unsigned char *tmp;
+            unsigned char *logs_array;
 
             i = data->logs->total;
-            tmp = data->logs->array + data->logs->size;
+            logs_array = data->logs->array + data->logs->size;
 
             if (undoes > data->logs->size)
                 undoes = data->logs->size;
@@ -847,7 +853,7 @@ static void marklines_to_undo(erase_data *data, int undoes){
             assert(undoes > 0);
 
             do {
-                i -= *(--tmp);
+                i -= *(--logs_array);
             } while (--undoes);
 
             for (; i < data->logs->total; i++)
@@ -862,7 +868,7 @@ static void marklines_to_undo(erase_data *data, int undoes){
 
 
 /******************************************************************************
-    * Delete Part
+    * Delete Phase
 ******************************************************************************/
 
 
@@ -879,26 +885,44 @@ static void marklines_to_undo(erase_data *data, int undoes){
  * @note if the return value is -1, an internal file error has occurred, but the deletion was successful.
  *
  * @attention 'data' must be reliably constructed before calling this function.
+ * @attention must not call this function if the target file does not contain any lines that can be deleted.
  */
 static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both_flag){
-    const char *result_file, *target_file, *log_file;
+    assert(data);
+    assert(data->lines_num > 0);
+    assert(data->lines);
+    assert(data->check_list);
+    assert(data->logs);
+    assert(data->logs->total >= 0);
+    assert(data->logs->p_provlog);
+    assert(opt);
+
+    int offset;
+    const char *target_file, *result_file, *log_file;
 
     if (opt->target_c == 'd'){
-        result_file = ERASE_RESULT_FILE_D;
+        offset = 1;
         target_file = DOCKER_FILE_DRAFT;
+        result_file = ERASE_RESULT_FILE_D;
         log_file = ERASE_FILE_D;
     }
     else {
-        result_file = ERASE_RESULT_FILE_H;
+        offset = 0;
         target_file = HISTORY_FILE;
+        result_file = ERASE_RESULT_FILE_H;
         log_file = ERASE_FILE_H;
     }
 
     int exit_status = POSSIBLE_ERROR, mode_c = '\0';
 
     if (both_flag >= 0){
-        if (comfirm_deleted_lines(data, opt, both_flag)){
-            FILE *result_fp, *target_fp;
+        exit_status = SUCCESS;
+
+        if (both_flag && opt->verbose)
+            fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset]);
+
+        if (confirm_deleted_lines(data, opt, target_file)){
+            FILE *result_fp, *target_fp, *fps[2] = {0};
 
             exit_status = UNEXPECTED_ERROR + ERROR_EXIT;
 
@@ -907,7 +931,6 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
                     const char *line;
                     int total, accum = 0, logs_idx = -1;
                     unsigned int i = 0;
-                    const char *format = "%s\n";
 
                     exit_status = SUCCESS;
                     mode_c = 'w';
@@ -918,8 +941,11 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
                         if (getbit_check_list(data->check_list, i)){
                             if (i < total){
                                 data->logs->total--;
+                                assert(data->logs->total >= 0);
 
                                 if (! data->logs->reset_flag){
+                                    assert(data->logs->array);
+
                                     while (i >= accum)
                                         accum += data->logs->array[++logs_idx];
                                     data->logs->array[logs_idx]--;
@@ -929,19 +955,28 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
                                 (*(data->logs->p_provlog))--;
 
                             if (*line){
-                                fprintf(result_fp, format, line);
+                                fps[0] = result_fp;
 
                                 if (opt->verbose)
-                                    fprintf(stdout, format, line);
+                                    fps[1] = stdout;
                             }
                         }
                         else
-                            fprintf(target_fp, format, line);
+                            fps[0] = target_fp;
+
+                        for (offset = 2; offset--;)
+                            if (fps[offset]){
+                                fprintf(fps[offset], "%s\n", line);
+                                fps[offset] = NULL;
+                            }
 
                         while (*(line++));
                     } while (++i < data->lines_num);
 
                     if (! data->logs->reset_flag){
+                        assert(data->logs->size < INT_MAX);
+                        assert(data->logs->array);
+
                         logs_idx = 0;
 
                         for (i = 0; i < data->logs->size; i++){
@@ -950,16 +985,17 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
                             else if (logs_idx)
                                 data->logs->array[i - logs_idx] = data->logs->array[i];
                         }
+
                         data->logs->size -= logs_idx;
+                        assert(data->logs->size < INT_MAX);
                     }
 
                     fclose(target_fp);
                 }
+
                 fclose(result_fp);
             }
         }
-        else
-            exit_status = SUCCESS;
     }
 
     if (data->logs->reset_flag)
@@ -978,7 +1014,7 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
  *
  * @param[out] data  variable to store the data commonly used in this command
  * @param[in]  opt  variable to store the results of option parse
- * @param[in]  both_flag  whether to edit both Dockerfile and history-file
+ * @param[in]  target_file  target file name
  * @return bool  whether the target file should be updated
  *
  * @note in the first half, empty lines are handled and lines to be deleted are extracted.
@@ -989,19 +1025,13 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
  * @attention 'data' must be reliably constructed before calling this function.
  * @attention must not call this function if the target file does not contain any lines that can be deleted.
  */
-static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool both_flag){
-    int offset = 0;
-
-    if (both_flag){
-        if (opt->target_c == 'd')
-            offset = 1;
-
-        if (opt->verbose){
-            both_flag = false;
-            fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset]);
-        }
-    }
-
+static bool confirm_deleted_lines(erase_data *data, const erase_opts *opt, const char *target_file){
+    assert(data);
+    assert(data->lines_num > 0);
+    assert(data->lines);
+    assert(data->list_size > 0);
+    assert(data->check_list);
+    assert(opt);
 
     int marked_num, max_count, truncates_num = 0, deletes_num = 0;
     const char *line = NULL;
@@ -1010,10 +1040,11 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
 
     marked_num = popcount_check_list(data->check_list, data->list_size);
     max_count = ((opt->max_count >= 0) && (opt->max_count < marked_num)) ? opt->max_count : marked_num;
+    assert(max_count >= 0);
 
     int candidate_idx = 0;
     const char *candidate_lines[max_count];
-    unsigned int candidate_idxs[max_count];
+    unsigned int candidate_numbers[max_count];
 
     do {
         if (! line)
@@ -1025,13 +1056,11 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
         mask = getmask_check_list(i);
 
         if (! *line){
-            data->check_list[idx] &= ~mask;
-
             switch (opt->blank_c){
                 case 's':
                     if (first_blank){
                         first_blank = false;
-                        continue;
+                        break;
                     }
                 case 't':
                     truncates_num++;
@@ -1039,26 +1068,37 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
                     continue;
                 default:
                     assert(opt->blank_c == 'p');
-                    continue;
             }
         }
-        first_blank = true;
+        else {
+            first_blank = true;
 
-        if (data->check_list[idx] & mask){
             if (max_count){
-                if ((candidate_idx = deletes_num++) >= max_count){
-                    candidate_idx %= max_count;
-                    idx = candidate_idxs[candidate_idx];
-                    invbit_check_list(data->check_list, idx);
+                if (data->check_list[idx] & mask){
+                    if ((candidate_idx = deletes_num++) >= max_count){
+                        candidate_idx %= max_count;
+                        idx = candidate_numbers[candidate_idx];
+                        assert(idx < i);
+
+                        invbit_check_list(data->check_list, idx);
+                        assert(! getbit_check_list(data->check_list, idx));
+                    }
+
+                    candidate_lines[candidate_idx] = line;
+                    candidate_numbers[candidate_idx] = i;
                 }
-                candidate_lines[candidate_idx] = line;
-                candidate_idxs[candidate_idx] = i;
+                continue;
             }
-            else
-                data->check_list[idx] ^= mask;
         }
+
+        data->check_list[idx] &= ~mask;
+        assert(! getbit_check_list(data->check_list, i));
+
     } while (++i < data->lines_num);
 
+
+    assert(deletes_num >= 0);
+    assert(candidate_idx >= 0);
 
     if (deletes_num > max_count){
         deletes_num = max_count;
@@ -1067,8 +1107,9 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
     else
         candidate_idx = 0;
 
+
     if (opt->assume_c != 'Y'){
-        int assume_c, select_idx = -1, selects_num = 0;
+        int assume_c, select_idx = -1, selects_num = 0, tmp;
         unsigned int select_list[1], start = 0, end = 0;
         char answer[5], range[64];
 
@@ -1084,6 +1125,7 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
 
                         if (*select_list & mask){
                             i++;
+                            assert(i <= marked_num);
                             continue;
                         }
                     }
@@ -1101,37 +1143,34 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
 
                 if ((assume_c != 'Q') && (select_idx < 0)){
                     if (! selects_num){
-                        if (both_flag){
-                            both_flag = false;
-                            fprintf(stderr, ("\n < %s >\n" + offset), target_args[2 - offset]);
-                        }
-
                         start = i - 1;
-                        end = start + 8;
+                        end = start + ERASE_CONFIRMATION_MAX;
 
                         if (end > marked_num)
                             end = marked_num;
-                        fprintf(stderr, "\nLines to be Deleted (%u/%d):\n", end, marked_num);
+
+                        fprintf(stderr, "\nCandidates in '%s' (%u/%d):\n", target_file, end, marked_num);
                     }
 
                     selects_num++;
+                    assert(selects_num <= ERASE_CONFIRMATION_MAX);
                     fprintf(stderr, "%3d  %s\n", selects_num, candidate_lines[idx]);
 
                     if (i == end){
                         fputc('\n', stderr);
 
                         if (! opt->assume_c){
-                            *answer = '\0';
-
                             do {
                                 fputs("Do you want to delete all of them? [Y/n]  ", stderr);
+
+                                *answer = '\0';
                                 fscanf(stdin, "%4[^\n]%*[^\n]", answer);
-                                fgetc(stdin);
+                                tmp = fgetc(stdin);
+                                assert(tmp == '\n');
 
-                                assume_c = receive_expected_string(answer, assume_args, ARGS_NUM, 3);
-                            } while (assume_c < 0);
+                            } while ((tmp = receive_expected_string(answer, assume_args, ARGS_NUM, 3)) < 0);
 
-                            assume_c = *(assume_args[assume_c]);
+                            assume_c = *(assume_args[tmp]);
                         }
                         switch (assume_c){
                             case 'N':
@@ -1142,7 +1181,8 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
 
                                 *range = '\0';
                                 fscanf(stdin, "%63[^\n]%*[^\n]", range);
-                                fgetc(stdin);
+                                tmp = fgetc(stdin);
+                                assert(tmp == '\n');
 
                                 select_idx = 0;
                                 *select_list = 0;
@@ -1155,21 +1195,24 @@ static bool comfirm_deleted_lines(erase_data *data, const erase_opts *opt, bool 
                                 selects_num = 0;
                         }
 
-                        if (i == marked_num)
+                        if ((assume_c == 'Q') || (end == marked_num))
                             fputc('\n', stderr);
                     }
                     continue;
                 }
 
                 deletes_num--;
-                idx = candidate_idxs[idx];
+                idx = candidate_numbers[idx];
                 invbit_check_list(data->check_list, idx);
+                assert(! getbit_check_list(data->check_list, idx));
             }
             else
                 break;
         } while (true);
     }
 
+    assert(truncates_num >= 0);
+    assert(deletes_num >= 0);
     return (bool) (truncates_num + deletes_num);
 }
 
@@ -1302,13 +1345,20 @@ static int popcount_check_list(unsigned int *check_list, size_t size){
  * @param[in]  concat_flag  whether to reflect the provisional number of reflected lines in the log-file
  * @return int  0 (success) or -1 (unexpected error)
  *
- * @note when the return value is set to 0, reading and writing of the log-file are completed successfully.
- * @note when 'logs->reset_flag' is set to false, array of the log-data and its size are correctly defined.
+ * @note when the return value is set to 0, reading or writing of the log-file are completed successfully.
+ * @note when 'logs->reset_flag' is set to false, array of the log-data and its size are correctly updated.
  * @note except when reading the log-data, release the dynamic memory that is no longer needed.
  *
+ * @attention 'logs' is not initialized in this function so that you can do write operations without reading.
  * @attention must not exit after only reading the log-data, as dynamic memory cannot be released.
  */
 static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, bool concat_flag){
+    assert(file_name);
+    assert((mode_c == 'r') || (mode_c == 'w') || (! mode_c));
+    assert(logs);
+    assert(logs->total >= 0);
+    assert(logs->p_provlog);
+
     char fm[] = "rb";
     FILE *fp = NULL;
     int exit_status = SUCCESS;
@@ -1319,27 +1369,25 @@ static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs
         exit_status = UNEXPECTED_ERROR;
     }
 
-    size_t size, total = 0;
+    size_t logs_size, total = 0;
     void *ptr;
     div_t tmp;
 
     switch (mode_c){
         case 'r':
-            logs->size = 0;
-            logs->array = NULL;
             logs->reset_flag = true;
 
-            if (fp && (fread(&size, sizeof(size), 1, fp) == 1)){
-                if (size){
-                    if ((size < INT_MAX) && (ptr = malloc(sizeof(unsigned char) * size))){
-                        logs->size = size;
+            if (fp && (fread(&logs_size, sizeof(logs_size), 1, fp) == 1)){
+                if (logs_size){
+                    if ((logs_size < INT_MAX) && (ptr = malloc(sizeof(unsigned char) * logs_size))){
+                        logs->size = logs_size;
                         logs->array = (unsigned char *) ptr;
 
-                        if (fread(logs->array, sizeof(unsigned char), size, fp) == size){
+                        if (fread(logs->array, sizeof(unsigned char), logs_size, fp) == logs_size){
                             exit_status = SUCCESS;
 
-                            while (size--)
-                                total += logs->array[size];
+                            while (logs_size--)
+                                total += logs->array[logs_size];
                         }
                     }
                 }
@@ -1365,14 +1413,18 @@ static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs
                 exit_status = SUCCESS;
 
                 if (total){
-                    tmp = div((total - 1), 255);
-                    size = tmp.quot + 1;
+                    assert(total > 0);
+                    tmp = div((total - 1), UCHAR_MAX);
 
-                    if ((ptr = realloc(logs->array, (sizeof(unsigned char) * (logs->size + size))))){
+                    logs_size = tmp.quot + 1;
+                    assert(logs_size < INT_MAX);
+                    assert(logs->size < (INT_MAX - logs_size));
+
+                    if ((ptr = realloc(logs->array, (sizeof(unsigned char) * (logs->size + logs_size))))){
                         logs->array = (unsigned char *) ptr;
-                        memset((logs->array + logs->size), 255, (size - 1));
+                        memset((logs->array + logs->size), UCHAR_MAX, (logs_size - 1));
 
-                        logs->size += size;
+                        logs->size += logs_size;
                         logs->array[logs->size - 1] = tmp.rem + 1;
                     }
                     else
@@ -1476,6 +1528,7 @@ static void getsize_check_list_macro_test(void){
         const size_t lines_num;
         const size_t list_size;
     }
+    // changeable part for updating test cases
     table[] = {
         {   1,  1 },
         {   2,  1 },
@@ -1484,6 +1537,8 @@ static void getsize_check_list_macro_test(void){
         {  64,  2 },
         {  65,  3 },
         { 376, 12 },
+        { 640, 20 },
+        { 999, 32 },
         {   0,  0 }
     };
 
@@ -1499,10 +1554,7 @@ static void getsize_check_list_macro_test(void){
 
 
 static void marklines_containing_pattern_test(void){
-    char lines_sequence[1024];
-    unsigned int check_list[1] = {0};
-    erase_data data = { .lines_num = 0, .lines = lines_sequence, .check_list = check_list };
-
+    // changeable part for updating test cases
     const char * const lines_array[] = {
         "ARG BASE_NAME",
         "ARG BASE_VERSION",
@@ -1520,38 +1572,141 @@ static void marklines_containing_pattern_test(void){
         "# generate the dit command",
         "COPY ./cmd ./",
         "RUN make && make clean",
+        "# build step finished",
+        "ENTRYPOINT [ \"/usr/local/bin/su-exec\", \"root\", \"dit\" ]",
+        "CMD [ \"optimize\" ]",
             NULL
     };
 
-    const char * const *tmp;
-    char *dest;
-    size_t total_size = 0, size;
 
-    for (tmp = lines_array; *tmp; tmp++){
+    const char * const *p_line;
+    char *dest, lines_sequence[1024];
+    size_t total_size = 0, size, lines_num = 0;
+
+    for (p_line = lines_array; *p_line; p_line++){
         dest = lines_sequence + total_size;
 
-        size = strlen(*tmp) + 1;
+        size = strlen(*p_line) + 1;
         assert((total_size += size) <= 1024);
 
-        data.lines_num++;
-        memcpy(dest, *tmp, size);
+        lines_num++;
+        memcpy(dest, *p_line, size);
     }
 
+    assert(lines_num < 32);
 
-    // successful cases
+    unsigned int check_list[1] = {0};
+    erase_data data = { .lines_num = lines_num, .lines = lines_sequence, .check_list = check_list };
 
-    
+
+    const struct {
+        const char * const pattern;
+        const int flag;
+        const bool ignore_case;
+        const unsigned int result;
+    }
+    // changeable part for updating test cases
+    table[] = {
+        { "^[[:space:]]*[^#]",                                        true, false, 0x0006def7 },
+        { "(\"|\')[[:print:]]+\\1",                                  false, false, 0x00061e84 },
+        { "^Run[[:space:]]",                                         false,  true, 0x00001c80 },
+        { "",                                                         true, false, 0x0007ffff },
+        { "^RUN([[:space:]]+)\\w+\\1([^&]*&{2}|[^|]*\\|{2})\\1\\w+", false, false, 0x00008880 },
+        { "$^",                                                      false,  true, 0x00000000 },
+        { "*.txt",                                                     -1,  false, 0x00000000 },
+        { "((|\\[|\\{)",                                               -1,  false, 0x00000000 },
+        { "^run[[:print:]]*\\",                                        -1,   true, 0x00000000 },
+        { "\\<[a-Z]+\\>",                                              -1,  false, 0x00000000 },
+        { "[[:unknown:]]?",                                            -1,   true, 0x00000000 },
+        { "C:\\Documents\\News\\2022-11-17.pdf",                       -1,   true, 0x00000000 },
+        {  0,                                                           0,     0,    0        }
+    };
+
+
+    int i, type;
+
+    int range_phase, range_idx, left;
+    bool first_line;
+    unsigned int j;
+    char range[64];
+    div_t tmp;
+
+
+    for (i = 0; table[i].pattern; i++){
+        fprintf(stderr, "  Specifying the %dth element '%s' ...\n    ", i, table[i].pattern);
+
+        type = SUCCESS;
+        data.first_mark = table[i].flag;
+
+        if (table[i].flag < 0){
+            *check_list = 0;
+            type = POSSIBLE_ERROR;
+        }
+
+        assert(marklines_containing_pattern(&data, table[i].pattern, table[i].ignore_case) == type);
+        assert(! data.first_mark);
+        assert(*check_list == table[i].result);
+
+
+        if (type == SUCCESS){
+            range_phase = 0;
+            range_idx = 0;
+            first_line = true;
+
+            for (j = 0; j < (lines_num + 1); j++)
+                if (getbit_check_list(check_list, j)){
+                    switch (range_phase){
+                        case 0:
+                            if (! first_line)
+                                range[range_idx++] = ',';
+
+                            left = j + 1;
+                            range_phase = 1;
+                            break;
+                        case 1:
+                            range_phase = 2;
+                    }
+
+                    first_line = false;
+                }
+                else {
+                    do {
+                        if (range_phase){
+                            tmp = div(left, 10);
+                            range[range_idx++] = tmp.quot + '0';
+                            range[range_idx++] = tmp.rem + '0';
+
+                            if (--range_phase){
+                                range[range_idx++] = '-';
+                                left = j;
+                                continue;
+                            }
+                        }
+                        break;
+                    } while (true);
+                }
+
+            range[range_idx] = '\0';
+            fprintf(stderr, "delete each line with number: '%s'\n", range);
+        }
+    }
 }
 
 
 
 
 static void marklines_with_numbers_test(void){
+    unsigned int check_list[2] = {0};
+    erase_data data = { .lines_num = 47, .list_size = 2, .check_list = check_list };
+    assert(data.lines_num <= 64);
+
+
     const struct {
-        const char *range;
+        const char * const range;
         const int flag;
         const unsigned int results[2];
     }
+    // changeable part for updating test cases
     table[] = {
         { "45-5,16-26,9,34-43",        true, { 0x03ff811f, 0x000077fe } },
         { "0-40",                     false, { 0x03ff811f, 0x000000fe } },
@@ -1564,14 +1719,12 @@ static void marklines_with_numbers_test(void){
         { "-2-7",                       -1,  { 0x00000000, 0x00000000 } },
         { "12:38-41:55",                -1,  { 0x00000000, 0x00000000 } },
         { "60-20,40, ...",              -1,  { 0x00000000, 0x00000000 } },
-        { "[:digit:]",                  -1,  { 0x00000000, 0x00000000 } },
+        { "[[:digit:]]",                -1,  { 0x00000000, 0x00000000 } },
         {  0,                            0,      0                      }
     };
 
-    int i, type;
-    unsigned int check_list[2] = {0};
-    erase_data data = { .lines_num = 47, .list_size = 2, .check_list = check_list };
 
+    int i, type;
 
     for (i = 0; table[i].range; i++){
         type = SUCCESS;
@@ -1597,20 +1750,23 @@ static void marklines_with_numbers_test(void){
 
 
 static void marklines_to_undo_test(void){
-    unsigned char array[] = {15, 3, 4, 1, 5, 2, 2, 4, 1, 3};
-    unsigned int check_list[2] = {0};
+    // changeable part for updating test cases
+    unsigned char logs_array[] = {15, 3, 4, 1, 5, 2, 2, 4, 1, 3};
 
-    erase_logs logs = { .array = array };
+
+    int i;
+    const size_t logs_size = sizeof(logs_array) / sizeof(*logs_array);
+    size_t total = 0;
+
+    for (i = 0; i < logs_size; i++)
+        total += logs_array[i];
+
+
+    unsigned int *check_list;
+    assert((check_list = calloc(getsize_check_list(total), sizeof(unsigned int))));
+
+    erase_logs logs = { .total = total, .array = logs_array };
     erase_data data = { .check_list = check_list, .logs = &logs };
-
-
-    int i, total = 0;
-    const size_t size = sizeof(array) / sizeof(*array);
-
-    for (i = 0; i < size; i++)
-        total += array[i];
-
-    logs.total = total;
 
 
     // when returning without marking the lines to be deleted
@@ -1623,7 +1779,7 @@ static void marklines_to_undo_test(void){
     assert(! check_list[1]);
 
 
-    logs.size = size;
+    logs.size = logs_size;
     logs.reset_flag = false;
 
     if (rand() % 2)
@@ -1641,14 +1797,14 @@ static void marklines_to_undo_test(void){
 
     unsigned int j, idx, mask;
 
-    logs.size = size;
+    logs.size = logs_size;
     logs.reset_flag = false;
 
-    for (i = 0; i++ < size;){
+    for (i = 0; i++ < logs_size;){
         check_list[0] = 0;
         check_list[1] = 0;
         data.first_mark = true;
-        total -= array[size - i];
+        total -= logs_array[logs_size - i];
 
         marklines_to_undo(&data, i);
         assert(! data.first_mark);
@@ -1661,6 +1817,9 @@ static void marklines_to_undo_test(void){
 
         fprintf(stderr, "  undoes:  %2d\n", i);
     }
+
+
+    free(check_list);
 }
 
 
@@ -1668,10 +1827,11 @@ static void marklines_to_undo_test(void){
 
 static void receive_range_specification_test(void){
     const struct {
-        const char *range;
+        const char * const range;
         const int stop;
         const unsigned int results[2];
     }
+    // changeable part for updating test cases
     table[] = {
         { "",                            8, { 0x00000000, 0x00000000 } },
         { "0",                           8, { 0x00000000, 0x00000000 } },
@@ -1697,10 +1857,11 @@ static void receive_range_specification_test(void){
         {  0,                            0,     0                      }
     };
 
+
     int i, type, stop;
     unsigned int check_list[2];
-    char range[32];
-
+    size_t size;
+    char range[64];
 
     for (int i = 0; table[i].range; i++){
         type = SUCCESS;
@@ -1712,7 +1873,10 @@ static void receive_range_specification_test(void){
             stop = -stop;
         }
 
-        memcpy(range, table[i].range, (strlen(table[i].range) + 1));
+        assert((size = strlen(table[i].range) + 1) <= 64);
+        memcpy(range, table[i].range, size);
+
+        assert(stop <= 64);
         assert(receive_range_specification(range, stop, check_list) == (! type));
 
         assert(check_list[0] == table[i].results[0]);
@@ -1731,6 +1895,7 @@ static void popcount_check_list_test(void){
         const unsigned int bits;
         const int pops;
     }
+    // changeable part for updating test cases
     table[] = {
         { 0x8c000000,  3 },
         { 0x00000000,  0 },
@@ -1751,9 +1916,9 @@ static void popcount_check_list_test(void){
         {   0,        -1 }
     };
 
+
     int i, j, count = 0;
     unsigned int check_list[4] = {0};
-
 
     for (i = 0; table[i].pops >= 0; i++){
         if ((j = i - 4) >= 0)

@@ -426,7 +426,7 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
             p_info->src_file = src_file;
             p_info->fp = fp;
             p_info->dest = NULL;
-            p_info->curr_size = 1023;
+            p_info->curr_size = 2047;
             p_info->curr_length = 0;
 
             allocate_flag = true;
@@ -461,6 +461,8 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
 
                 if (p_info->dest[length - 1] != '\n'){
                     tmp = p_info->curr_size + 1;
+                    assert(! (p_info->curr_size & tmp));
+
                     if ((tmp <<= 1)){
                         p_info->curr_size = tmp - 1;
                         allocate_flag = true;
