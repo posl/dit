@@ -1,41 +1,57 @@
 #include "main.h"
 
 
+#define COMMAND_LINE_FILE "/dit/tmp/last-command-line"
+
+#define CONVERT_RESULT_FILE_D "/dit/tmp/convert-result.dock"
+#define CONVERT_RESULT_FILE_H "/dit/tmp/convert-result.hist"
+
+
+
 
 int convert(int argc, char **argv){
-    const char * const files[2] = {
-        "/dit/tmp/convert-result.dock",
-        "/dit/tmp/convert-result.hist"
-    };
-    const char * const targets[2] = {
-        "Dockerfile",
-        "history-file"
-    };
-    const char * const outputs[2] = {
-        "ENV abc=123",
-        "export abc=123"
-    };
+    const char *tmp, *line = NULL;
+    bool first_line = true;
+    int errid = 0, exit_status = SUCCESS;
 
-    int i = 0;
-    FILE* fp;
-
-    while (1){
-        if ((fp = fopen(files[i], "w"))){
-            fprintf(stdout, " < %s >\n%s\n", targets[i], outputs[i]);
-            fprintf(fp, "%s\n", outputs[i]);
-            fclose(fp);
+    while ((tmp = xfgets_for_loop(COMMAND_LINE_FILE, true, &errid))){
+        if (first_line){
+            line = tmp;
+            first_line = false;
         }
-        else {
-            fprintf(stderr, "convert: unexpected error in working with '%s'\n", files[i]);
-            return 1;
-        }
-
-        if (++i < 2)
-            fputc('\n', stdout);
         else
-            break;
+            errid = -1;
     }
-    return 0;
+
+    if (line && (! errid)){
+        int mode2d, mode2h;
+
+        if (! get_config(NULL, &mode2d, &mode2h)){
+            FILE* fp;
+
+            if (mode2d){
+                if ((fp = fopen(CONVERT_RESULT_FILE_D, "w"))){
+                    fprintf(fp, "RUN %s\n", line);
+                    fclose(fp);
+                }
+                else
+                    exit_status = FAILURE;
+            }
+
+            if (mode2h){
+                if ((fp = fopen(CONVERT_RESULT_FILE_H, "w"))){
+                    fprintf(fp, "%s\n", line);
+                    fclose(fp);
+                }
+                else
+                    exit_status = FAILURE;
+            }
+        }
+        else
+            exit_status = FAILURE;
+    }
+
+    return exit_status;
 }
 
 

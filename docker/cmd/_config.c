@@ -161,11 +161,13 @@ static int config_contents(unsigned int code, ...){
     has_arg = code & CONF_ISHASARG;
 
     FILE *fp;
-    int exit_status = SUCCESS;
+    int exit_status = UNEXPECTED_ERROR;
 
     if ((fp = fopen(CONFIG_FILE, (reset_flag ? "wb" : "rb+")))){
         signed char c = CONF_INITIAL_STAT;
         int mode2d = CONF_DEFAULT_MODE, mode2h = CONF_DEFAULT_MODE;
+
+        exit_status = SUCCESS;
 
         if (! reset_flag){
             if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < CONF_EXCEED_STAT)){
@@ -219,8 +221,6 @@ static int config_contents(unsigned int code, ...){
 
         fclose(fp);
     }
-    else
-        exit_status = UNEXPECTED_ERROR;
 
     return exit_status;
 }
@@ -333,9 +333,9 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
 
         *p_mode2d = mode2d;
         *p_mode2h = mode2h;
-        return true;
     }
-    return false;
+
+    return true;
 }
 
 
@@ -389,6 +389,7 @@ static void receive_mode_test(void){
     }
     // changeable part for updating test cases
     table[] = {
+        { "",                CONF_INITIAL_STAT       },
         { "_",               CONF_INITIAL_STAT       },
         { "0,1,2,3,4",       CONF_STAT_FORMULA(4, 4) },
         { "0_",              CONF_STAT_FORMULA(0, 4) },
