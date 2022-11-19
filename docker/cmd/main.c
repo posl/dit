@@ -13,13 +13,15 @@
 #define EXIT_STATUS_FILE "/dit/tmp/last-exit-status"
 
 #define XFGETS_NESTINGS_MAX 2
+#define XFGETS_INITIAL_SIZE 1023
 
 
 /** Data type for storing the information for one loop for 'xfgets_for_loop' */
 typedef struct {
     const char *src_file;    /** source file name or NULL */
     FILE *fp;                /** handler for the source file */
-    char *dest;              /** pointer to the beginning of the dynamic memory allocated */
+    char **p_start;          /** pointer to the beginning of a series of strings or NULL */
+    char *dest;              /** pointer to the beginning of dynamic memory allocated */
     size_t curr_size;        /** the size of dynamic memory currently in use */
     size_t curr_length;      /** the total length of the preserved strings including null characters */
 } xfgets_info;
@@ -267,9 +269,9 @@ void xperror_valid_args(const char * const reprs[], size_t size){
 
     fputs("Valid arguments are:\n", stderr);
 
-    for (const char * const *tmp = reprs; size--; tmp++){
-        assert(*tmp);
-        fprintf(stderr, "  - '%s'\n", *tmp);
+    for (const char * const *p_repr = reprs; size--; p_repr++){
+        assert(*p_repr);
+        fprintf(stderr, "  - '%s'\n", *p_repr);
     }
 }
 
@@ -282,7 +284,7 @@ void xperror_valid_args(const char * const reprs[], size_t size){
  * @param[in]  desc  the description for the arguments or NULL
  * @param[in]  before_arg  the immediately preceding argument, if any
  *
- * @note if 'desc' is NULL, print an error message about specifying the target file.
+ * @note if 'desc' is NULL, prints an error message about specifying the target file.
  */
 void xperror_missing_args(const char * restrict desc, const char * restrict before_arg){
     assert(desc || (! before_arg));
@@ -311,7 +313,7 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
  *
  * @param[in]  limit  the maximum number of arguments or negative integer
  *
- * @note if 'limit' is negative integer, print an error message about specifying both files as targets.
+ * @note if 'limit' is negative integer, prints an error message about specifying both files as targets.
  * @attention if 'limit' is 2 or more, it does not work as expected.
  */
 void xperror_too_many_args(int limit){
@@ -340,7 +342,7 @@ void xperror_too_many_args(int limit){
  * @param[in]  msg  the error message or NULL
  * @param[in]  addition  additional information, if any
  *
- * @note if 'msg' is NULL, print an error message about manipulating an internal file.
+ * @note if 'msg' is NULL, prints an error message about manipulating an internal file.
  * @attention if 'msg' is NULL, 'addition' must also be NULL.
  */
 void xperror_message(const char * restrict msg, const char * restrict addition){
@@ -365,16 +367,16 @@ void xperror_message(const char * restrict msg, const char * restrict addition){
  * @param[in]  cmd_flag  whether to suggest displaying the manual of each dit command
  */
 void xperror_suggestion(bool cmd_flag){
-    const char *tmp1, *tmp2;
+    const char *str1, *str2;
 
     if (cmd_flag){
-        tmp1 = program_name;
-        tmp2 = " --";
+        str1 = program_name;
+        str2 = " --";
     }
     else
-        tmp1 = (tmp2 = "");
+        str1 = (str2 = "");
 
-    fprintf(stderr, "Try 'dit %s%shelp' for more information.\n", tmp1, tmp2);
+    fprintf(stderr, "Try 'dit %s%shelp' for more information.\n", str1, str2);
 }
 
 
@@ -388,22 +390,24 @@ void xperror_suggestion(bool cmd_flag){
 /**
  * @brief read the contents of the specified file exactly one line at a time.
  *
- * @param[in]  src_file  source file name or NULL
- * @param[in]  preserve_flag  whether to preserve or overwrite the previously read lines
+ * @param[in]  src_file  source file name or NULL to indicate that the source is standard input
+ * @param[out] p_start  pointer to the beginning of a series of strings corresponding to each line or NULL
  * @param[out] p_errid  variable to store the error ID when an error occurs
  * @return char*  the resulting line or NULL
  *
  * @note read to the end of the file by using it as a conditional expression in a loop statement.
- * @note this function can be nested by passing different 'src_file' to a depth of 'XFGETS_NESTINGS_MAX'.
+ * @note this function can be nested up to a depth of 'XFGETS_NESTINGS_MAX' by passing different 'src_file'.
+ * @note if 'p_start' is non-NULL, preserves read line into the dynamic memory pointed to by its contents.
  * @note all lines of the file whose size is too large to be represented by int type cannot be preserved.
  * @note this function updates the contents of 'p_errid' only when an error occurs while opening the file.
- * @note if the contents of 'p_errid' was set to something other than 0, perform finish processing.
+ * @note if the contents of 'p_errid' was set to something other than 0, performs finish processing.
  * @note the trailing newline character of the line that is the return value is stripped.
  *
- * @attention the string returned at the first call should be released at the end if you preserve read lines.
+ * @attention the value of 'p_start' only makes sense for the first one in a series of calls.
+ * @attention if 'p_start' and its contents are non-NULL, its contents should be released by the caller.
  * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
  */
-char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
+char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
     static int info_idx = -1;
     static xfgets_info info_list[XFGETS_NESTINGS_MAX];
 
@@ -416,6 +420,9 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
         FILE *fp = stdin;
         errno = 0;
 
+        if (p_start)
+            *p_start = NULL;
+
         if ((info_idx < (XFGETS_NESTINGS_MAX - 1)) && ((! src_file) || (fp = fopen(src_file, "r")))){
             info_idx++;
             p_info++;
@@ -425,8 +432,10 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
 
             p_info->src_file = src_file;
             p_info->fp = fp;
+            p_info->p_start = p_start;
+
             p_info->dest = NULL;
-            p_info->curr_size = 2047;
+            p_info->curr_size = XFGETS_INITIAL_SIZE;
             p_info->curr_length = 0;
 
             allocate_flag = true;
@@ -438,28 +447,39 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
         }
     }
 
-    size_t length;
     char *start;
+    size_t length;
     unsigned int tmp;
     bool reset_flag = true;
 
+    start = p_info->dest;
     length = p_info->curr_length;
 
     do {
         if (allocate_flag){
+            assert(p_info->curr_size <= INT_MAX);
+
             if ((start = (char *) realloc(p_info->dest, (sizeof(char) * p_info->curr_size)))){
+                if (p_info->p_start)
+                    *(p_info->p_start) = start;
+
                 p_info->dest = start;
                 allocate_flag = false;
                 continue;
             }
         }
-        else if ((! (p_errid && *p_errid)) && ((tmp = p_info->curr_size - length) > 1)){
-            start = p_info->dest + length;
+        else if (! (p_errid && *p_errid)){
+            assert(start == p_info->dest);
+            start += length;
+
+            tmp = p_info->curr_size - length;
+            assert((tmp > 0) && (tmp <= INT_MAX));
 
             if (fgets(start, tmp, p_info->fp)){
-                length += strlen(start);
+                tmp = strlen(start);
+                length += tmp;
 
-                if (p_info->dest[length - 1] != '\n'){
+                if (! (tmp && (start[--tmp] == '\n'))){
                     tmp = p_info->curr_size + 1;
                     assert(! (p_info->curr_size & tmp));
 
@@ -470,7 +490,8 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
                     }
                 }
                 else {
-                    p_info->dest[--length] = '\0';
+                    length--;
+                    start[tmp] = '\0';
                     reset_flag = false;
                 }
             }
@@ -478,24 +499,30 @@ char *xfgets_for_loop(const char *src_file, bool preserve_flag, int *p_errid){
                 reset_flag = false;
         }
 
+        start = p_info->dest;
+
         if (reset_flag){
+            assert(src_file == p_info->src_file);
+
             if (src_file)
                 fclose(p_info->fp);
             else
                 clearerr(p_info->fp);
 
-            if ((! preserve_flag) && p_info->dest)
-                free(p_info->dest);
+            if ((! (p_info->p_start && p_info->curr_length)) && start){
+                free(start);
 
-            start = NULL;
+                if (p_info->p_start)
+                    *(p_info->p_start) = NULL;
+            }
+
             info_idx--;
+            start = NULL;
         }
-        else if (preserve_flag){
-            start = p_info->dest + p_info->curr_length;
+        else if (p_info->p_start){
+            start += p_info->curr_length;
             p_info->curr_length = length + 1;
         }
-        else
-            start = p_info->dest;
 
         return start;
     } while (true);
@@ -664,7 +691,7 @@ int receive_expected_string(const char *target, const char * const reprs[], size
  * @param[out] p_id  variable to store index number of the instruction to be compared
  * @return char*  substring that is the argument for the instruction in the target line or NULL
  *
- * @note if the content of 'p_id' is an index number, compare only with corresponding instruction.
+ * @note if the content of 'p_id' is an index number, compares only with corresponding instruction.
  * @note when there is a corresponding instruction, its index number is stored in 'p_id'.
  * @attention the instruction must not contain unnecessary leading white spaces.
  */
@@ -672,11 +699,11 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
     assert(line);
     assert(p_id);
 
-    char *tmp;
+    char *args;
     size_t instr_len = 0;
 
-    tmp = line;
-    while (! isspace((unsigned char) *(tmp++)))
+    args = line;
+    while (! isspace((unsigned char) *(args++)))
         instr_len++;
 
     char instr[instr_len + 1];
@@ -685,16 +712,16 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
 
     if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM)){
         if (xstrcmp_upper_case(instr, docker_instr_reprs[*p_id]))
-            tmp = NULL;
+            args = NULL;
     }
     else if ((*p_id = receive_expected_string(instr, docker_instr_reprs, DOCKER_INSTRS_NUM, 1)) < 0)
-        tmp = NULL;
+        args = NULL;
 
-    if (tmp)
-        while (isspace((unsigned char) *tmp))
-            tmp++;
+    if (args)
+        while (isspace((unsigned char) *args))
+            args++;
 
-    return tmp;
+    return args;
 }
 
 
@@ -711,7 +738,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
  * @param[in]  file_name  target file name
  * @return int  the resulting file size, -1 (unexpected error) or -2 (too large)
  *
- * @note if the file is too large, set an error number indicating that.
+ * @note if the file is too large, sets an error number indicating that.
  */
 int get_file_size(const char *file_name){
     assert(file_name);
@@ -743,7 +770,7 @@ int get_last_exit_status(void){
     const char *line;
     int errid = 0, i = -1;
 
-    while ((line = xfgets_for_loop(EXIT_STATUS_FILE, false, &errid))){
+    while ((line = xfgets_for_loop(EXIT_STATUS_FILE, NULL, &errid))){
         errid = -1;
 
         if ((i = receive_positive_integer(line, NULL)) >= 256)
@@ -801,7 +828,7 @@ static void xfgets_for_loop_test(void){
     assert((fp = fopen(TMP_FILE1, "w")));
     assert(! fclose(fp));
 
-    assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
+    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
     assert(! errid);
 
 
@@ -813,17 +840,15 @@ static void xfgets_for_loop_test(void){
     assert(fputs(line, fp) != EOF);
     assert(! fclose(fp));
 
-    assert(! strcmp(xfgets_for_loop(TMP_FILE1, false, &errid), line));
+    assert((line = xfgets_for_loop(TMP_FILE1, NULL, &errid)));
+    assert(! strcmp(line, line));
     assert(! errid);
 
-    assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
+    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
     assert(! errid);
 
 
     // when accepting input from standard input while reading 'r' lines of a non-empty file
-
-    const char * const *tmp;
-    size_t n;
 
     const char * const lines[6] = {
         "abc",
@@ -834,24 +859,27 @@ static void xfgets_for_loop_test(void){
         NULL
     };
 
+    const char * const *p_line;
+    size_t n;
+
     assert((fp = fopen(TMP_FILE1, "w")));
-    for (tmp = lines; *tmp; tmp++)
-        assert(fprintf(fp, "%s\n", *tmp) >= 0);
+    for (p_line = lines; *p_line; p_line++)
+        assert(fprintf(fp, "%s\n", *p_line) >= 0);
     assert(! fclose(fp));
 
     n = rand();
     n %= 6;
 
-    for (tmp = lines;; tmp++){
+    for (p_line = lines;; p_line++){
         if (n--){
-            assert(! strcmp(xfgets_for_loop(TMP_FILE1, false, &errid), *tmp));
+            assert(! strcmp(xfgets_for_loop(TMP_FILE1, NULL, &errid), *p_line));
             assert(! errid);
-            fprintf(stderr, "  %-11s  (%d lines left)\n", *tmp, ((int) n));
+            fprintf(stderr, "  %-11s  (%d lines left)\n", *p_line, ((int) n));
         }
         else {
             fputs("Checking if it works the same as 'cat -' ...\n", stderr);
 
-            while ((line = xfgets_for_loop(NULL, false, NULL)))
+            while ((line = xfgets_for_loop(NULL, NULL, NULL)))
                 assert(fprintf(stdout, "%s\n", line) >= 0);
 
             fputs("If everything is fine, press enter to proceed: ", stderr);
@@ -869,7 +897,7 @@ static void xfgets_for_loop_test(void){
             }
 
             errid = -1;
-            assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
+            assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
             assert(errid == -1);
             break;
         }
@@ -879,7 +907,7 @@ static void xfgets_for_loop_test(void){
     // when specifying a non-existing file
 
     assert(! remove(TMP_FILE1));
-    assert(! xfgets_for_loop(TMP_FILE1, false, &errid));
+    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
     assert(errid == ENOENT);
 }
 
@@ -1058,20 +1086,20 @@ static void receive_dockerfile_instruction_test(void){
     };
 
     int i, id, remain;
-    char *line, *tmp;
+    char *line, *args;
 
 
     for (i = 0; (line = table[i].line); i++){
         id = table[i].expected_id;
-        tmp = receive_dockerfile_instruction(line, &id);
+        args = receive_dockerfile_instruction(line, &id);
 
         if (table[i].offset >= 0){
-            assert(tmp == (line + table[i].offset));
+            assert(args == (line + table[i].offset));
             assert(id == table[i].actual_id);
             id = SUCCESS;
         }
         else {
-            assert(! tmp);
+            assert(! args);
             id = FAILURE;
         }
 
@@ -1108,8 +1136,8 @@ static void get_file_size_test(void){
     assert((fp = fopen(TMP_FILE1, "wb")));
 
     size = rand();
-    size = size % 50 + 1;
-    assert(fwrite("123456789 123456789 123456789 123456789 123456789", sizeof(char), size, fp) == size);
+    size = size % 32 + 1;
+    assert(fwrite("1234567 1234567 1234567 1234567", sizeof(char), size, fp) == size);
     size *= sizeof(char);
 
     assert(! fclose(fp));
@@ -1136,7 +1164,7 @@ static void get_file_size_test(void){
 
 
 static void get_last_exit_status_test(void){
-    int last_exit_status, tmp;
+    int last_exit_status;
     FILE *fp;
     unsigned int i;
 
@@ -1151,12 +1179,11 @@ static void get_last_exit_status_test(void){
     i = rand();
     i %= 256;
     assert(fprintf(fp, "%u\n", i) >= 0);
-    assert(fputs("abc\n", fp) != EOF);
+    assert(fputs("to be ignored\n", fp) != EOF);
 
     assert(! fclose(fp));
 
-    tmp = get_last_exit_status();
-    assert((tmp >= 0) && (tmp < 256));
+    assert(((unsigned int) get_last_exit_status()) < 256);
 
 
     // if the exit status of last executed command line is invalid
@@ -1168,7 +1195,7 @@ static void get_last_exit_status_test(void){
 
 
     assert((fp = fopen(EXIT_STATUS_FILE, "w")));
-    assert(fputs("huga\n", fp) != EOF);
+    assert(fputs("exit status\n", fp) != EOF);
     assert(! fclose(fp));
     assert(get_last_exit_status() == -1);
 

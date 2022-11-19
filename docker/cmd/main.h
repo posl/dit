@@ -185,7 +185,7 @@ void xperror_suggestion(bool cmd_flag);
     * Extensions of Standard Library Functions
 ******************************************************************************/
 
-char *xfgets_for_loop(const char *file_name, bool preserve_flag, int *p_errid);
+char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid);
 int xstrcmp_upper_case(const char * restrict target, const char * restrict expected);
 
 

@@ -198,9 +198,9 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
 static void display_cmd_list(void){
     const int cmd_rearange[] = {1, 10, 0, 6, 2, 8, 12, 4, 9, 11, 3, 7, 5, -1};
 
-    for (const int *tmp = cmd_rearange; *tmp >= 0; tmp++){
-        assert(*tmp < CMDS_NUM);
-        fprintf(stdout, "%s\n", cmd_reprs[*tmp]);
+    for (const int *p_id = cmd_rearange; *p_id >= 0; p_id++){
+        assert(*p_id < CMDS_NUM);
+        fprintf(stdout, "%s\n", cmd_reprs[*p_id]);
     }
 }
 
@@ -214,7 +214,7 @@ static int display_version(void){
     const char *line;
     int errid = 0, exit_status = NORMALLY_EXIT;
 
-    while ((line = xfgets_for_loop(VERSION_FILE, false, &errid)))
+    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid)))
         fprintf(stdout, "%s\n", line);
 
     if (errid){

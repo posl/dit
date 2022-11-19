@@ -152,7 +152,7 @@ int erase(int argc, char **argv){
  * @return int  0 (parse success), 1 (normally exit) or -1 (error exit)
  *
  * @note the arguments are expected to be passed as-is from main function.
- * @note if 'data' is NULL, parse the options for behavior for use in subsequent processing.
+ * @note if 'data' is NULL, parses the options for behavior for use in subsequent processing.
  *
  * @attention options are separated for behavior and for deletion, and must be parsed in that order.
  */
@@ -374,7 +374,7 @@ static void display_prev(int target_c){
             fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset]);
         }
 
-        while ((line = xfgets_for_loop(src_file, false, NULL)))
+        while ((line = xfgets_for_loop(src_file, NULL, NULL)))
             fprintf(stdout, "%s\n", line);
     } while ((target_c = next_target_c));
 
@@ -486,7 +486,7 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
         .assume_c = assume_c
     };
 
-    if (! patterns){
+    if (! (patterns && size)){
         opt.has_delopt = false;
         opt.undoes = 1;
     }
@@ -511,9 +511,9 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
  * @param[in]  no_delete  whether there is no subsequent delete processing
  * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
  *
- * @note each element of 'data' is a non-null value if subsequent deletion operations can be performed.
- * @note only in the above case, terminate normally without calling 'manage_erase_logs'.
- * @note if no changes to the log-file are necessary, just release the log-data at 'manage_erase_logs'.
+ * @note each element of 'data' is non-NULL if subsequent deletion operations can be performed.
+ * @note only in the above case, terminates normally without calling 'manage_erase_logs'.
+ * @note if no changes to the log-file are necessary, just releases the log-data at 'manage_erase_logs'.
  *
  * @attention 'data->logs->reset_flag' must be appropriately initialized before calling this function.
  */
@@ -541,18 +541,14 @@ static int construct_erase_data(erase_data *data, int target_c, unsigned short p
         log_file = ERASE_FILE_H;
     }
 
-    char *line;
-    bool preserve_flag;
+    char **p_start = NULL;
     int exit_status = SUCCESS;
 
-    preserve_flag = (! no_delete);
+    if (! no_delete)
+        p_start = &(data->lines);
 
-    while ((line = xfgets_for_loop(target_file, preserve_flag, &exit_status))){
+    while (xfgets_for_loop(target_file, p_start, &exit_status))
         data->lines_num++;
-
-        if (preserve_flag && (! data->lines))
-            data->lines = line;
-    }
 
     if (! exit_status){
         assert(data->lines_num < INT_MAX);
@@ -639,23 +635,25 @@ int update_erase_logs(unsigned short prov_reflecteds[2]){
  * @note the argument types match those of 'parse_opts' in order to treat this function in the same way.
  * @note the actual types are 'size_t', 'const char * const *', 'const erase_opts *' and 'erase_data *'.
  * @note set 'data->first_mark' to true during the loop to combine the conditions with a logical OR.
+ *
+ * @attention there must be at least one regular expression pattern to determine which lines to delete.
  */
 static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, erase_data *data){
-    assert(size >= 0);
+    assert(size > 0);
     assert(patterns);
     assert(opt);
     assert(data);
 
     int exit_status = SUCCESS;
 
-    while (size--){
+    do {
         data->first_mark = true;
 
         if (marklines_containing_pattern(data, *(patterns++), opt->ignore_case)){
             exit_status = ERROR_EXIT;
             break;
         }
-    }
+    } while (--size);
 
     return exit_status;
 }
@@ -881,7 +879,7 @@ static void marklines_to_undo(erase_data *data, int undoes){
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note modify the contents of the log-data as lines are deleted to properly update the log-file.
- * @note if no changes to the log-file are necessary, just release the log-data at 'manage_erase_logs'.
+ * @note if no changes to the log-file are necessary, just releases the log-data at 'manage_erase_logs'.
  * @note if the return value is -1, an internal file error has occurred, but the deletion was successful.
  *
  * @attention 'data' must be reliably constructed before calling this function.
@@ -1347,7 +1345,7 @@ static int popcount_check_list(unsigned int *check_list, size_t size){
  *
  * @note when the return value is set to 0, reading or writing of the log-file are completed successfully.
  * @note when 'logs->reset_flag' is set to false, array of the log-data and its size are correctly updated.
- * @note except when reading the log-data, release the dynamic memory that is no longer needed.
+ * @note except when reading the log-data, releases the dynamic memory that is no longer needed.
  *
  * @attention 'logs' is not initialized in this function so that you can do write operations without reading.
  * @attention must not exit after only reading the log-data, as dynamic memory cannot be released.

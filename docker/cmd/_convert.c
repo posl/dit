@@ -10,48 +10,50 @@
 
 
 int convert(int argc, char **argv){
-    const char *tmp, *line = NULL;
+    char *line;
+    int errid = 0;
     bool first_line = true;
-    int errid = 0, exit_status = SUCCESS;
 
-    while ((tmp = xfgets_for_loop(COMMAND_LINE_FILE, true, &errid))){
-        if (first_line){
-            line = tmp;
-            first_line = false;
-        }
-        else
+    while (xfgets_for_loop(COMMAND_LINE_FILE, &line, &errid)){
+        if (! first_line)
             errid = -1;
+
+        first_line = false;
     }
 
-    if (line && (! errid)){
+    if (line){
         int mode2d, mode2h;
 
-        if (! get_config(NULL, &mode2d, &mode2h)){
+        if (! (errid || get_config(NULL, &mode2d, &mode2h))){
+            int offset = 0, mode;
+            const char *file_name;
             FILE* fp;
 
-            if (mode2d){
-                if ((fp = fopen(CONVERT_RESULT_FILE_D, "w"))){
-                    fprintf(fp, "RUN %s\n", line);
-                    fclose(fp);
+            do {
+                if (! offset){
+                    mode = mode2d;
+                    file_name = CONVERT_RESULT_FILE_D;
                 }
-                else
-                    exit_status = FAILURE;
-            }
+                else {
+                    mode = mode2h;
+                    file_name = CONVERT_RESULT_FILE_H;
+                }
 
-            if (mode2h){
-                if ((fp = fopen(CONVERT_RESULT_FILE_H, "w"))){
-                    fprintf(fp, "%s\n", line);
+                if (mode && (fp = fopen(file_name, "w"))){
+                    fprintf(fp, ("RUN %s\n" + offset), line);
                     fclose(fp);
                 }
-                else
-                    exit_status = FAILURE;
-            }
+
+                if (offset)
+                    break;
+                offset = 4;
+            } while (true);
         }
-        else
-            exit_status = FAILURE;
+
+        free(line);
     }
 
-    return exit_status;
+    return 0;
 }
 
 
