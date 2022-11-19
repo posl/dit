@@ -248,7 +248,7 @@ static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt
  * @param[in]  comp  comparison function used when qsort
  * @return file_node*  the result of sub-constructing
  *
- * @note at the same time, sort files in directory.
+ * @note at the same time, sorts files in directory.
  */
 static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, qcmp comp){
     assert(ipath);
@@ -321,27 +321,33 @@ static bool concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, 
     assert(ipath);
     assert(ipath->max >= ipath_len);
     assert(suf);
-    assert((strlen(suf) + 1) == suf_len);
+    assert(suf_len == (strlen(suf) + 1));
 
-    if ((ipath->max - ipath_len) < suf_len){
-        size_t curr_max;
-        void *ptr;
+    size_t curr_max;
+    bool allocate_flag = false;
+    void *ptr;
 
-        if (! (curr_max = ipath->max))
-            curr_max = INSP_INITIAL_PATH_MAX / 2;
+    if (! (curr_max = ipath->max)){
+        curr_max = INSP_INITIAL_PATH_MAX;
+        allocate_flag = true;
+    }
 
-        do
-            if (! (curr_max <<= 1))
-                return false;
-        while ((curr_max - ipath_len) < suf_len);
-
-        if ((ptr = realloc(ipath->ptr, (sizeof(char) * curr_max)))){
+    do {
+        if ((curr_max - ipath_len) < suf_len){
+            if ((curr_max <<= 1)){
+                allocate_flag = true;
+                continue;
+            }
+        }
+        else if (! allocate_flag)
+            break;
+        else if ((ptr = realloc(ipath->ptr, (sizeof(char) * curr_max)))){
             ipath->ptr = (char *) ptr;
             ipath->max = curr_max;
+            break;
         }
-        else
-            return false;
-    }
+        return false;
+    } while (true);
 
     assert(ipath->ptr);
 
@@ -623,8 +629,8 @@ static void destruct_dir_tree(file_node *tree, const insp_opts *opt){
  * @param[in]  opt  variable containing the result of option parse or NULL
  * @param[in]  depth  hierarchy in the directory tree of the file we are currently trying to display
  *
- * @note at the same time, release the dynamic memory that is no longer needed.
- * @note if NULL is passed to 'opt', just release the dynamic memory that is never used.
+ * @note at the same time, releases the dynamic memory that is no longer needed.
+ * @note if NULL is passed to 'opt', just releases the dynamic memory that is never used.
  *
  * @attention note that if 'depth' wraps around, the hierarchical representation of directories is disturbed.
  */
@@ -669,8 +675,8 @@ static void destruct_recursive(file_node *file, const insp_opts *opt, size_t dep
         size = file->children_num;
         depth++;
 
-        for (file_node * const *tmp = file->children; size--; tmp++)
-            destruct_recursive(*tmp, opt, depth);
+        for (file_node * const *p_file = file->children; size--; p_file++)
+            destruct_recursive(*p_file, opt, depth);
 
         free(file->children);
     }
@@ -719,7 +725,7 @@ static void print_file_mode(mode_t mode){
  * @param[in]  file  the file we are currently trying to display
  * @param[in]  numeric_id  whether to represent users and groups numerically
  *
- * @attention if the id exceeds 8 digits, print a string that represents a numeric excess.
+ * @attention if the id exceeds 8 digits, prints a string that represents a numeric excess.
  */
 static void print_file_owner(const file_node *file, bool numeric_id){
     assert(file);

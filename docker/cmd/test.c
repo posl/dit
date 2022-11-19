@@ -124,16 +124,16 @@ bool check_if_alphabetical_order(const char * const reprs[], size_t size){
     assert(reprs);
 
     if (size > 1){
-        const char * const *tmp;
+        const char * const *p_repr;
         const char *repr;
 
-        tmp = reprs;
+        p_repr = reprs;
         size--;
 
         do {
-            assert((repr = *(tmp++)));
+            assert((repr = *(p_repr++)));
 
-            if (strcmp(repr, *tmp) >= 0)
+            if (strcmp(repr, *p_repr) >= 0)
                 return false;
         } while (--size);
     }

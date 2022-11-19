@@ -183,7 +183,7 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
  * @param[out] opt  variable to store the results of option parse
  * @return int  0 (success), 1 (possible error) or negative integer (unexpected error)
  *
- * @note if no non-optional arguments, use the convert-file prepared by this tool and reset it after use.
+ * @note if no non-optional arguments, uses the convert-file prepared by this tool and reset it after use.
  * @note 'opt->target_c' keeps updating in the loop to represent the next 'target_c'.
  */
 static int do_reflect(int argc, char **argv, refl_opts *opt){
@@ -272,7 +272,7 @@ static int reflect_file(const char *src_file, int target_c, const refl_opts *opt
     }
 
     do {
-        if ((line = xfgets_for_loop(src_file, false, p_errid))){
+        if ((line = xfgets_for_loop(src_file, NULL, p_errid))){
             if (! *line){
                 switch (opt->blank_c){
                     case 's':
@@ -311,7 +311,7 @@ static int reflect_file(const char *src_file, int target_c, const refl_opts *opt
  * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
- * @note if the destination file is too large to be represented by int type, exit with the error.
+ * @note if the destination file is too large to be represented by int type, exits with the error.
  * @note if both files are destination, it will be indicated when reflecting the first line in each.
  * @note record the number of reflected lines after there are no more lines to be reflected.
  * @note if the return value is -1, an internal file error has occurred, but processing can be continued.
@@ -429,7 +429,7 @@ static int init_dockerfile(FILE *fp){
         ID_WORKDIR
     };
 
-    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, false, &errid))){
+    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, NULL, &errid))){
         if ((reflected < 3) && (receive_dockerfile_instruction(line, (instr_ids + reflected)))){
             reflected++;
             fprintf(fp, "%s\n", line);
