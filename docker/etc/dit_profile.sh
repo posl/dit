@@ -82,7 +82,7 @@ export PROMPT_COMMAND PS1
 DIT_VERSION='1.0.0'
 
 if [ ! -s /dit/etc/dit_version ]; then
-    . /dit/mnt/.dit_history > /dev/null
+    # . /dit/mnt/.dit_history > /dev/null
     history -r /dit/mnt/.dit_history
     echo "dit version ${DIT_VERSION:-?.?.?}" > /dit/etc/dit_version
 fi
