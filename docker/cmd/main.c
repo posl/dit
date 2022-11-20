@@ -791,6 +791,10 @@ int get_last_exit_status(void){
 ******************************************************************************/
 
 
+// if you want to a normal test for 'fgets_for_loop', comment out the line immediately after
+// #define XFGETS_TEST_COMPLETE
+
+
 static void xfgets_for_loop_test(void);
 static void xstrcmp_upper_case_test(void);
 
@@ -820,88 +824,205 @@ void dit_test(void){
 
 
 static void xfgets_for_loop_test(void){
-    FILE *fp;
-    int errid = 0;
+    // when specifying the file whose contents do not end with a newline character
 
-    // when specifying an empty file
-
-    assert((fp = fopen(TMP_FILE1, "w")));
-    assert(! fclose(fp));
-
-    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
-    assert(! errid);
-
-
-    // when specifying the file whose contents do not end with a newline
-
-    const char *line = "tonari no kyaku ha yoku kaki kuu kyaku da";
-
-    assert((fp = fopen(TMP_FILE1, "w")));
-    assert(fputs(line, fp) != EOF);
-    assert(! fclose(fp));
-
-    assert((line = xfgets_for_loop(TMP_FILE1, NULL, &errid)));
-    assert(! strcmp(line, line));
-    assert(! errid);
-
-    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
-    assert(! errid);
-
-
-    // when accepting input from standard input while reading 'r' lines of a non-empty file
-
-    const char * const lines[6] = {
-        "abc",
-        "def ghij",
-        "kl mn",
-        "op qr",
-        "stu v w xyz",
+    // changeable part for updating test cases
+    const char * const lines_without_newline[] = {
+        "The parts where the test case can be updated by changing the code are commented as shown above.",
+        "You can try changing the value of the macro 'XFGETS_INITIAL_SIZE' before testing.",
+        "",
         NULL
     };
 
     const char * const *p_line;
-    size_t n;
+    FILE *fp;
+    bool isempty;
+    char *line;
+    int errid = 0;
+
+    for (p_line = lines_without_newline; *p_line; p_line++){
+        fprintf(stderr, "  Reading '%s' ...\n", *p_line);
+
+        assert((fp = fopen(TMP_FILE1, "w")));
+        assert(fputs(*p_line, fp) != EOF);
+        assert(! fclose(fp));
+
+        isempty = (! **p_line);
+
+        do {
+            line = xfgets_for_loop(TMP_FILE1, NULL, &errid);
+            assert(! errid);
+
+            if (isempty){
+                assert(! line);
+                break;
+            }
+            else {
+                assert(! strcmp(line, *p_line));
+                isempty = true;
+            }
+        } while (true);
+    }
+
+
+    // when specifying the file where multiple lines are stored and interrupting the reading in the middle
+
+    // changeable part for updating test cases
+    const char * const lines_with_trailing_newline[] = {
+        "                                   .... (:((!\"`'?7OC+--...                      ",
+        "          8                            ...?7~           _~_~~_.<~<!`.-?9~..     ",
+        "                     8                        ..?!                ``````` ``    ",
+        "  `_!__<~.                      8                     ..^      .`               ",
+        "                    `_<.   ,^~?-           8                   .?`       .(~    ",
+        "    .              _.             `_<>.    1.         8                 .?      ",
+        "   (``      .(!              `` <.               <-    <         8              ",
+        " .?         .>``     .J~.`                 `__                1.   1        8   ",
+        "           J`         .~`     ..!_~ `                  `(                 (-. ._",
+        "       8             >`  `      `z     .c~   .`    ._               <           ",
+        "     . 1.`1       8            :` .(.     ._     `.:`   -    . ~..       .`    .",
+        "`  .l            ``<..       8           >   _>.    .C`     .:`  .<.    .( ``   ",
+        "    .-     :`  j_              (_-(.    8          J.   (>`   .Z_     .C   .v.  ",
+        "   q  .        (.      \\` (:              `<!  (   8         .!    (z.   d:     ",
+        " v~  .C_      j  .        <.` .....  (>               .1  /   8         <     (l",
+        "_  /f.     (:   v~      ..  .    ....>.JJWWV1Jn.(l:               _+(_   8      ",
+        "   ~     _1l  O>     :V   J:      .-C> .-<((((! v      (0f.(I& >             ~(2",
+        "    8        .      ~+'`ld      (<  .<      `-  I (OAwOwn  }_ -+WVY=..(Z   :~   ",
+        "        _([    8        (.      (l`lR      y~ .C       ;   O _yZAmdphgX77=~_..  ",
+        "-dr   <:~_          :O.   8        <        ? dD     ( _ (~   .7<_(   O  (AWWY\"!",
+        ".(_.`      _Hk    _~~_..(~.    :(~   8        (.        ?S5     j . 0:     ((v, ",
+        "     v>      -`       (Wk  .wxuuXVT4X_    ~(;   8        ._~       Jtr     U _.I",
+        ":    J>  %~~(<   -      (`      _JTWkX\"\"  :  (0Y:    :~[   8        `1_~     (  ",
+        "r    ( :_JI  ~(v~       h~~<n-      >      ,v)IWAQ._v+US_~     _~~[   8         ",
+        " -(~    J  $    z :_Kv:(Jnwg       (<{  I<     .-     >),7wWW9rX<\\        ~:_\\  ",
+        " 8          (!    _0'  w   k ~(HWqHHMHHHHHH@H   &-$j       . >~h\\(\"\"  (?k    d  ",
+        "     ~~._   8          (_   ~( '` :   w :?0Y::(MQHMHHHHMMHHMHU~l  l   }>)   (f.-",
+        "(   ?Xkzw      (c~(~   8          !.   -Z~_~k~   O ~(`````WMM#=,``P:~?THb._   ( ",
+        "        -dHHMHHHHWky      (6 $    8         w`    f``.      t ~(``  .MNd, .(, ``",
+        "__~~ `:  ?_    .MHMWH@MHr<<7THHH  (< I  (    8        zt    (!``~      t ~(_` .J",
+        "MHWNB=?b  ``      -!?<m`J ..#=,M| ````(0=(  :, k  %     8       J ~    (_``_~j  ",
+        "  t _({`  J|  \"= .F  `          ``  JMB, .?b   ``` (   U<   SJ`    8      .  ~. ",
+        "   L ` ~d    t  ($`  .h.77!.d!                 .MMTH=J]    ``.l V:~  tk`      8 ",
+        "     R y _     n.``(    ld-?d_`  -?9.J\"                   J|  & .F    .zc&JZl  $",
+        "         8     .+ r`     d  a,,    1   <-                            .h?7!uF    ",
+        "` ? H\\  O  (S       8     v  }`     O _       ( b.   ~_(<_~                     ",
+        "  9.7^    `  (R 'I (Z   9      8    J!  !`     l   tw .  . d_    ````           ",
+        "        ._     _>)~     X0'`x  (<  l      8   ,(! .``     v  0  [ ,    {        ",
+        "                          ````     W '`k   ?  ._     8  . I  ( `     I d `  $  _",
+        " 4u                      _              (v?Td `-'|     <_ 1     8  C.) `( `   . ",
+        " _0 `' C    : OU-.                 / ``\"        _-?4. ``?2~.       <  .    8 . (",
+        "!   -`   ~( _I `'` j-  z:    yU+..(?77=i.                 ````j_?+.``z+     |   ",
+        " >`   8  3._   t``_ ~d_(Z `'`  ;. _z_4x7=!...-77<. `?.               .>? d6*~_=.",
+        "CC     ({   (_   8         7. _(Zt(7~~_Id(X_ .?- l._~(v````.(/   42TM#NNmgmO&+jV",
+        "\"`   <>?v~_(d     .l    |   8           _7_d(i,     I;j-..O   (J>     `,L  `.Ye ",
+        "   79% w  ,N,, 1j    ~(W     ((   `~   8                        jI1+(   +z!     ",
+        ". ,H, .< ,h..J!      .#Nz.?(    _(v    _C.    `   8                         (<~`",
+        "  >+!     .  ` .\"YSa+JMMSaJ....JY-X3..`.. -~Z JJ__J`,   J    8                  ",
+        "      J~.``  j!`.   .C     .._-z   ?M   @ +Hg>?1z-. .~(!_~999  77!`     8",
+        NULL
+    };
+
+
+    size_t count = 1, remain;
+    char *start_for_file;
 
     assert((fp = fopen(TMP_FILE1, "w")));
-    for (p_line = lines; *p_line; p_line++)
+    for (p_line = lines_with_trailing_newline; *p_line; p_line++){
+        count++;
         assert(fprintf(fp, "%s\n", *p_line) >= 0);
+    }
     assert(! fclose(fp));
 
-    n = rand();
-    n %= 6;
+#ifdef XFGETS_TEST_COMPLETE
+    assert(count > 0);
+    count -= rand() % count;
+#endif
+    assert(count > 0);
+    remain = rand() % count;
+    count = remain;
 
-    for (p_line = lines;; p_line++){
-        if (n--){
-            assert(! strcmp(xfgets_for_loop(TMP_FILE1, NULL, &errid), *p_line));
-            assert(! errid);
-            fprintf(stderr, "  %-11s  (%d lines left)\n", *p_line, ((int) n));
+
+    for (p_line = lines_with_trailing_newline; remain--; p_line++){
+#ifndef XFGETS_TEST_COMPLETE
+        fprintf(stderr, "  Reading '%s' ...\n", *p_line);
+#endif
+        assert((line = xfgets_for_loop(TMP_FILE1, &start_for_file, &errid)));
+        assert(! strcmp(line, *p_line));
+        assert(! errid);
+
+#ifdef XFGETS_TEST_COMPLETE
+        for (; *line; line++)
+            fputc(((*line != '8') ? *line : '\n'), stderr);
+#endif
+    }
+
+
+    // when accepting the input from standard input while reading other file
+
+    char *start_for_stdin;
+
+    fputs("\nChecking if it works the same as 'cat -' ...\n", stderr);
+
+    for (remain = 0; (line = xfgets_for_loop(NULL, &start_for_stdin, NULL)); remain++)
+        assert(fprintf(stdout, "%s\n", line) >= 0);
+
+    do {
+        fputs("If everything is fine, press enter to proceed: ", stderr);
+
+        switch (fgetc(stdin)){
+            case '\n':
+                fputs("Done!\n", stderr);
+                break;
+            case EOF:
+                clearerr(stdin);
+                assert(false);
+            default:
+                fscanf(stdin, "%*[^\n]%*c");
+                assert(false);
+        }
+
+        if (start_for_stdin){
+            assert(remain > 0);
+
+            fputs("Checking if the output matches the input ...\n", stderr);
+
+            line = start_for_stdin;
+
+            do {
+                assert(fprintf(stdout, "%s\n", line) >= 0);
+                while (*(line++));
+            } while (--remain);
+
+            free(start_for_stdin);
+            start_for_stdin = NULL;
         }
         else {
-            fputs("Checking if it works the same as 'cat -' ...\n", stderr);
-
-            while ((line = xfgets_for_loop(NULL, NULL, NULL)))
-                assert(fprintf(stdout, "%s\n", line) >= 0);
-
-            fputs("If everything is fine, press enter to proceed: ", stderr);
-
-            switch (fgetc(stdin)){
-                case '\n':
-                    fputs("Done!\n", stderr);
-                    break;
-                case EOF:
-                    clearerr(stdin);
-                    assert(false);
-                default:
-                    fscanf(stdin, "%*[^\n]%*c");
-                    assert(false);
-            }
-
-            errid = -1;
-            assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
-            assert(errid == -1);
+            assert(! remain);
             break;
         }
+    } while (true);
+
+
+    // when performing terminate processing for the interrupted file reading and confirming its correctness
+
+    errid = -1;
+    assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, &errid));
+    assert(errid == -1);
+
+    if (start_for_file){
+        assert(count > 0);
+
+        line = start_for_file;
+        p_line = lines_with_trailing_newline;
+
+        do {
+            assert(! strcmp(line, *(p_line++)));
+            while (*(line++));
+        } while (--count);
+
+        free(start_for_file);
     }
+
+    assert(! count);
 
 
     // when specifying a non-existing file
@@ -1120,34 +1241,39 @@ static void receive_dockerfile_instruction_test(void){
 
 
 static void get_file_size_test(void){
-    FILE *fp;
+    assert(sizeof(char) == 1);
+
+    // when specifying a valid file
+
+    // changeable part for updating test cases
+    const unsigned int digit = 6;
+    assert(digit <= 10);
+
+    int i, divisor = 1;
     size_t size;
+    FILE *fp;
+    char *tmp;
 
-    // when specifying an empty file
+    for (i = -1; ++i < digit; divisor *= 10) {
+        size = rand() % divisor;
 
-    assert((fp = fopen(TMP_FILE1, "wb")));
-    assert(! fclose(fp));
+        assert((fp = fopen(TMP_FILE1, "wb")));
+        if (size){
+            assert((tmp = calloc(size, sizeof(char))));
+            assert(fwrite(tmp, sizeof(char), size, fp) == size);
+            free(tmp);
+        }
+        assert(! fclose(fp));
 
-    assert(! get_file_size(TMP_FILE1));
+        assert(get_file_size(TMP_FILE1) == size);
 
-
-    // when specifying a non-empty file
-
-    assert((fp = fopen(TMP_FILE1, "wb")));
-
-    size = rand();
-    size = size % 32 + 1;
-    assert(fwrite("1234567 1234567 1234567 1234567", sizeof(char), size, fp) == size);
-    size *= sizeof(char);
-
-    assert(! fclose(fp));
-
-    assert(get_file_size(TMP_FILE1) == size);
+        fprintf(stderr, "  size:  %*d\n", digit, ((int) size));
+    };
 
 
     // when specifying a file that is too large
 
-    if (system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K"))){
+    if (system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K > /dev/null"))){
         assert(get_file_size(TMP_FILE1) == -2);
         assert(errno == EFBIG);
     }
@@ -1164,47 +1290,43 @@ static void get_file_size_test(void){
 
 
 static void get_last_exit_status_test(void){
-    int last_exit_status;
+    int curr;
+
+    curr = get_last_exit_status();
+    assert((curr >= 0) && (curr < 256));
+
+
+    const struct {
+        const char * const format;
+        const int input;
+        const int result;
+    }
+    // changeable part for updating test cases
+    table[] = {
+        { "%d\n",                     0,    0 },
+        { "%d\nto be ignored\n",    128,  128 },
+        { "%d",                       1,    1 },
+        { "%d\n",                 18610,   -1 },
+        { "-1\ninvalid status\n",    -1,   -1 },
+        { "",                        -1,   -1 },
+        { "%d\n",                  curr, curr },
+        {  0,                         0,    0 },
+    };
+
+
+    int i;
     FILE *fp;
-    unsigned int i;
 
-    // if the exit status of last executed command line is valid
+    for (i = 0; table[i].format; i++){
+        assert((fp = fopen(EXIT_STATUS_FILE, "w")));
+        assert(fprintf(fp, table[i].format, table[i].input) >= 0);
+        assert(! fclose(fp));
 
-    last_exit_status = get_last_exit_status();
-    assert((last_exit_status >= 0) && (last_exit_status < 256));
+        assert(get_last_exit_status() == table[i].result);
 
-
-    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
-
-    i = rand();
-    i %= 256;
-    assert(fprintf(fp, "%u\n", i) >= 0);
-    assert(fputs("to be ignored\n", fp) != EOF);
-
-    assert(! fclose(fp));
-
-    assert(((unsigned int) get_last_exit_status()) < 256);
-
-
-    // if the exit status of last executed command line is invalid
-
-    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
-    assert(fprintf(fp, "%u\n", (i + 256)) >= 0);
-    assert(! fclose(fp));
-    assert(get_last_exit_status() == -1);
-
-
-    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
-    assert(fputs("exit status\n", fp) != EOF);
-    assert(! fclose(fp));
-    assert(get_last_exit_status() == -1);
-
-
-    // restore the contents of the file
-
-    assert((fp = fopen(EXIT_STATUS_FILE, "w")));
-    assert(fprintf(fp, "%d\n", last_exit_status) >= 0);
-    assert(! fclose(fp));
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "% 6d  % 4d\n", table[i].input, table[i].result);
+    }
 }
 
 

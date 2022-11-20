@@ -395,7 +395,7 @@ static void display_prev(int target_c){
  * @param[in]  argc  the length of the argument vector below
  * @param[out] argv  array of the arguments used to determine which lines to delete
  * @param[out] opt  variable to store the results of option parse
- * @param[in]  command_line  whether to use this function directly from the command line
+ * @param[in]  marklines_func  function that marks the lines to be deleted based on the options for deletion
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note if the return value is -1, an internal file error has occurred, but the deletion was successful.
@@ -875,7 +875,7 @@ static void marklines_to_undo(erase_data *data, int undoes){
  *
  * @param[out] data  variable to store the data commonly used in this command
  * @param[in]  opt  variable to store the results of option parse
- * @param[in]  flag  whether to edit both Dockerfile and history-file or -1
+ * @param[in]  both_flag  whether to edit both Dockerfile and history-file or -1
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note modify the contents of the log-data as lines are deleted to properly update the log-file.
@@ -1479,12 +1479,12 @@ void erase_test(void){
     do_test(assign_exit_status_macro_test);
     do_test(getsize_check_list_macro_test);
 
+    do_test(receive_range_specification_test);
+    do_test(popcount_check_list_test);
+
     do_test(marklines_containing_pattern_test);
     do_test(marklines_with_numbers_test);
     do_test(marklines_to_undo_test);
-
-    do_test(receive_range_specification_test);
-    do_test(popcount_check_list_test);
 
     do_test(manage_erase_logs_test);
 }
@@ -1605,19 +1605,19 @@ static void marklines_containing_pattern_test(void){
     }
     // changeable part for updating test cases
     table[] = {
-        { "^[[:space:]]*[^#]",                                        true, false, 0x0006def7 },
-        { "(\"|\')[[:print:]]+\\1",                                  false, false, 0x00061e84 },
-        { "^Run[[:space:]]",                                         false,  true, 0x00001c80 },
-        { "",                                                         true, false, 0x0007ffff },
-        { "^RUN([[:space:]]+)\\w+\\1([^&]*&{2}|[^|]*\\|{2})\\1\\w+", false, false, 0x00008880 },
-        { "$^",                                                      false,  true, 0x00000000 },
-        { "*.txt",                                                     -1,  false, 0x00000000 },
-        { "((|\\[|\\{)",                                               -1,  false, 0x00000000 },
-        { "^run[[:print:]]*\\",                                        -1,   true, 0x00000000 },
-        { "\\<[a-Z]+\\>",                                              -1,  false, 0x00000000 },
-        { "[[:unknown:]]?",                                            -1,   true, 0x00000000 },
-        { "C:\\Documents\\News\\2022-11-17.pdf",                       -1,   true, 0x00000000 },
-        {  0,                                                           0,     0,    0        }
+        { "^[[:space:]]*[^#]",                        true, false, 0x0006def7 },
+        { "\"[[:print:]]+\"",                        false, false, 0x00061c04 },
+        { "^Run[[:space:]]",                         false,  true, 0x00001c00 },
+        { "",                                         true, false, 0x0007ffff },
+        { "^RUN[[:print:]]+([^&]*&{2}|[^|]*\\|{2})", false, false, 0x00008880 },
+        { "$^",                                      false,  true, 0x00000000 },
+        { "*.txt",                                     -1,  false, 0x00000000 },
+        { "((|\\[|\\{)",                               -1,  false, 0x00000000 },
+        { "^run[[:print:]]*\\",                        -1,   true, 0x00000000 },
+        { "[",                                         -1,  false, 0x00000000 },
+        { "\\<[a-Z]+\\>",                              -1,  false, 0x00000000 },
+        { "[[:unknown:]]?",                            -1,   true, 0x00000000 },
+        {  0,                                           0,     0,    0        }
     };
 
 
@@ -1943,6 +1943,114 @@ static void popcount_check_list_test(void){
 
 
 static void manage_erase_logs_test(void){
+    // when specifying a vvalid log-file
+
+    const unsigned char ucm = UCHAR_MAX;
+
+    const struct {
+        const int total;
+        const unsigned short provlog;
+
+        const struct {
+            const int flag;
+            const size_t size;
+            const unsigned char array[4];
+        } read_result;
+
+        const struct {
+            const int flag;
+            const size_t size;
+            const unsigned char array[4];
+        } write_input;
+    }
+    // changeable part for updating test cases
+    table[] = {
+        {   0,   0, {   -1,  0, {0}                  }, { false, 0, {0}       } },
+        {   0, 755, { false, 0, {0}                  }, {  true, 0, {0}       } },
+        { 755,   0, { false, 3, {ucm, ucm, 245}      }, { false, 2, {245, 88} } },
+        { 634, 333, {  true, 2, {245, 88}            }, {  true, 0, {0}       } },
+        { 967,   0, { false, 4, {ucm, ucm, ucm, 202} }, {   -1,  0, {0}       } },
+        {  -1,   0, {0},                                {0}                     }
+    };
+
+
+    FILE *fp;
+    int i, tmp;
+    unsigned short provlog;
+    erase_logs logs = { .p_provlog = &provlog };
+    size_t logs_idx;
+
+    assert((fp = fopen(TMP_FILE1, "wb")));
+    assert(! fclose(fp));
+
+
+    for (i = 0; table[i].total >= 0; i++){
+        logs.total = table[i].total;
+        logs.size = 0;
+        logs.array = NULL;
+        provlog = table[i].provlog;
+
+        tmp = SUCCESS;
+        if (table[i].read_result.flag < 0)
+            tmp = UNEXPECTED_ERROR;
+
+        assert(manage_erase_logs(TMP_FILE1, 'r', &logs, false) == tmp);
+        assert(logs.size == table[i].read_result.size);
+
+        for (logs_idx = logs.size; logs_idx--;)
+            assert(logs.array[logs_idx] == table[i].read_result.array[logs_idx]);
+
+        assert(logs.reset_flag == ((bool) table[i].read_result.flag));
+        assert(provlog == table[i].provlog);
+
+
+        tmp = 'w';
+        if (table[i].write_input.flag < 0)
+            tmp = '\0';
+
+        for (logs_idx = (logs.size = table[i].write_input.size); logs_idx--;)
+            logs.array[logs_idx] = table[i].write_input.array[logs_idx];
+
+        assert(manage_erase_logs(TMP_FILE1, tmp, &logs, ((bool) table[i].write_input.flag)) == SUCCESS);
+
+
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "confirmed log-data:  [ ");
+
+        for (logs_idx = 0; logs_idx < table[i].read_result.size; logs_idx++)
+            fprintf(stderr, "%d ", table[i].read_result.array[logs_idx]);
+
+        fputs("]\n", stderr);
+    }
+
+
+    // when specifying an invalid log-file
+
+    logs.size = 3;
+
+    for (i = 1;; i--){
+        if (i){
+            assert((fp = fopen(TMP_FILE1, "wb")));
+            assert(fwrite(&(logs.size), sizeof(logs.size), 1, fp) == 1);
+            assert(! fclose(fp));
+        }
+        else
+            assert(! remove(TMP_FILE1));
+
+        logs.size = 0;
+        logs.array = NULL;
+
+        assert(manage_erase_logs(TMP_FILE1, 'r', &logs, false) == UNEXPECTED_ERROR);
+        assert(manage_erase_logs(TMP_FILE1, '\0', &logs, true) == SUCCESS);
+
+        if (i)
+            assert(logs.size == 3);
+        else {
+            assert(! logs.size);
+            assert(! logs.array);
+            break;
+        }
+    }
 }
 
 

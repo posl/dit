@@ -915,52 +915,60 @@ void inspect_test(void){
 
 
 static void concat_inf_path_test(void){
-    char name[] = " , the temporary file-name for docker-interactive-tool/";
-    size_t name_len = sizeof(name) / sizeof(*name);
+    const struct {
+        const char * const path;
+        const size_t inherit;
+        const char * const result;
+    }
+    // changeable part for updating test cases
+    table[] = {
+        { "dit/",                 0, "dit/"                        },
+        { "tmp/",                 4, "dit/tmp/"                    },
+        { "last-history-number",  8, "dit/tmp/last-history-number" },
+        { "reflect-report.prov",  8, "dit/tmp/reflect-report.prov" },
+        { "etc/config.stat",      4, "dit/etc/config.stat"         },
+        { "./",                   0, "./"                          },
+        { "../etc/passwd",        2, "./../etc/passwd"             },
+        { "../etc/passwd",        5, "./../../etc/passwd"          },
+        { "../etc/passwd",        8, "./../../../etc/passwd"       },
+        { "malware.sh",          15, "./../../../etc/malware.sh"   },
+        {  0,                     0,  0                            }
+    };
 
-    int iter = 0;
-    while (((name_len - 1) * (++iter) + 1) <= INSP_INITIAL_PATH_MAX);
-    assert(((name_len - 1) * iter + 1) < (INSP_INITIAL_PATH_MAX * 2));
-
-    int i = 0;
+    int i;
     inf_path ipath = { .ptr = NULL, .max = 0};
-    size_t ipath_len = 0;
 
-
-    // when concatenating strings in order
-
-    do {
-        fprintf(stderr, "  Concatenating the %dth element ...\n", i);
-
-        name[0] = i + '0';
-        assert(concat_inf_path(&ipath, ipath_len, name, name_len));
-
+    for (i = 0; table[i].path; i++){
+        assert(concat_inf_path(&ipath, table[i].inherit, table[i].path, (strlen(table[i].path) + 1)));
         assert(ipath.ptr);
-        assert(! strcmp((ipath.ptr + ipath_len), name));
+        assert(! strcmp(ipath.ptr, table[i].result));
 
-        ipath_len += (name_len - 1);
-        assert(strlen(ipath.ptr) == ipath_len);
-
-        if (++i < iter)
-            assert(ipath.max == INSP_INITIAL_PATH_MAX);
-        else {
-            assert(ipath.max == (INSP_INITIAL_PATH_MAX * 2));
-            break;
-        }
-    } while (true);
-
-    assert(i == iter);
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "%s\n", table[i].result);
+    }
 
 
-    // when terminating the path string at any point
+    // changeable part for updating test cases
+    const char *repeat = "Infinitely-Deep-Directory/";
 
-    i = rand();
-    i %= name_len;
-    assert(concat_inf_path(&ipath, ((size_t) i), "", 1));
+    size_t size, ipath_len = 0;
+    int iter = 0;
 
-    name[0] = '0';
-    name[i] = '\0';
-    assert(! strcmp(ipath.ptr, name));
+    size = strlen(repeat);
+    assert(size > 0);
+
+    while ((size * (++iter) + 1) <= INSP_INITIAL_PATH_MAX);
+    assert((size * iter + 1) < (INSP_INITIAL_PATH_MAX * 2));
+
+    for (i = 0; i < iter;){
+        assert(ipath.max == INSP_INITIAL_PATH_MAX);
+        assert(concat_inf_path(&ipath, ipath_len, repeat, (size + 1)));
+        assert(ipath.ptr);
+
+        ipath_len += size;
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "%s * %d\n", repeat, ++i);
+    }
 
     assert(ipath.max == (INSP_INITIAL_PATH_MAX * 2));
 
@@ -984,15 +992,8 @@ static void new_file_test(void){
     // when specifying a regular file
 
     FILE *fp;
-    size_t size;
 
-    assert((fp = fopen(TMP_FILE1, "wb")));
-
-    size = rand();
-    size = size % 54 + 1;
-    assert(fwrite("ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz", sizeof(char), size, fp) == size);
-    size *= sizeof(char);
-
+    assert((fp = fopen(TMP_FILE1, "w")));
     assert(! fclose(fp));
 
     assert((file = new_file(TMP_FILE1, TMP_NAME1)));
@@ -1003,7 +1004,7 @@ static void new_file_test(void){
 
     assert(file->uid == uid);
     assert(file->gid == gid);
-    assert(file->size == size);
+    assert(! file->size);
 
     assert(! (file->link_path || file->link_mode || file->link_invalid));
     assert(! (file->children || file->children_num || file->children_max));
@@ -1099,11 +1100,11 @@ static void append_file_test(void){
     // when storing file nodes in order
 
     do {
-        fprintf(stderr, "  Appending the %dth element ...\n", i);
-
         assert((file = (file_node *) malloc(sizeof(file_node))));
-
         file->size = rand() / (INSP_INITIAL_DIRS_MAX * 2);
+
+        fprintf(stderr, "  Appending the %2dth element of size %d ...\n", i, ((int) file->size));
+
         assert(append_file(&node, file));
 
         total_size += file->size;
