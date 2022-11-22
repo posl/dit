@@ -10,7 +10,7 @@ dit config --unit-tests || exit 1
 
 
 #
-# Functions
+# Test Functions
 #
 
 #

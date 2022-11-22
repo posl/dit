@@ -10,7 +10,7 @@ dit inspect --unit-tests || exit 1
 
 
 #
-# Variables
+# Preprocessing
 #
 
 set +x
@@ -45,7 +45,7 @@ set -x
 
 
 #
-# Functions
+# Test Functions
 #
 
 #
@@ -59,12 +59,10 @@ set -x
 do_test(){
     set +x
 
-    if [ "$#" -eq 1 ]; then
-        ( dit inspect "$1" "${DIR}" || exit 1 ) | awk '/^.* \|-- / { print $1, $2, $3, $NF }' > "${TMP1}"
-        ( ls -Al "$1" "${DIR}" || exit 1 ) | awk 'NR != 1 { print $1, $3, $4, $NF }' | tee "${TMP2}"
+    ( dit inspect "$1" "${DIR}" || exit 1 ) | awk '/^.* \|-- / { print $1, $2, $3, $NF }' > "${TMP1}"
+    ( ls -Al "$1" "${DIR}" || exit 1 ) | awk 'NR != 1 { print $1, $3, $4, $NF }' | tee "${TMP2}"
 
-        diff -u "${TMP1}" "${TMP2}" || exit 1
-    fi
+    diff -u "${TMP1}" "${TMP2}" || exit 1
 
     echo
     set -x

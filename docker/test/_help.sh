@@ -10,7 +10,7 @@ dit help --unit-tests || exit 1
 
 
 #
-# Variables
+# Preprocessings
 #
 
 set +x
@@ -29,7 +29,7 @@ set -x
 
 
 #
-# Functions
+# Test Functions
 #
 
 do_test_cmd_list(){
