@@ -16,12 +16,14 @@ dit inspect --unit-tests || exit 1
 set +x
 
 trap 'rm -fR _inspect[1-3].tmp; echo' EXIT
+trap 'exit 1' HUP INT QUIT TERM
+
 
 TMP1=_inspect1.tmp
 TMP2=_inspect2.tmp
 
-
 DIR=_inspect3.tmp
+
 
 mkdir -m g+s "${DIR}"
 chown root:sys "${DIR}"

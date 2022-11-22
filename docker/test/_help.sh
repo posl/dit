@@ -15,11 +15,12 @@ dit help --unit-tests || exit 1
 
 set +x
 
+trap ': > /dit/etc/dit_version; rm -f _help[1-2].tmp; echo' EXIT
+trap 'exit 1' HUP INT QUIT TERM
+
+
 OUTPUT=''
 CMDS_NUM=13
-
-
-trap ': > /dit/etc/dit_version; rm -f _help[1-2].tmp; echo' EXIT
 
 TMP1=_help1.tmp
 TMP2=_help2.tmp

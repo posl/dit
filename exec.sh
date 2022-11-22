@@ -99,6 +99,7 @@ fi
 
 
 trap 'rm -f docker/.dockerignore' EXIT
+trap 'exit 1' HUP INT QUIT TERM
 
 case "${BUILD_TARGET}" in
     builder)
