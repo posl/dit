@@ -63,7 +63,7 @@ export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT
 
 
 if unset PROMPT_COMMAND 2> /dev/null; then
-    PROMPT_COMMAND='( PROMPT_REFLECT && PROMPT_OPTION ) > /dev/null'
+    PROMPT_COMMAND='{ PROMPT_REFLECT; PROMPT_OPTION; } > /dev/null'
     readonly PROMPT_COMMAND
 fi
 

@@ -80,6 +80,9 @@ if [ "${OPTIND}" -eq 1 ]; then
                 ;;
         esac
     done
+else
+    echo 'exec.sh: option parse is impossible' 1>&2
+    exit 1
 fi
 
 shift "$(( OPTIND - 1 ))"
