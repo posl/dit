@@ -452,7 +452,7 @@ void erase_manual(void){
         "    line number will be assigned depending on the position, and if left NUM is greater than\n"
         "    right NUM, it is interpreted as two range specifications, each without NUM on one side.\n"
         "  - The internal log-files that record the number of reflected lines are used by '-Z',\n"
-        "    and if there is an inconsiestency between one of that files and the target file,\n"
+        "    and if there is an inconsistency between one of that files and the target file,\n"
         "    it resets the files that had the problem and behaves as if '-Z' had not been given.\n"
         "  - Information that the number of reflected lines is 0 is not retained in that log-files,\n"
         "    and '-Z' counts the timing when some lines are added to the target file as one time.\n"
@@ -754,10 +754,10 @@ static void cp_example(void){
 
 static void erase_example(void){
     fputs(
-        "dit erase -dh                   Delete the lines added just before.\n"
-        "dit erase -diy -E '^ONBUILD'    Delete all ONBUILD instructions from Dockerfile.\n"
-        "dit erase -hm10 -N -            Delete last 10 lines from history-file.\n"
-        "dit erase -v --target both      Display the previous deleted lines.\n"
+        "dit erase -dh                              Delete the lines added just before.\n"
+        "dit erase -diy -E '^ONBUILD[[:space:]]'    Delete all ONBUILD instructions from Dockerfile.\n"
+        "dit erase -hm10 -N -                       Delete last 10 lines from history-file.\n"
+        "dit erase -v --target both                 Display the previous deleted lines.\n"
     , stdout);
 }
 

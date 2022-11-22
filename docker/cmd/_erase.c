@@ -405,7 +405,8 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
     assert(opt);
     assert(marklines_func);
 
-    int both_flag = false, tmp, exit_status = SUCCESS;
+    int tmp, exit_status = SUCCESS;
+    bool both_flag = false, delopt_noerr = true;
 
     if (opt->target_c == 'b'){
         opt->target_c = 'd';
@@ -426,13 +427,15 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
 
         if (data.lines){
             if (data.check_list){
-                data.first_mark = true;
-                marklines_to_undo(&data, opt->undoes);
+                if (delopt_noerr){
+                    data.first_mark = true;
+                    marklines_to_undo(&data, opt->undoes);
 
-                if (opt->has_delopt && marklines_func(argc, argv, opt, &data))
-                    both_flag = -1;
+                    if (opt->has_delopt && marklines_func(argc, argv, opt, &data))
+                        delopt_noerr = false;
+                }
 
-                tmp = delete_marked_lines(&data, opt, both_flag);
+                tmp = delete_marked_lines(&data, opt, (delopt_noerr ? both_flag : -1));
                 if_necessary_assign_exit_status(tmp, exit_status);
 
                 free(data.check_list);
@@ -445,7 +448,7 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
         else
             if_necessary_assign_exit_status(tmp, exit_status);
 
-        if ((both_flag > 0) && (opt->target_c != 'h'))
+        if (both_flag && (opt->target_c != 'h'))
             opt->target_c = 'h';
         else
             break;
@@ -566,7 +569,7 @@ static int construct_erase_data(erase_data *data, int target_c, unsigned short p
                     mode_c = '\0';
             }
             else
-                xperror_individually("the internal log-file is reset.");
+                xperror_message("Inconsistency detected, will be reset", log_file);
         }
 
         if (data->lines){
@@ -1610,7 +1613,7 @@ static void marklines_containing_pattern_test(void){
         { "^Run[[:space:]]",                         false,  true, 0x00001c00 },
         { "",                                         true, false, 0x0007ffff },
         { "^RUN[[:print:]]+([^&]*&{2}|[^|]*\\|{2})", false, false, 0x00008880 },
-        { "$^",                                      false,  true, 0x00000000 },
+        { "0^",                                      false,  true, 0x00000000 },
         { "*.txt",                                     -1,  false, 0x00000000 },
         { "((|\\[|\\{)",                               -1,  false, 0x00000000 },
         { "^run[[:print:]]*\\",                        -1,   true, 0x00000000 },
