@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/sh -eux
 
 
 #
 # Unit Tests
 #
 
-dit inspect --unit-tests || exit 1
+dit inspect --unit-tests
 
 
 
@@ -28,7 +28,7 @@ DIR=_inspect3.tmp
 mkdir -m g+s "${DIR}"
 chown root:sys "${DIR}"
 
-cd "${DIR}" || exit 1
+cd "${DIR}"
 
 dd if=/dev/random of=large.rand bs=1M count=1
 chmod a=w,u+r,u+s large.rand
@@ -61,10 +61,11 @@ set -x
 do_test(){
     set +x
 
-    ( dit inspect "$1" "${DIR}" || exit 1 ) | awk '/^.* \|-- / { print $1, $2, $3, $NF }' > "${TMP1}"
-    ( ls -Al "$1" "${DIR}" || exit 1 ) | awk 'NR != 1 { print $1, $3, $4, $NF }' | tee "${TMP2}"
+    dit inspect "$1" "${DIR}" > "${TMP1}"
+    awk '/^.* \|-- / { print $1, $2, $3, $NF }' "${TMP1}" | tee "${TMP2}"
 
-    diff -u "${TMP1}" "${TMP2}" || exit 1
+    ls -Al "$1" "${DIR}" | awk 'NR != 1 { print $1, $3, $4, $NF }' > "${TMP1}"
+    diff -u "${TMP1}" "${TMP2}"
 
     echo
     set -x
@@ -81,7 +82,7 @@ do_test -n
 do_test -S
 do_test -X
 
-( dit inspect --help || exit 1 ) | head -n2 | grep -F '  dit inspect [OPTION]...' || exit 1
+dit inspect --help | head -n2 | grep -F '  dit inspect [OPTION]...'
 echo
 
 
@@ -94,11 +95,11 @@ echo
 
 : 'check the correctness of file information and file name coloring.'
 ls -Al --color "${DIR}"
-dit inspect -C || exit 1
+dit inspect -C
 read -r REPLY
 
-: 'make sure the correct file information is displayed.'
-dit inspect -C /dit /dev || exit 1
+: 'check if the correct file information is displayed.'
+dit inspect -C /dit /dev
 read -r REPLY
 
 
@@ -106,12 +107,12 @@ read -r REPLY
 
 : 'warning: a non-existing file should not be specified.'
 rm -f "${TMP1}"
-dit inspect "${TMP1}" || exit 1
+dit inspect "${TMP1}"
 read -r REPLY
 
 : 'warning: an invalid symbolic link should not be specified.'
 ln -s "${TMP1}" "${TMP1}"
-dit inspect "${TMP1}" || exit 1
+dit inspect "${TMP1}"
 read -r REPLY
 
 
