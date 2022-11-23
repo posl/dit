@@ -35,8 +35,10 @@ alias \
 #
 
 PROMPT_REFLECT(){
+    local LAST_EXIT_STATUS="$?"
+
     if history 1 | awk -f /dit/etc/parse_history.awk; then
-        echo "$?" > /dit/tmp/last-exit-status
+        echo "${LAST_EXIT_STATUS}" > /dit/tmp/last-exit-status
 
         if dit convert -qs; then
             dit reflect -dh
