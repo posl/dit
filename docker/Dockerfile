@@ -73,4 +73,4 @@ WORKDIR /dit/test
 COPY ./test ./
 
 # interactively verify that all dit commands work properly
-CMD [ "/bin/bash", "-eux", "main.sh" ]
+CMD [ "/bin/sh", "-eux", "main.sh" ]
