@@ -35,6 +35,7 @@ chmod a=w,u+r,u+s large.rand
 
 mkdir -m a=rx,u+w,o+t empty
 mknod -m a=rw zero.dev c 1 5
+mknod -m a= fc1.unused b 1 2
 mkfifo -m a=,g=rw .pipe
 ln -s /usr/local/bin/dit dit.link
 
