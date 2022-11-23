@@ -5,9 +5,6 @@
 # run test codes for each dit command
 #
 
-dit inspect /dit > /tmp/main1.tmp
-
-
 if dit test; then
     set +x
 
@@ -21,6 +18,3 @@ if dit test; then
 else
     exit 1
 fi
-
-dit inspect /dit > /tmp/main2.tmp
-diff -u /tmp/main[1-2].tmp
