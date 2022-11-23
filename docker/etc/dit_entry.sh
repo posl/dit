@@ -46,7 +46,12 @@ unset BASE_NAME BASE_VERSION
 chmod a=x /usr/local/bin/dit
 
 find /dit/etc -type f -exec chmod a=r {} +
-find /dit/mnt -type f -exec chmod a=rw {} +
+
+chmod a=rw \
+    /dit/mnt/.dit_history \
+    /dit/mnt/.dockerignore \
+    /dit/mnt/Dockerfile \
+    /dit/mnt/Dockerfile.draft
 
 
 DEFAULT_UMASK_VALUE="$( umask )"
@@ -116,7 +121,7 @@ rm -f \
 
 
 if [ "${DEFAULT_USER}" != 'root' ]; then
-    su-exec "${DEFAULT_USER}" "$@"
+    exec su-exec "${DEFAULT_USER}" "$@"
 else
     exec "$@"
 fi
