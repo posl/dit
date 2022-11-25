@@ -46,9 +46,10 @@ static bool display_help(help_conts code, const char *target);
 static void dit_manual(void);
 
 static void dit_description(void);
+static void cmd_description(void);
 static void config_description(void);
 static void convert_description(void);
-static void cp_description(void);
+static void copy_description(void);
 static void erase_description(void);
 static void healthcheck_description(void);
 static void help_description(void);
@@ -58,12 +59,12 @@ static void label_description(void);
 static void onbuild_description(void);
 static void optimize_description(void);
 static void reflect_description(void);
-static void setcmd_description(void);
 
 static void dit_example(void);
+static void cmd_example(void);
 static void config_example(void);
 static void convert_example(void);
-static void cp_example(void);
+static void copy_example(void);
 static void erase_example(void);
 static void healthcheck_example(void);
 static void help_example(void);
@@ -73,7 +74,6 @@ static void label_example(void);
 static void onbuild_example(void);
 static void optimize_example(void);
 static void reflect_example(void);
-static void setcmd_example(void);
 
 
 extern const char * const cmd_reprs[CMDS_NUM];
@@ -196,7 +196,7 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
  * @note display the commands in the same order as 'dit help'.
  */
 static void display_cmd_list(void){
-    const int cmd_rearange[] = {1, 10, 0, 6, 2, 8, 12, 4, 9, 11, 3, 7, 5, -1};
+    const int cmd_rearange[] = {2, 11, 1, 7, 3, 9, 0, 5, 10, 12, 4, 8, 6, -1};
 
     for (const int *p_id = cmd_rearange; *p_id >= 0; p_id++){
         assert(*p_id < CMDS_NUM);
@@ -245,9 +245,10 @@ static bool display_help(help_conts code, const char *target){
     if (target){
         void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])(void) = {
             {
+                cmd_manual,
                 config_manual,
                 convert_manual,
-                cp_manual,
+                copy_manual,
                 erase_manual,
                 healthcheck_manual,
                 help_manual,
@@ -256,13 +257,13 @@ static bool display_help(help_conts code, const char *target){
                 label_manual,
                 onbuild_manual,
                 optimize_manual,
-                reflect_manual,
-                setcmd_manual
+                reflect_manual
             },
             {
+                cmd_description,
                 config_description,
                 convert_description,
-                cp_description,
+                copy_description,
                 erase_description,
                 healthcheck_description,
                 help_description,
@@ -271,13 +272,13 @@ static bool display_help(help_conts code, const char *target){
                 label_description,
                 onbuild_description,
                 optimize_description,
-                reflect_description,
-                setcmd_description
+                reflect_description
             },
             {
+                cmd_example,
                 config_example,
                 convert_example,
-                cp_example,
+                copy_example,
                 erase_example,
                 healthcheck_example,
                 help_example,
@@ -286,14 +287,13 @@ static bool display_help(help_conts code, const char *target){
                 label_example,
                 onbuild_example,
                 optimize_example,
-                reflect_example,
-                setcmd_example
+                reflect_example
             }
         };
 
         int i;
-        i = (! strcmp(target, "cfg")) ? 0 :
-            (! strcmp(target, "hc")) ? 4 :
+        i = (! strcmp(target, "cfg")) ? 1 :
+            (! strcmp(target, "hc")) ? 5 :
             receive_expected_string(target, cmd_reprs, CMDS_NUM, 2);
 
         if (i >= 0){
@@ -349,9 +349,9 @@ static void dit_manual(void){
         "  ignore         edit set of commands that are ignored "WHEN_REFLECTING"\n"
         "\n"
         "editing Dockerfile:\n"
-        "  cp             copy files from the host environment and reflect this as COPY/ADD instructions\n"
+        "  copy           copy files from the host environment and reflect this as COPY/ADD instructions\n"
         "  label          edit list of LABEL/EXPOSE instructions\n"
-        "  setcmd         set CMD/ENTRYPOINT instruction\n"
+        "  cmd            set CMD/ENTRYPOINT instruction\n"
         "  healthcheck    set HEALTHCHECK instruction\n"
         "  onbuild        append ONBUILD instructions\n"
         "\n"
@@ -362,6 +362,14 @@ static void dit_manual(void){
         "  help           show information for some dit commands\n"
         "\n"
         "See 'dit help [OPTION]... [COMMAND]...' for details.\n"
+    , stdout);
+}
+
+
+void cmd_manual(void){
+    fputs(
+        HELP_USAGES_STR
+        "  dit cmd [OPTION]...\n"
     , stdout);
 }
 
@@ -405,10 +413,10 @@ void convert_manual(void){
 }
 
 
-void cp_manual(void){
+void copy_manual(void){
     fputs(
         HELP_USAGES_STR
-        "  dit cp [OPTION]...\n"
+        "  dit copy [OPTION]...\n"
     , stdout);
 }
 
@@ -605,14 +613,6 @@ void reflect_manual(void){
 }
 
 
-void setcmd_manual(void){
-    fputs(
-        HELP_USAGES_STR
-        "  dit setcmd [OPTION]...\n"
-    , stdout);
-}
-
-
 
 
 /******************************************************************************
@@ -623,6 +623,12 @@ void setcmd_manual(void){
 static void dit_description(void){
     fputs(
         "Use the tool-specific functions as the subcommand.\n"
+    , stdout);
+}
+
+static void cmd_description(void){
+    fputs(
+        "Set CMD/ENTRYPOINT instruction in Dockerfile.\n"
     , stdout);
 }
 
@@ -638,7 +644,7 @@ static void convert_description(void){
     , stdout);
 }
 
-static void cp_description(void){
+static void copy_description(void){
     fputs(
         "Perform the processing equivalent to COPY/ADD instructions and reflect this in Dockerfile.\n"
     , stdout);
@@ -698,12 +704,6 @@ static void reflect_description(void){
     , stdout);
 }
 
-static void setcmd_description(void){
-    fputs(
-        "Set CMD/ENTRYPOINT instruction in Dockerfile.\n"
-    , stdout);
-}
-
 
 
 
@@ -714,10 +714,20 @@ static void setcmd_description(void){
 
 static void dit_example(void){
     fputs(
-        "dit cp       \n"
-        "dit setcmd   \n"
+        "dit copy     \n"
+        "dit cmd      \n"
         "dit erase    \n"
         "dit optimize \n"
+    , stdout);
+}
+
+
+static void cmd_example(void){
+    fputs(
+        "dit cmd \n"
+        "dit cmd \n"
+        "dit cmd \n"
+        "dit cmd \n"
     , stdout);
 }
 
@@ -742,12 +752,12 @@ static void convert_example(void){
 }
 
 
-static void cp_example(void){
+static void copy_example(void){
     fputs(
-        "dit cp \n"
-        "dit cp \n"
-        "dit cp \n"
-        "dit cp \n"
+        "dit copy \n"
+        "dit copy \n"
+        "dit copy \n"
+        "dit copy \n"
     , stdout);
 }
 
@@ -838,16 +848,6 @@ static void reflect_example(void){
         "dit reflect -d in    Reflect the contents of './in' in Dockerfile.\n"
         "dit reflect -hp -    Reflect the input contents in history-file while keeping the empty lines.\n"
         "dit reflect -dhv     Reflect the output contents of the previous 'convert', and report them.\n"
-    , stdout);
-}
-
-
-static void setcmd_example(void){
-    fputs(
-        "dit setcmd \n"
-        "dit setcmd \n"
-        "dit setcmd \n"
-        "dit setcmd \n"
     , stdout);
 }
 

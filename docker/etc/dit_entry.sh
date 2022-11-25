@@ -34,7 +34,7 @@ SHELL [ "${SHELL:-/bin/sh}", "-c" ]
 WORKDIR $( pwd )
 EOF
 
-echo "Entered '${BASE_NAME}:${BASE_VERSION}'."
+echo "Entering '${BASE_NAME}:${BASE_VERSION}' ..."
 unset BASE_NAME BASE_VERSION
 
 
@@ -78,13 +78,13 @@ touch \
     /dit/tmp/reflect-report.prov \
     /dit/tmp/reflect-report.real \
     \
+    /dit/var/cmd.log \
     /dit/var/config.stat \
     /dit/var/erase.log.dock \
     /dit/var/erase.log.hist \
-    /dit/var/ignore.list.dock \
-    /dit/var/ignore.list.hist \
-    /dit/var/optimize.stat \
-    /dit/var/setcmd.log
+    /dit/var/ignore.json.dock \
+    /dit/var/ignore.json.hist \
+    /dit/var/optimize.json
 
 umask "${DEFAULT_UMASK_VALUE}"
 

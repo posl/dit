@@ -67,9 +67,10 @@ void test(int argc, char **argv, int cmd_id);
 ******************************************************************************/
 
 void dit_test(void);
+void cmd_test(void);
 void config_test(void);
 void convert_test(void);
-void cp_test(void);
+void copy_test(void);
 void erase_test(void);
 void healthcheck_test(void);
 void help_test(void);
@@ -79,7 +80,6 @@ void label_test(void);
 void onbuild_test(void);
 void optimize_test(void);
 void reflect_test(void);
-void setcmd_test(void);
 
 
 /******************************************************************************

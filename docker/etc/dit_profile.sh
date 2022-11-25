@@ -6,11 +6,13 @@
 #
 
 alias \
+    cmd='dit cmd' \
     config='dit config' \
     conf='dit config' \
     cfg='dit config' \
     convert='dit convert' \
     conv='dit convert' \
+    copy='dit copy' \
     erase='dit erase' \
     healthcheck='dit healthcheck' \
     hc='dit healthcheck' \
@@ -24,9 +26,7 @@ alias \
     optimize='dit optimize' \
     optim='dit optimize' \
     reflect='dit reflect' \
-    refl='dit reflect' \
-    setcmd='dit setcmd' \
-    setc='dit setcmd'
+    refl='dit reflect'
 
 
 

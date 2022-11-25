@@ -32,9 +32,10 @@ static int call_dit_command(int argc, char **argv, int cmd_id);
 
 /** array of strings in alphabetical order representing each dit command */
 const char * const cmd_reprs[CMDS_NUM] = {
+    "cmd",
     "config",
     "convert",
-    "cp",
+    "copy",
     "erase",
     "healthcheck",
     "help",
@@ -43,8 +44,7 @@ const char * const cmd_reprs[CMDS_NUM] = {
     "label",
     "onbuild",
     "optimize",
-    "reflect",
-    "setcmd"
+    "reflect"
 };
 
 
@@ -178,19 +178,19 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
     assert((cmd_id >= 0) && (cmd_id < CMDS_NUM));
 
     int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
+        cmd,
         config,
         convert,
-        cp,
+        copy,
         erase,
         healthcheck,
         help,
         ignore,
-        inspect,  // cmd_id = 7
+        inspect,  // cmd_id = 8
         label,
         onbuild,
         optimize,
-        reflect,
-        setcmd
+        reflect
     };
 
     int i = 1, mode;
@@ -201,7 +201,7 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
             fp = stdout;
             mode = _IOLBF;
 #ifdef NDEBUG
-            if (cmd_id == 7)
+            if (cmd_id == 8)
                 mode = _IOFBF;
 #endif
         }

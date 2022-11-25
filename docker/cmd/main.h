@@ -117,9 +117,10 @@
     * Tool-specific Functions
 ******************************************************************************/
 
+int cmd(int argc, char **argv);
 int config(int argc, char **argv);
 int convert(int argc, char **argv);
-int cp(int argc, char **argv);
+int copy(int argc, char **argv);
 int erase(int argc, char **argv);
 int healthcheck(int argc, char **argv);
 int help(int argc, char **argv);
@@ -129,16 +130,16 @@ int label(int argc, char **argv);
 int onbuild(int argc, char **argv);
 int optimize(int argc, char **argv);
 int reflect(int argc, char **argv);
-int setcmd(int argc, char **argv);
 
 
 /******************************************************************************
     * Help Functions that display each Manual
 ******************************************************************************/
 
+void cmd_manual(void);
 void config_manual(void);
 void convert_manual(void);
-void cp_manual(void);
+void copy_manual(void);
 void erase_manual(void);
 void healthcheck_manual(void);
 void help_manual(void);
@@ -148,7 +149,6 @@ void label_manual(void);
 void onbuild_manual(void);
 void optimize_manual(void);
 void reflect_manual(void);
-void setcmd_manual(void);
 
 
 /******************************************************************************

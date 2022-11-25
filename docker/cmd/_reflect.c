@@ -481,7 +481,7 @@ static int check_dockerfile_instruction(char *line, bool onbuild_flag){
                 if (instr_id == cmd_ent_ids[i]){
                     if (cmd_ent_duplicates[i]){
                         // exit_status = delete_from_dockerfile(cmd_ent_patterns, 2, false, 'Y');
-                        // TODO: waiting the implementation of setcmd commnad
+                        // TODO: waiting the implementation of cmd commnad
 
                         cmd_ent_duplicates[0] = false;
                         cmd_ent_duplicates[1] = false;

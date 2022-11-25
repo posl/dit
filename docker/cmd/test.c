@@ -43,9 +43,10 @@ void test(int argc, char **argv, int cmd_id){
 
     if (cmd_id >= 0){
         void (* const test_funcs[CMDS_NUM])(void) = {
+            cmd_test,
             config_test,
             convert_test,
-            cp_test,
+            copy_test,
             erase_test,
             healthcheck_test,
             help_test,
@@ -54,8 +55,7 @@ void test(int argc, char **argv, int cmd_id){
             label_test,
             onbuild_test,
             optimize_test,
-            reflect_test,
-            setcmd_test
+            reflect_test
         };
 
         test_flag = parse_opts(argc, argv);

@@ -1200,7 +1200,7 @@ static void fcmp_ext_test(void){
         { { .name = "config.stat"      }, { .name = "optimize.stat"            }, COMPTEST_EQUAL   },
         { { .name = "properties.json"  }, { .name = "tasks.json"               }, COMPTEST_EQUAL   },
         { { .name = "bin"              }, { .name = "sbin"                     }, COMPTEST_EQUAL   },
-        { { .name = "ignore.list.dock" }, { .name = "ignore.list.hist"         }, COMPTEST_LESSER  },
+        { { .name = "ignore.json.dock" }, { .name = "ignore.json.hist"         }, COMPTEST_LESSER  },
         { { .name = "build"            }, { .name = "docker-compose.build.yml" }, COMPTEST_LESSER  },
         { { .name = "main.c"           }, { .name = "main.o"                   }, COMPTEST_LESSER  },
         { { .name = "Dockerfile.draft" }, { .name = ".dockerignore"            }, COMPTEST_GREATER },

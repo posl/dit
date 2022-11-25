@@ -1,9 +1,9 @@
 /**
- * @file _setcmd.c
+ * @file _cmd.c
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the dit command 'setcmd', 
+ * @brief Described the dit command 'cmd', 
  * @author Tsukasa Inada
  * @date 
  *
@@ -12,7 +12,7 @@
 
 #include "main.h"
 
-#define SETCMD_FILE "/dit/var/setcmd.log"
+#define CMD_FILE "/dit/var/cmd.log"
 
 
 
@@ -31,8 +31,8 @@
  *
  * @note treated like a normal main function.
  */
-int setcmd(int argc, char **argv){
-    fputs("setcmd\n", stdout);
+int cmd(int argc, char **argv){
+    fputs("cmd\n", stdout);
     return 0;
 }
 
@@ -46,8 +46,8 @@ int setcmd(int argc, char **argv){
     * Unit Test Functions
 ******************************************************************************/
 
-void setcmd_test(void){
-    fputs("setcmd test\n", stdout);
+void cmd_test(void){
+    fputs("cmd test\n", stdout);
 }
 
 
