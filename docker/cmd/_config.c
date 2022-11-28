@@ -18,8 +18,8 @@
 #define CONF_ISWRTFLG 0b010
 #define CONF_ISHASARG 0b100
 
-#define CONF_RESET_OR_SHOW(reset_flag)  (((reset_flag) << 1) | (reset_flag))
-#define CONF_SET_OR_UPDATE(reset_flag)  (CONF_ISWRTFLG | CONF_ISHASARG | (reset_flag))
+#define CONF_RESET_OR_SHOW(reset_flag)  ((reset_flag) | ((reset_flag) << 1))
+#define CONF_SET_OR_UPDATE(reset_flag)  ((reset_flag) | CONF_ISWRTFLG | CONF_ISHASARG)
 #define CONF_GET_FROM_CONVERT  (CONF_ISHASARG)
 
 #define CONF_MODES_NUM 5
@@ -106,7 +106,7 @@ int config(int argc, char **argv){
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
- * @param[out] opt  variable to store boolean representing whether to reset config-file
+ * @param[out] opt  variable to store boolean representing whether to reset the config-file
  * @return int  0 (parse success), 1 (normally exit) or -1 (error exit)
  *
  * @note the arguments are expected to be passed as-is from main function.
@@ -145,7 +145,7 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
 
 
 /**
- * @brief function that combines the individual functions to handle config-file into one
+ * @brief function that combines the individual functions to handle the config-file into one
  *
  * @param[in]  code  some flags (bit 1: wheter to reset, bit 2: whether to write, bit 3: argument existence)
  * @param[out] ...  if necessary, string for determining the modes and variable to store them

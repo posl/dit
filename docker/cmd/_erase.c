@@ -74,7 +74,7 @@ typedef int (* delopt_func)(int, char **, erase_opts *, erase_data *);
 
 
 static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data);
-static void display_prev(int target_c);
+static void display_prev_verbose(int target_c);
 
 static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func marklines_func);
 
@@ -285,7 +285,7 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
 
         if (! (opt->has_delopt || opt->undoes || (opt->blank_c != 'p'))){
             if (opt->verbose){
-                display_prev(opt->target_c);
+                display_prev_verbose(opt->target_c);
                 return NORMALLY_EXIT;
             }
             else
@@ -350,7 +350,7 @@ errexit:
  *
  * @param[in]  target_c  character representing the target files ('d', 'h' or 'b')
  */
-static void display_prev(int target_c){
+static void display_prev_verbose(int target_c){
     int next_target_c, offset = 0;
     const char *src_file, *line;
 
@@ -371,7 +371,7 @@ static void display_prev(int target_c){
 
         if (offset){
             offset--;
-            fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset]);
+            print_target_repr(offset);
         }
 
         while ((line = xfgets_for_loop(src_file, NULL, NULL)))
@@ -920,7 +920,7 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
         exit_status = SUCCESS;
 
         if (both_flag && opt->verbose)
-            fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset]);
+            print_target_repr(offset);
 
         if (confirm_deleted_lines(data, opt, target_file)){
             FILE *result_fp, *target_fp, *fps[2] = {0};

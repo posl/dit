@@ -792,7 +792,9 @@ int get_last_exit_status(void){
 
 
 // if you want to a normal test for 'fgets_for_loop', comment out the line immediately after
+#ifndef XFGETS_TEST_COMPLETE
 // #define XFGETS_TEST_COMPLETE
+#endif
 
 
 static void xfgets_for_loop_test(void);

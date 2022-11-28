@@ -3,7 +3,9 @@
 
 
 // if you want to test each command, comment out the line immediately after
+#ifndef NDEBUG
 // #define NDEBUG
+#endif
 
 
 #include <assert.h>
@@ -25,6 +27,7 @@
 #include <unistd.h>
 
 #include "test.h"
+#include "yyjson.h"
 
 
 
@@ -76,8 +79,10 @@
 
 
 /******************************************************************************
-    * commonly used Error Message Functions
+    * commonly used Functions
 ******************************************************************************/
+
+#define print_target_repr(offset)  fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset])
 
 #define xperror_config_arg(target)  xperror_invalid_arg('C', 0, "mode", target)
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
