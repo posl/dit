@@ -36,6 +36,7 @@ alias \
 
 PROMPT_REFLECT(){
     local LAST_EXIT_STATUS="$?"
+    local PROMPT_STRING=' [d:?? h:??] \u:\w \$ '
 
     if history 1 | awk -f /dit/etc/parse_history.awk; then
         echo "${LAST_EXIT_STATUS}" > /dit/tmp/last-exit-status
@@ -45,7 +46,13 @@ PROMPT_REFLECT(){
         fi
 
         : > /dit/tmp/reflect-report.real
-        dit reflect
+        if dit reflect; then
+            PROMPT_STRING="$( cat /dit/tmp/reflect-report.real )"
+        fi
+    fi
+
+    if unset PS1 2> /dev/null; then
+        PS1="${PROMPT_STRING}"
     fi
 }
 
@@ -53,15 +60,7 @@ PROMPT_OPTION(){
     :
 }
 
-PROMPT_REPORT(){
-    if [ -s /dit/tmp/reflect-report.real ]; then
-        cat /dit/tmp/reflect-report.real
-    else
-        echo 'd:?? h:??'
-    fi
-}
-
-export -f PROMPT_REFLECT PROMPT_OPTION PROMPT_REPORT
+export -f PROMPT_REFLECT PROMPT_OPTION
 
 
 if unset PROMPT_COMMAND 2> /dev/null; then
@@ -69,11 +68,7 @@ if unset PROMPT_COMMAND 2> /dev/null; then
     readonly PROMPT_COMMAND
 fi
 
-CB='\[\e[1;32m\]'
-CE='\[\e[m\]'
-PS1="${CB}"' ['"${CE}"'$( PROMPT_REPORT )'"${CB}"'] '"${CE}"'\u:\w '"${CB}"'\$ '"${CE}"
-
-export PROMPT_COMMAND PS1
+export PROMPT_COMMAND
 
 
 

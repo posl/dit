@@ -18,6 +18,8 @@
 #define REFLECT_FILE_P "/dit/tmp/reflect-report.prov"
 #define REFLECT_FILE_R "/dit/tmp/reflect-report.real"
 
+#define CC(target)  "\\[\\e[1;%dm\\]" target "\\[\\e[m\\]"
+
 #define update_provisional_report(curr_reflecteds)  manage_provisional_report(curr_reflecteds, "r+w\0")
 #define reset_provisional_report(prov_reflecteds)  manage_provisional_report(prov_reflecteds, "r\0w\0")
 
@@ -519,10 +521,10 @@ static int check_dockerfile_instruction(char *line, bool onbuild_flag){
 static int record_reflected_lines(void){
     int exit_status, tmp;
 
-    unsigned short prov_reflecteds[2] = {0};
-    exit_status = reset_provisional_report(prov_reflecteds);
+    unsigned short reflecteds[2] = {0};
+    exit_status = reset_provisional_report(reflecteds);
 
-    tmp = update_erase_logs(prov_reflecteds);
+    tmp = update_erase_logs(reflecteds);
     if (! exit_status)
         exit_status = tmp;
 
@@ -531,7 +533,14 @@ static int record_reflected_lines(void){
 
     FILE *fp;
     if ((fp = fopen(REFLECT_FILE_R, "w"))){
-        fprintf(fp, "d:+%hu h:+%hu\n", prov_reflecteds[0], prov_reflecteds[1]);
+        tmp = 31;  // red
+        if (! get_last_exit_status())
+            tmp++;  // grean
+
+        fprintf(
+            fp, CC(" [") "d:+%hu h:+%hu" CC("] ") "\\u:\\w " CC("\\$ "),
+            tmp, reflecteds[0], reflecteds[1], tmp, tmp
+        );
         fclose(fp);
     }
     else
