@@ -255,7 +255,7 @@ static int do_reflect(int argc, char **argv, refl_opts *opt){
  * @param[in]  src_file  source file name
  * @param[in]  target_c  character representing destination file ('d' or 'h')
  * @param[in]  opt  variable to store the results of option parse
- * @param[out] p_errid  variable for recording error that occur, if necessary
+ * @param[out] p_errid  variable for recording the occured error, if necessary
  * @return int  0 (success), 1 (possible error) or negative integer (unexpected error)
  *
  * @note squeezing repeated empty lines is done across multiple source files.

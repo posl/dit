@@ -219,7 +219,7 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
  * @brief construct the directory tree with details about each file also collected together.
  *
  * @param[in]  base_path  file path to the root of the directory tree
- * @param[in]  opt  variable containing the result of option parse
+ * @param[in]  opt  variable to store the results of option parse
  * @return file_node*  the result of constructing
  */
 static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt){
@@ -607,7 +607,7 @@ static const char *get_file_ext(const char *name){
  * @brief display the directory tree and release the dynamic memory used for it.
  *
  * @param[out] tree  pre-constructed directory tree
- * @param[in]  opt  variable containing the result of option parse
+ * @param[in]  opt  variable to store the results of option parse
  */
 static void destruct_dir_tree(file_node *tree, const insp_opts *opt){
     assert(tree);
@@ -626,7 +626,7 @@ static void destruct_dir_tree(file_node *tree, const insp_opts *opt){
  * @brief display and release the directory tree, recursively.
  *
  * @param[out] file  the file we are currently trying to display
- * @param[in]  opt  variable containing the result of option parse or NULL
+ * @param[in]  opt  variable to store the results of option parse or NULL
  * @param[in]  depth  hierarchy in the directory tree of the file we are currently trying to display
  *
  * @note at the same time, releases the dynamic memory that is no longer needed.
@@ -806,7 +806,7 @@ static void print_file_size(off_t size){
  * @brief display file name on screen.
  *
  * @param[in]  file  the file we are currently trying to display
- * @param[in]  opt  variable containing the result of option parse
+ * @param[in]  opt  variable to store the results of option parse
  * @param[in]  link_flag  whether or not to display the information of the link destination
  */
 static void print_file_name(const file_node *file, const insp_opts *opt, bool link_flag){

@@ -23,7 +23,7 @@ typedef struct {
     char **p_start;          /** pointer to the beginning of a series of strings or NULL */
     char *dest;              /** pointer to the beginning of dynamic memory allocated */
     size_t curr_size;        /** the size of dynamic memory currently in use */
-    size_t curr_length;      /** the total length of the preserved strings including null characters */
+    size_t curr_len;      /** the total length of the preserved strings including null characters */
 } xfgets_info;
 
 
@@ -436,7 +436,7 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
 
             p_info->dest = NULL;
             p_info->curr_size = XFGETS_INITIAL_SIZE;
-            p_info->curr_length = 0;
+            p_info->curr_len = 0;
 
             allocate_flag = true;
         }
@@ -448,12 +448,12 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
     }
 
     char *start;
-    size_t length;
+    size_t len;
     unsigned int tmp;
     bool reset_flag = true;
 
     start = p_info->dest;
-    length = p_info->curr_length;
+    len = p_info->curr_len;
 
     do {
         if (allocate_flag){
@@ -470,14 +470,14 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
         }
         else if (! (p_errid && *p_errid)){
             assert(start == p_info->dest);
-            start += length;
+            start += len;
 
-            tmp = p_info->curr_size - length;
+            tmp = p_info->curr_size - len;
             assert((tmp > 0) && (tmp <= INT_MAX));
 
             if (fgets(start, tmp, p_info->fp)){
                 tmp = strlen(start);
-                length += tmp;
+                len += tmp;
 
                 if (! (tmp && (start[--tmp] == '\n'))){
                     tmp = p_info->curr_size + 1;
@@ -490,12 +490,12 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
                     }
                 }
                 else {
-                    length--;
+                    len--;
                     start[tmp] = '\0';
                     reset_flag = false;
                 }
             }
-            else if (length != p_info->curr_length)
+            else if (len != p_info->curr_len)
                 reset_flag = false;
         }
 
@@ -509,7 +509,7 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
             else
                 clearerr(p_info->fp);
 
-            if ((! (p_info->p_start && p_info->curr_length)) && start){
+            if ((! (p_info->p_start && p_info->curr_len)) && start){
                 free(start);
 
                 if (p_info->p_start)
@@ -520,8 +520,8 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
             start = NULL;
         }
         else if (p_info->p_start){
-            start += p_info->curr_length;
-            p_info->curr_length = length + 1;
+            start += p_info->curr_len;
+            p_info->curr_len = len + 1;
         }
 
         return start;

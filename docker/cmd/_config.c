@@ -145,7 +145,7 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
 
 
 /**
- * @brief function that combines the individual functions to handle the config-file into one
+ * @brief function that contains all the individual functions that handle the config-file
  *
  * @param[in]  code  some flags (bit 1: wheter to reset, bit 2: whether to write, bit 3: argument existence)
  * @param[out] ...  if necessary, string for determining the modes and variable to store them
