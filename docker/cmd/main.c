@@ -264,7 +264,7 @@ void xperror_invalid_arg(int code_c, int state, const char * restrict desc, cons
  * @param[in]  reprs  array of expected strings
  * @param[in]  size  array size
  */
-void xperror_valid_args(const char * const reprs[], size_t size){
+void xperror_valid_args(const char * const *reprs, size_t size){
     assert(reprs);
 
     fputs("Valid arguments are:\n", stderr);
@@ -615,7 +615,7 @@ int receive_positive_integer(const char *target, int *p_left){
  * @note make efficient by applying binary search sequentially from the first character of target string.
  * @attention array of expected strings must be pre-sorted alphabetically.
  */
-int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode){
+int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode){
     assert(reprs);
     assert((size - 1) <= INT_MAX);
     assert(check_if_alphabetical_order(reprs, size));

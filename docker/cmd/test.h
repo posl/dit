@@ -86,7 +86,7 @@ void reflect_test(void);
     * Utilities
 ******************************************************************************/
 
-bool check_if_alphabetical_order(const char * const reprs[], size_t size);
+bool check_if_alphabetical_order(const char * const *reprs, size_t size);
 
 bool comptest_result_check(int type, int result);
 

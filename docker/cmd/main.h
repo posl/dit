@@ -177,7 +177,7 @@ int write_provisional_report(unsigned short prov_reflecteds[2]);
 ******************************************************************************/
 
 void xperror_invalid_arg(int code_c, int state, const char * restrict desc, const char * restrict arg);
-void xperror_valid_args(const char * const expected[], size_t size);
+void xperror_valid_args(const char * const *expected, size_t size);
 
 void xperror_missing_args(const char * restrict desc, const char * restrict before_arg);
 void xperror_too_many_args(int limit);
@@ -199,7 +199,7 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
 ******************************************************************************/
 
 int receive_positive_integer(const char *target, int *p_left);
-int receive_expected_string(const char *target, const char * const reprs[], size_t size, unsigned int mode);
+int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode);
 char *receive_dockerfile_instruction(char *line, int *p_id);
 
 

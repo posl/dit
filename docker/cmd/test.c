@@ -120,7 +120,7 @@ static bool parse_opts(int argc, char **argv){
  *
  * @note even if there are duplications between strings, it is regarded as an error.
  */
-bool check_if_alphabetical_order(const char * const reprs[], size_t size){
+bool check_if_alphabetical_order(const char * const *reprs, size_t size){
     assert(reprs);
 
     if (size > 1){
