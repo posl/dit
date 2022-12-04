@@ -529,6 +529,8 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
 }
 
 
+
+
 /**
  * @brief determine if the first string after uppercase conversion matches the second string.
  *
@@ -549,6 +551,18 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
     } while ((! (d = toupper(c) - d)) && c);
 
     return d;
+}
+
+
+/**
+ * @brief comparison function between strings used when qsort
+ *
+ * @param[in]  a  pointer to string1
+ * @param[in]  b  pointer to string2
+ * @return int  comparison result
+ */
+int qstrcmp(const void *a, const void *b){
+    return strcmp(*((char **) a), *((char **) b));
 }
 
 

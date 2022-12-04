@@ -192,6 +192,7 @@ void xperror_suggestion(bool cmd_flag);
 
 char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid);
 int xstrcmp_upper_case(const char * restrict target, const char * restrict expected);
+int qstrcmp(const void *a, const void *b);
 
 
 /******************************************************************************
