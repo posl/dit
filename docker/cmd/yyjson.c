@@ -7873,8 +7873,7 @@ ctn_end:
 doc_end:
     *--cur = '\0';
     *dat_len = (usize)(cur - hdr);
-    err->code = YYJSON_WRITE_SUCCESS;
-    err->msg = "success";
+    memset(err, 0, sizeof(yyjson_write_err));
     return hdr;
 
 fail_alloc:
@@ -8074,8 +8073,7 @@ ctn_end:
 doc_end:
     *cur = '\0';
     *dat_len = (usize)(cur - hdr);
-    err->code = YYJSON_WRITE_SUCCESS;
-    err->msg = "success";
+    memset(err, 0, sizeof(yyjson_write_err));
     return hdr;
 
 fail_alloc:
