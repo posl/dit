@@ -382,7 +382,7 @@ void config_manual(void){
         WHEN_REFLECTING" in "DOCKER_OR_HISTORY", individually.\n"
         "\n"
         HELP_OPTIONS_STR
-        "  -r, --reset    reset each level with default value\n"
+        "  -r, --reset    reset each level with the default value\n"
         "      --help     " HELP_OPTION_DESC
         "\n"
         "Modes:\n"
@@ -396,7 +396,7 @@ void config_manual(void){
         "  - If neither OPTION nor MODE is specified, display the current settings.\n"
         "  - To specify a mode, you can use the above serial numbers and strings\n"
         "    and any of the strings "CAN_BE_TRUNCATED".\n"
-        "  - If you specify an underscore instead of a mode, the current settings is inherited.\n"
+        "  - If you specify an underscore instead of a mode, the current setting is inherited.\n"
         "  - Each MODE is one of the following formats and targets the files listed on the right.\n"
         "      <mode>           both files\n"
         "      [bdh]=<mode>     'b' (both files), 'd' (Dockerfile), 'h' (history-file)\n"
@@ -476,7 +476,7 @@ void erase_manual(void){
         "    as to whether it is okay to delete all the lines that match the specified conditions.\n"
         "  - If you answer 'YES' to above confirmation, delete all the lines, if you answer 'NO', delete\n"
         "    lines you select in the same way as specifying the line numbers with '-N', and if you answer\n"
-        "    'QUIT', stop deleting lines for which the confirmation before deletion has not been completed.\n"
+        "    'QUIT', stop deleting lines for which above confirmation has not yet been completed.\n"
         "  - If the answer to above confirmation is set, it skips that step and perform the same process.\n"
         "\n"
         "We take no responsibility for using regular expression pattern that uses excessive resources.\n"
@@ -519,7 +519,58 @@ void help_manual(void){
 void ignore_manual(void){
     fputs(
         HELP_USAGES_STR
-        "  dit ignore [OPTION]...\n"
+        "  dit ignore [OPTION]... [NAME]...\n"
+        "  dit ignore [OPTION]... -A NAME [SHORT_OPTS [LONG_OPTS]...] [OPTARG]... [FIRST_ARG]...\n"
+        "Edit set of commands that should not be reflected and the conditions for ignoring each element,\n"
+        "used "WHEN_REFLECTING" in "DOCKER_OR_HISTORY", individually.\n"
+        "\n"
+        HELP_OPTIONS_STR
+        "  -d                            edit the settings when reflecting in Dockerfile\n"
+        "  -h                            edit the settings when reflecting in history-file\n"
+        "      --target=FILE             determine the target file:\n"
+        "                                " TARGET_OPTION_ARGS
+        "  -n, --unset                   remove the setting for each specified NAME\n"
+        "  -p, --print                   display the current of default settings without any editing\n"
+        "  -r, --reset                   reset the settings\n"
+        "  -A, --additional-settings     accept the specification of the conditions for ignoring\n"
+        "      --same-as-nothing=TEXT    replace the string meaning no arguments:\n"
+        "                                  NONE (default), used in OPTARG or FIRST_ARG\n"
+        "      --help                    " HELP_OPTION_DESC
+        "\n"
+        "Conditions:\n"
+        "  SHORT_OPTS    specify short options the same as the first argument of 'getopts' except that:\n"
+        "                  - Optstring cannot start with ':' and must not contain '='.\n"
+        "  LONG_OPTS     specify long options the same as SHORT_OPTS except that:\n"
+        "                  - Options with no arguments must be split using multiple positional arguments.\n"
+        "  OPTARG        specify the argument to be specified for an option as follows:\n"
+        "                  - Specify by a string containing one or more '='s that doesn't start with '='.\n"
+        "                  - When separating the strings with '=', the first element is an option,\n"
+        "                    the last element is its argument, and the others are aliases of the option.\n"
+        "                  - A condition that the option has no arguments can be also specified.\n"
+        "  FIRST_ARG     specify the first non-optional argument as follows:\n"
+        "                  - Specify by a string that does not contain '='.\n"
+        "                  - A condition that there are no non-optional arguments can be also specified.\n"
+        "\n"
+        HELP_REMARKS_STR
+        "  - If no NAMEs are specified and '-r' is not given, it behaves as if '-p' is given.\n"
+        "  - If the number of the non-optional arguments is less than 2, '-A' makes no sense, and\n"
+        "    if either of '-np' is given, the non-optional arguments other than NAME make no sense.\n"
+        "  - The argument for '--target' "CAN_BE_TRUNCATED".\n"
+        "  - The target "SPECIFIED_BY_TARGET".\n"
+        "  - When appending the setting, it always overwrites the previous setting.\n"
+        "  - When '-p' is given, '-r' toggles between displaying the current and default settings,\n"
+        "    and NAMEs narrow down the settings to be displayed to only those specified.\n"
+        "  - The argument for '--same-as-nothing' can be any string that does not\n"
+        "    contain '=', and the string to be specified here is case insensitive.\n"
+        "  - When specifying LONG_OPTSs, it must come after specifying one SHORT_OPTS, so even if\n"
+        "    you don't want to specify SHORT_OPTS, you must specify an empty string instead.\n"
+        "  - OPTARG is distinguished from other conditions by whether or not it contains '='.\n"
+        "  - Aliases of the option in OPTARG are used when you want to define a short option and a\n"
+        "    long option that have the same meaning, or when you want to give an alias that does not\n"
+        "    match any options to a long option that requires specifying many arguments as conditions.\n"
+        "  - If you want to specify FIRST_ARG without specifying OPTARG, use one '=' instead of OPTARG.\n"
+        "  - The settings here are recorded in the ignore-file in json format, but even if you edit the\n"
+        "    file without using this command, the contents will be checked so that no problems will occur.\n"
     , stdout);
 }
 
@@ -794,10 +845,10 @@ static void help_example(void){
 
 static void ignore_example(void){
     fputs(
-        "dit ignore \n"
-        "dit ignore \n"
-        "dit ignore \n"
-        "dit ignore \n"
+        "dit ignore -d diff vim             Prevent 'diff' and 'vim' from being reflected in Dockerfile.\n"
+        "dit ignore -hn declare             Make 'declare' a command that is reflected in history-file.\n"
+        "dit ignore -dhA export p = none    Set the detailed conditions for ignoring 'export'.\n"
+        "dit ignore -dhpr sed awk           Display the default ignore settings for 'sed' and 'awk'.\n"
     , stdout);
 }
 
