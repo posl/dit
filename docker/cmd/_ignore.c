@@ -34,7 +34,7 @@ typedef struct {
     bool print_flag;             /** whether to print the contents of the ignore-file */
     int reset_flag;              /** whether to reset the ignore-file */
     bool additional_settings;    /** whether to accept the additional settings in the arguments */
-    const char *nothing;         /** string meaning no arguments in the additional settings */
+    char *nothing;               /** string meaning no arguments in the additional settings */
 } ig_opts;
 
 
@@ -74,7 +74,7 @@ typedef struct {
 static int parse_opts(int argc, char **argv, ig_opts *opt);
 static int ignore_contents(int argc, char **argv, ig_opts *opt);
 
-static int parse_additional_settings(int argc, char **argv, additional_settings *data, const char *nothing);
+static bool parse_additional_settings(int argc, char **argv, additional_settings *data, const char *nothing);
 static int parse_short_opts(const char *target);
 static int parse_long_opts(const char *target, additional_settings *data);
 static int append_long_opt(additional_settings *data, const char *name, size_t name_len, int has_arg);
@@ -125,13 +125,8 @@ int ignore(int argc, char **argv){
     else if (i > 0)
         exit_status = SUCCESS;
 
-    if (exit_status){
-        if (exit_status < 0){
-            exit_status = FAILURE;
-            xperror_internal_file();
-        }
+    if (exit_status)
         xperror_suggestion(true);
-    }
     return exit_status;
 }
 
@@ -168,11 +163,9 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
     opt->print_flag = false;
     opt->reset_flag = false;
     opt->additional_settings = false;
-    opt->nothing = "NONE";
+    opt->nothing = NULL;
 
     int c, i;
-    char *tmp;
-
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0)
         switch (c){
             case 'd':
@@ -205,8 +198,6 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
                 }
                 else {
                     if (optarg && (! strchr(optarg, '='))){
-                        for (tmp = optarg; *tmp; tmp++)
-                            *tmp = toupper(*tmp);
                         opt->nothing = optarg;
                         break;
                     }
@@ -220,6 +211,13 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
         }
 
     assert(opt->reset_flag == ((bool) opt->reset_flag));
+
+    if (opt->nothing){
+        for (char *tmp = opt->nothing; *tmp; tmp++)
+            *tmp = toupper(*tmp);
+    }
+    else
+        opt->nothing = "NONE";
 
     if (opt->target_c)
         return SUCCESS;
@@ -237,22 +235,23 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
  * @param[in]  argc  the number of non-optional arguments
  * @param[out] argv  array of strings that are non-optional arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
+ * @return int  command's exit status
  *
  * @note when appending ignored commands with detailed information, argument parsing is done first.
  */
 static int ignore_contents(int argc, char **argv, ig_opts *opt){
     assert(opt);
+    assert((opt->target_c == 'd') || (opt->target_c == 'h') || (opt->target_c == 'b'));
 
     const char *ignore_files[][2] = {
         { IGNORE_FILE_H,      IGNORE_FILE_D,     },
         { IGNORE_FILE_BASE_H, IGNORE_FILE_BASE_D }
     };
 
-    int exit_status = SUCCESS, offset = 1;
+    bool success = true;
     additional_settings data = {0};
+    int offset = 1, exit_status = FAILURE;
     const char *file_name, *errmsg;
-    bool success;
 
     yyjson_doc *idoc;
     yyjson_read_err read_err;
@@ -266,15 +265,16 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
                 opt->additional_settings = false;
             }
             else
-                exit_status = parse_additional_settings(argc, argv, &data, opt->nothing);
+                success = parse_additional_settings(argc, argv, &data, opt->nothing);
         }
     }
     else if (! opt->reset_flag)
         opt->print_flag = true;
 
-    if (! exit_status){
+    if (success){
         if (opt->target_c == 'h')
             offset = 0;
+        exit_status = SUCCESS;
 
         do {
             file_name = ignore_files[opt->reset_flag][offset];
@@ -304,7 +304,7 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
                         }
 
                         if (! success)
-                            exit_status = UNEXPECTED_ERROR;
+                            exit_status = FAILURE;
                     }
                     else {
                         assert(opt->reset_flag);
@@ -319,8 +319,7 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
                 errmsg = read_err.msg;
 
             if (errmsg){
-                if (! exit_status)
-                    exit_status = POSSIBLE_ERROR;
+                exit_status = FAILURE;
                 xperror_message(errmsg, file_name);
             }
 
@@ -354,10 +353,11 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
  * @param[in]  argv  array of strings that are non-optional arguments
  * @param[out] data  variable to store the results of parsing the additional settings
  * @param[in]  nothing  string meaning no arguments in the additional settings
- * @return int  0 (parse success), 1 (parse failure) or -1 (unexpected error)
+ * @return int  successful or not
  */
-static int parse_additional_settings(int argc, char **argv, additional_settings *data, const char *nothing){
+static bool parse_additional_settings(int argc, char **argv, additional_settings *data, const char *nothing){
     assert(argc > 1);
+    assert(argv);
     assert(data);
     assert(nothing);
 
@@ -370,7 +370,7 @@ static int parse_additional_settings(int argc, char **argv, additional_settings 
     assert(! data->first_args);
     assert(! data->first_args_num);
 
-    int phase = 0, exit_status = UNEXPECTED_ERROR;
+    int phase = 0;
     const char *errdesc = NULL;
     yyjson_mut_doc *mdoc;
     yyjson_mut_val *mobj;
@@ -454,14 +454,13 @@ static int parse_additional_settings(int argc, char **argv, additional_settings 
         if (! append_optarg(data, p_info, nothing))
             goto exit;
 
-    exit_status = SUCCESS;
+    return true;
 
 exit:
-    if (errdesc){
-        exit_status = POSSIBLE_ERROR;
+    if (errdesc)
         xperror_invalid_arg('C', 1, errdesc, *argv);
-    }
-    return exit_status;
+
+    return false;
 }
 
 
@@ -784,6 +783,7 @@ static bool append_optarg(additional_settings *data, const optarg_info *p_info, 
  */
 static void display_ignored_set(const yyjson_doc *idoc, int argc, char **argv, yyjson_write_err *write_err){
     assert(idoc);
+    assert(argv);
     assert(write_err);
 
     if (argc > 0)
@@ -836,6 +836,7 @@ static void display_ignored_set(const yyjson_doc *idoc, int argc, char **argv, y
 static bool edit_ignored_set(yyjson_mut_doc *mdoc, int argc, char **argv, bool unset_flag){
     assert(mdoc);
     assert(argc > 0);
+    assert(argv);
 
     const char *key;
 

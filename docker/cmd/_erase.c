@@ -205,6 +205,10 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
                     opt->has_delopt = true;
                     break;
                 case 'Z':
+                    if (! optarg){
+                        opt->undoes = 1;
+                        break;
+                    }
                     ptr = &(opt->undoes);
                     i = ERASE_OPTID_UNDOES;
                 case 'm':
@@ -212,18 +216,14 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
                         ptr = &(opt->max_count);
                         i = ERASE_OPTID_MAX_COUNT;
                     }
-                    if (optarg){
-                        if ((c = receive_positive_integer(optarg, NULL)) < 0){
-                            errcode = 'N';
-                            c = 1;
-                            goto errexit;
-                        }
+                    if ((c = receive_positive_integer(optarg, NULL)) >= 0){
                         *ptr = c;
+                        ptr = NULL;
+                        break;
                     }
-                    else
-                        *ptr = 1;
-                    ptr = NULL;
-                    break;
+                    errcode = 'N';
+                    c = 1;
+                    goto errexit;
                 case 'd':
                     assign_both_or_either(opt->target_c, 'h', 'b', 'd');
                     break;
@@ -309,19 +309,20 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
         while ((c = getopt_long(argc, argv, short_delopts, long_delopts, NULL)) >= 0)
             switch (c){
                 case 'E':
-                    if (marklines_containing_pattern(data, optarg, opt->ignore_case))
-                        goto errexit;
-                    break;
+                    if (! marklines_containing_pattern(data, optarg, opt->ignore_case))
+                        break;
+                    goto errexit;
                 case 'N':
-                    if ((c = marklines_with_numbers(data, optarg))){
-                        if (c == POSSIBLE_ERROR){
+                    switch (marklines_with_numbers(data, optarg)){
+                        case SUCCESS:
+                            break;
+                        case POSSIBLE_ERROR:
                             errcode = 'O';
                             c = 0;
                             i = ERASE_OPTID_NUMBERS;
-                        }
-                        goto errexit;
+                        default:
+                            goto errexit;
                     }
-                    break;
             }
     }
 
@@ -441,7 +442,7 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
                 free(data.check_list);
             }
             else
-                exit_status = UNEXPECTED_ERROR + ERROR_EXIT;
+                exit_status = POSSIBLE_ERROR;
 
             free(data.lines);
         }
@@ -1423,7 +1424,7 @@ static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs
 
                     if ((ptr = realloc(logs->array, (sizeof(unsigned char) * (logs->size + logs_size))))){
                         logs->array = (unsigned char *) ptr;
-                        memset((logs->array + logs->size), UCHAR_MAX, (logs_size - 1));
+                        memset((logs->array + logs->size), UCHAR_MAX, tmp.quot);
 
                         logs->size += logs_size;
                         logs->array[logs->size - 1] = tmp.rem + 1;
