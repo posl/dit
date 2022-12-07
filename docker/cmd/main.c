@@ -560,9 +560,18 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
  * @param[in]  a  pointer to string1
  * @param[in]  b  pointer to string2
  * @return int  comparison result
+ *
+ * @note keep NULLs clustered at the end of the array.
  */
 int qstrcmp(const void *a, const void *b){
-    return strcmp(*((char **) a), *((char **) b));
+    assert(a);
+    assert(b);
+
+    const char *str1, *str2;
+    str1 = *((char **) a);
+    str2 = *((char **) b);
+
+    return str1 ? (str2 ? strcmp(str1, str2) : -1) : (str2 ? 1 : 0);
 }
 
 
@@ -627,13 +636,15 @@ int receive_positive_integer(const char *target, int *p_left){
  * @return int  index number of the corresponding string, -1 (ambiguous) or -2 (invalid)
  *
  * @note make efficient by applying binary search sequentially from the first character of target string.
- * @attention array of expected strings must be pre-sorted alphabetically.
+ * @attention the array must be pre-sorted alphabetically and NULLs must be clustered at the end of it.
  */
 int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode){
     assert(reprs);
-    assert((size - 1) <= INT_MAX);
-    assert(check_if_alphabetical_order(reprs, size));
+    assert((size > 0) && ((size - 1) <= INT_MAX));
     assert(mode < 4);
+
+    for (const char * const *p_repr = (reprs + size); (! *(--p_repr)) && --size;);
+    assert(check_if_alphabetical_order(reprs, size));
 
     if (target && (size > 0)){
         const char *expecteds[size];
@@ -668,13 +679,11 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
                             max = mid - 1;
                     }
                     else {
-                        tmp = mid;
-                        while ((--tmp >= min) && (c == ((unsigned char) *(expecteds[tmp]++))));
-                        min = ++tmp;
+                        for (tmp = mid; (--tmp >= min) && (c == ((unsigned char) *(expecteds[tmp]++))););
+                        min = tmp + 1;
 
-                        tmp = mid;
-                        while ((++tmp <= max) && (c == ((unsigned char) *(expecteds[tmp]++))));
-                        max = --tmp;
+                        for (tmp = mid; (++tmp <= max) && (c == ((unsigned char) *(expecteds[tmp]++))););
+                        max = tmp - 1;
 
                         break_flag = true;
                     }
@@ -691,10 +700,12 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
                 return -2;
         }
 
-        if (! tmp)
-            return (forward_match || (! *(expecteds[min]))) ? min : -2;
+        if (tmp)
+            return -1;
+        if (forward_match || (! *(expecteds[min])))
+            return min;
     }
-    return -1;
+    return -2;
 }
 
 
