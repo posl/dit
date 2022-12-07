@@ -165,6 +165,8 @@ int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p
 int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assume_c);
 int update_erase_logs(unsigned short prov_reflecteds[2]);
 
+int check_if_ignored(int argc, char **argv, int target_c);
+
 int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag);
 int read_provisional_report(unsigned short prov_reflecteds[2]);
 int write_provisional_report(unsigned short prov_reflecteds[2]);
