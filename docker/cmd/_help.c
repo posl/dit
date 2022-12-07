@@ -569,8 +569,9 @@ void ignore_manual(void){
         "    long option that have the same meaning, or when you want to give an alias that does not\n"
         "    match any options to a long option that requires specifying many arguments as conditions.\n"
         "  - If you want to specify FIRST_ARG without specifying OPTARG, use one '=' instead of OPTARG.\n"
-        "  - The settings here are recorded in the ignore-file in json format, but even if you edit the\n"
-        "    file without using this command, the contents will be checked so that no problems will occur.\n"
+        "  - The settings here are recorded in the ignore-file in json format, and as long as you use this\n"
+        "    command, no invalid, incorrect or meaningless settings will be recorded, but even if you edit\n"
+        "    the file in another way, the contents will be checked so that no problems will occur.\n"
     , stdout);
 }
 
