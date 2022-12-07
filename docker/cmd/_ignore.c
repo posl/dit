@@ -7,7 +7,7 @@
  * @author Tsukasa Inada
  * @date 2022/11/26
  *
- * @note In the ignore-file, a json object that associates each command name with its details is stored.
+ * @note In the ignore-file, a JSON object that associates each command name with its details is stored.
  */
 
 #include "main.h"
@@ -25,9 +25,6 @@
 #endif
 
 #define IG_INITIAL_LONG_OPTS_MAX 16
-
-#define SHOULD_BE_IGNORED      0
-#define SHOULD_NOT_BE_IGNORED  1
 
 
 /** Data type for storing the results of option parse */
@@ -67,7 +64,7 @@ typedef struct {
     size_t long_opts_num;        /** the current number of long options */
     size_t long_opts_max;        /** the current maximum length of the array */
 
-    yyjson_mut_doc *optargs;     /** json data representing the arguments to be specified for the options */
+    yyjson_mut_doc *optargs;     /** JSON data representing the arguments to be specified for the options */
 
     char **first_args;           /** array of the first non-optional arguments */
     size_t first_args_num;       /** the current number of the first non-optional arguments */
@@ -639,7 +636,7 @@ static int append_long_opt(additional_settings *data, const char *name, size_t n
  * @param[out] p_info  variable to store the results of this parsing
  * @return int  0 (success), 1 (skip this parsing), -1 (invalid optarg) or -2 (unexpected error)
  *
- * @note in order to analyze which options are equivalent first, construct json data in 2 steps.
+ * @note in order to analyze which options are equivalent first, construct JSON data in 2 steps.
  * @note this function analyzes which options are equivalent and extracts the data for the next step.
  */
 static int parse_optarg(const char *target, additional_settings *data, optarg_info *p_info){
@@ -782,7 +779,7 @@ static bool append_optarg(additional_settings *data, const optarg_info *p_info, 
 /**
  * @brief display the contents of the ignore-file on screen.
  *
- * @param[in]  idoc  immutable json data that is the contents of the ignore-file
+ * @param[in]  idoc  immutable JSON data that is the contents of the ignore-file
  * @param[in]  argc  the number of non-optional arguments
  * @param[out] argv  array of strings that are non-optional arguments
  *
@@ -827,7 +824,7 @@ static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yy
 /**
  * @brief edit set of commands in the ignore-file.
  *
- * @param[out] mdoc  variable to store json data that is the result of editing
+ * @param[out] mdoc  variable to store JSON data that is the result of editing
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
  * @param[in]  unset_flag  whether to only remove the contents of the ignore-file
@@ -859,7 +856,7 @@ static bool edit_ignore_set(yyjson_mut_doc *mdoc, int argc, char **argv, bool un
 /**
  * @brief append an ignored command with detailed conditions to set of commands in the ignore-file.
  *
- * @param[out] mdoc  variable to store json data that is the result of editing
+ * @param[out] mdoc  variable to store JSON data that is the result of editing
  * @param[in]  data  variable to store the results of parsing the additional settings
  * @param[in]  nothing  string meaning no arguments in the additional settings
  * @return bool  successful or not
@@ -980,16 +977,17 @@ static bool append_ignore_set(yyjson_mut_doc *mdoc, const additional_settings *d
  * @param[in]  argc the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments
  * @param[in]  target_c  character representing the target ignore-file ('d' or 'h')
- * @return int  0 (should be ignored), 1 (should not be ignored) or -1 (unexpected error)
+ * @return int  offset to start of the non-optional arguments if should be ignored, 0 or -1 otherwise
  *
- * @note The contents of the ignore-file are used as much as possible, except for invalid data.
+ * @note returns a negative integer only if JSON data could not be successfully read from the ignore-file.
+ * @note the contents of the ignore-file are used as much as possible, except for invalid data.
  */
 int check_if_ignored(int argc, char **argv, int target_c){
     assert(argc > 0);
     assert(argv);
     assert((target_c == 'd') || (target_c == 'h'));
 
-    int offset = 1, exit_status = UNEXPECTED_ERROR;
+    int offset = 1;
     yyjson_doc *idoc;
 
     if (target_c == 'h')
@@ -997,7 +995,7 @@ int check_if_ignored(int argc, char **argv, int target_c){
 
     if ((idoc = yyjson_read_file(ignore_files[0][offset], 0, NULL, NULL))){
         yyjson_val *ictn;
-        exit_status = SHOULD_NOT_BE_IGNORED;
+        offset = 0;
 
         if ((ictn = yyjson_obj_get(idoc->root, *argv))){
             yyjson_obj_iter obj_iter;
@@ -1118,25 +1116,28 @@ int check_if_ignored(int argc, char **argv, int target_c){
                     goto exit;
             }
 
-            exit_status = SHOULD_BE_IGNORED;
+            offset = optind;
+            assert(offset);
         }
 
         yyjson_doc_free(idoc);
     }
+    else
+        offset = -1;
 
 exit:
     optind = 0;
     opterr = 1;
-    return exit_status;
+    return offset;
 }
 
 
 /**
- * @brief check if the passed string is contained within the json array of expected strings.
+ * @brief check if the passed string is contained within the JSON array of expected strings.
  *
  * @param[in]  target  target string
- * @param[in]  iarr  json array of expected strings
- * @param[out] p_arr_iter  pointer to a json array iterator
+ * @param[in]  iarr  JSON array of expected strings
+ * @param[out] p_arr_iter  pointer to a JSON array iterator
  * @return bool  the resulting boolean
  */
 static bool check_if_contained(const char *target, yyjson_val *ival, yyjson_arr_iter *p_arr_iter){
