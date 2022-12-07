@@ -62,7 +62,7 @@ void test(int argc, char **argv, int cmd_id){
         test_func = test_funcs[cmd_id];
     }
     else if (argc == 1)
-        test_flag = (! strcmp(*argv, "test"));
+        test_flag = (! strncmp(*argv, "test", 4));
 
     if (test_flag){
         test_func();
@@ -93,9 +93,7 @@ static bool parse_opts(int argc, char **argv){
 
     opterr = 0;
 
-    while (getopt_long(argc, argv, short_opts, long_opts, NULL) >= 0)
-        if (flag)
-            break;
+    while ((getopt_long(argc, argv, short_opts, long_opts, NULL) >= 0) && (! flag));
 
     optind = 0;
     opterr = 1;

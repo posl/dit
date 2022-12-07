@@ -747,7 +747,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
 
 
 /**
- * @brief check if the size of the specified file is not too large to be represented by int type.
+ * @brief get the size of target file.
  *
  * @param[in]  file_name  target file name
  * @return int  the resulting file size, -1 (unexpected error) or -2 (too large)
@@ -774,7 +774,7 @@ int get_file_size(const char *file_name){
 
 
 /**
- * @brief check the exit status of last executed command line.
+ * @brief get the exit status of last executed command line.
  *
  * @return int  the resulting integer or -1
  *

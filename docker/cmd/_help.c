@@ -292,8 +292,8 @@ static bool display_help(help_conts code, const char *target){
         };
 
         int i;
-        i = (! strcmp(target, "cfg")) ? 1 :
-            (! strcmp(target, "hc")) ? 5 :
+        i = (! strncmp(target, "cfg", 3)) ? 1 :
+            (! strncmp(target, "hc", 2)) ? 5 :
             receive_expected_string(target, cmd_reprs, CMDS_NUM, 2);
 
         if (i >= 0){
