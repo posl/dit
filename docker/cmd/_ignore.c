@@ -1034,13 +1034,11 @@ int check_if_ignored(int argc, char **argv, int target_c){
                     for (tmp = 0; (ival = yyjson_arr_iter_next(&arr_iter)); tmp++){
                         switch (tmp){
                             case 0:
-                                name = yyjson_get_str(ival);
-                                if ((! name) || strpbrk(name, ":=?"))
+                                if ((! (name = yyjson_get_str(ival))) || strpbrk(name, ":=?"))
                                     break;
                                 continue;
                             case 1:
-                                colons = yyjson_get_uint(ival);
-                                if (colons >= 3)
+                                if ((! yyjson_is_uint(ival)) || ((colons = yyjson_get_uint(ival)) >= 3))
                                     break;
                             default:
                                 continue;
