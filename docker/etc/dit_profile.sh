@@ -7,26 +7,26 @@
 
 alias \
     cmd='dit cmd' \
-    config='dit config' \
-    conf='dit config' \
     cfg='dit config' \
-    convert='dit convert' \
+    conf=cfg \
+    config=cfg \
     conv='dit convert' \
+    convert=conv \
     copy='dit copy' \
     erase='dit erase' \
-    healthcheck='dit healthcheck' \
     hc='dit healthcheck' \
-    ignore='dit ignore' \
+    healthcheck=hc \
     ig='dit ignore' \
-    inspect='dit inspect' \
+    ignore=ig \
     insp='dit inspect' \
+    inspect=insp \
     label='dit label' \
-    onbuild='dit onbuild' \
     onb='dit onbuild' \
-    optimize='dit optimize' \
+    onbuild=onb \
     optim='dit optimize' \
-    reflect='dit reflect' \
-    refl='dit reflect'
+    optimize=optim \
+    refl='dit reflect' \
+    reflect=refl
 
 
 
