@@ -39,7 +39,6 @@
 
 \colorlet{word}{blue!75!black}
 \definecolor{numb}{rgb}{0.0,0.6,0.0}
-\colorlet{colon}{red!75!black}
 \definecolor{delim}{RGB}{20,100,175}
 
 \lstdefinelanguage{json}{
@@ -56,7 +55,6 @@
         {7}{{{\color{numb}7}}}{1}
         {8}{{{\color{numb}8}}}{1}
         {9}{{{\color{numb}9}}}{1}
-        {:}{{{\color{colon}{:}}}}{1}
         {\{}{{{\color{delim}{\{}}}}{1}
         {\}}{{{\color{delim}{\}}}}}{1}
         {[}{{{\color{delim}{[}}}}{1}
@@ -771,8 +769,7 @@ dit erase -diy -E '^LABEL[[:space:]]'
     処理内容
     \begin{itemize}
         \item 順序に意味がない命令をそれぞれ集めて，並べ替える．
-        \item 見やすさを向上させるための整形を行う．
-        \item WORKDIR命令を絶対パス指定にする．
+        \item 可読性を向上させるための整形を行う．
         \item ENV・ARG命令の重複や無意味な再定義を取り除く．
         \item 連続するRUN命令をリスト実行の\textcolor{red!75}{\&\&}でまとめる．
     \end{itemize}
