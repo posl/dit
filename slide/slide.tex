@@ -113,6 +113,7 @@
 
 
 
+
 %--------- スライド ---------%
 \begin{document}
 
@@ -169,7 +170,7 @@
         \begin{column}[T]{0.3\mycolumnwidth}
             \begin{figure}
                 \centering
-                \includegraphics[height=60pt]{img/docker_image.png}
+                \includegraphics[height=60pt]{img/image.png}
                 \caption{イメージ}
             \end{figure}
         \end{column}
@@ -183,7 +184,7 @@
         \begin{column}[T]{0.3\mycolumnwidth}
             \begin{figure}
                 \centering
-                \includegraphics[height=60pt]{img/docker_container.png}
+                \includegraphics[height=60pt]{img/container.png}
                 \caption{コンテナ}
             \end{figure}
         \end{column}
@@ -266,27 +267,30 @@
 
 
 \begin{frame}{別で，同じベースイメージから起動したコンテナで\\動作確認をしながら，Dockerfileを開発する例}
-    
+    \href{https://user-images.githubusercontent.com/103095414/209308363-14a95e02-4351-4036-a222-39e6a08a2982.mp4}{
+        \includegraphics[keepaspectratio, width=\linewidth]{img/thumbnail1.png}
+    }
 
     \pause
     \begin{tikzpicture}[remember picture]
         \useasboundingbox (0.0, 0.0);
         \begin{scope}[shift={(current page.south west)}]
-            \node[probrem] at (6.0, 5.0) {手間が多い};
-            \node[probrem] at (6.0, 3.0) {気にかけることが多い};
+            \node[probrem] at (6.4, 4.0) {気にかけることが多い};
         \end{scope}
     \end{tikzpicture}
 \end{frame}
 
 
 \begin{frame}{開発途中のDockerfileから逐一生成するコンテナで\\動作確認をしながら，Dockerfileを開発する例}
-    
+    \href{https://user-images.githubusercontent.com/103095414/209308620-3ed140c5-6c34-4dba-925d-e29227639d16.mp4}{
+        \includegraphics[keepaspectratio, width=\linewidth]{img/thumbnail2.png}
+    }
 
     \pause
     \begin{tikzpicture}[remember picture]
         \useasboundingbox (0.0, 0.0);
         \begin{scope}[shift={(current page.south west)}]
-            \node[probrem] at (6.0, 4.0) {時間ロスが大きい};
+            \node[probrem] at (6.4, 4.0) {時間ロスが大きい};
         \end{scope}
     \end{tikzpicture}
 \end{frame}
@@ -317,11 +321,12 @@
     前述の方法で自動生成したDockerfile
 
     % TODO: リファクタリング・最適化前の画像
+    
 
     \begin{tikzpicture}[remember picture]
         \useasboundingbox (0.0, 0.0);
         \begin{scope}[shift={(current page.south west)}]
-            \only<2>{\node[probrem] at (6.0, 4.0) {見づらい};}
+            \only<2>{\node[probrem] at (6.4, 4.0) {見づらい};}
 
             \begin{onlyenv}<3>
                 \node[callout, callout absolute pointer={(5.6, 2.2)}] at (8.8, 3.8) {絶対パス指定の方がいい};
@@ -336,6 +341,7 @@
     リファクタリング・最適化後のDockerfile
 
     % TODO: リファクタリング・最適化後の画像
+    
 \end{frame}
 
 
