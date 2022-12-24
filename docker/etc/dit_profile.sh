@@ -73,13 +73,20 @@ export PROMPT_COMMAND
 
 
 #
-# if necessary, reproducing the environment under construction
+# if necessary, reproduce the environment under construction
 #
 
-DIT_VERSION='1.0.0'
-
 if [ ! -s /dit/etc/dit_version ]; then
-    # . /dit/mnt/.dit_history > /dev/null
-    history -r /dit/mnt/.dit_history
-    echo "dit version ${DIT_VERSION:-?.?.?}" > /dit/etc/dit_version
+    if [ -s /dit/mnt/.dit_history ]; then
+        echo 'Reproducing the environment under construction ...'
+
+        set -ex
+        . /dit/mnt/.dit_history > /dev/null
+        set +ex
+
+        echo 'Done!'
+        history -r /dit/mnt/.dit_history
+    fi
+
+    echo "dit version 1.0.0" > /dit/etc/dit_version
 fi
