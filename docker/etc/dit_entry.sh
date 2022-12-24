@@ -2,7 +2,7 @@
 
 
 #
-# check the shared directory, and initialize the base-file for Dockerfile
+# check the directory shared with the host environment
 #
 
 if [ ! -e /dit/mnt ]; then
@@ -13,7 +13,7 @@ fi
 
 if [ -s /dit/mnt/Dockerfile.draft ]; then
     PREV_FROM="$( head -n1 /dit/mnt/Dockerfile.draft )"
-    CURR_FROM="FROM ${BASE_NAME}:${BASE_VERSION}"
+    CURR_FROM="$( head -n1 /dit/etc/Dockerfile.base )"
 
     if [ "${PREV_FROM}" != "${CURR_FROM}" ]; then
         echo "dit: base-image inconsistency with the contents of 'Dockerfile.draft'" 1>&2
@@ -26,16 +26,6 @@ touch \
     /dit/mnt/.dockerignore \
     /dit/mnt/Dockerfile \
     /dit/mnt/Dockerfile.draft
-
-
-cat <<EOF > /dit/etc/Dockerfile.base
-FROM ${BASE_NAME}:${BASE_VERSION}
-SHELL [ "${SHELL:-/bin/sh}", "-c" ]
-WORKDIR $( pwd )
-EOF
-
-echo "Entering '${BASE_NAME}:${BASE_VERSION}' ..."
-unset BASE_NAME BASE_VERSION
 
 
 
@@ -98,7 +88,7 @@ chmod a=rx \
 
 
 #
-# initialize or delete the internal files depending on usage, and enter a login shell
+# initialize the internal files, and enter a shell as the default user
 #
 
 echo '0' > /dit/tmp/last-exit-status
@@ -111,13 +101,9 @@ dit reflect
 
 
 DEFAULT_USER="$( head -n1 /dit/etc/default_user )"
+rm -f /dit/etc/default_user
 
-cp -f /dit/etc/dit_profile.sh /etc/profile.d/
-
-rm -f \
-    /dit/etc/default_user \
-    /dit/etc/dit_*.sh \
-    /dit/etc/package_manager
+export ENV=/dit/etc/dit_profile.sh
 
 
 if [ "${DEFAULT_USER}" != 'root' ]; then
