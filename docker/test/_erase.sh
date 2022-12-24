@@ -274,7 +274,7 @@ do_test_other_options(){
             check_log_file hist 16 2 2
         fi
 
-        echo "done!"
+        echo "Done!"
     done
 
     echo
