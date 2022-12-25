@@ -28,7 +28,7 @@ trap 'end_processing' EXIT
 trap 'exit 1' HUP INT QUIT TERM
 
 
-CMDS_NUM=13
+CMDS_NUM=14
 
 TMP1=_help1.tmp
 TMP2=_help2.tmp
@@ -138,10 +138,6 @@ read -r REPLY
 
 : 'check if short descriptions for some commands specified in abbreviations are displayed.'
 dit help --desc conv optim refl erase
-read -r REPLY
-
-: 'check if short descriptions for some aliased commands are displayed.'
-dit help --description cfg hc
 read -r REPLY
 
 

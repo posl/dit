@@ -26,7 +26,7 @@
 
 #define do_test(func) \
     do { \
-        fprintf(stderr, "Testing %s:%u: "#func" ...\n", __FILE__, __LINE__); \
+        fprintf(stderr, "Testing %s:%u: '"#func"' ...\n", __FILE__, __LINE__); \
         func(); \
         fputs("Passed all tests!\n\n", stderr); \
     } while(false)
@@ -79,6 +79,7 @@ void inspect_test(void);
 void label_test(void);
 void onbuild_test(void);
 void optimize_test(void);
+void package_test(void);
 void reflect_test(void);
 
 

@@ -55,6 +55,7 @@ void test(int argc, char **argv, int cmd_id){
             label_test,
             onbuild_test,
             optimize_test,
+            package_test,
             reflect_test
         };
 

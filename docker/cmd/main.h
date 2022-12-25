@@ -45,7 +45,7 @@
 #define POSSIBLE_ERROR 1
 #define UNEXPECTED_ERROR (-1)
 
-#define CMDS_NUM 13
+#define CMDS_NUM 14
 #define ARGS_NUM 3
 #define DOCKER_INSTRS_NUM 18
 
@@ -93,6 +93,26 @@
 
 
 /******************************************************************************
+    * IDs for each dit command
+******************************************************************************/
+
+#define ID_DIT_CMD           0
+#define ID_DIT_CONFIG        1
+#define ID_DIT_CONVERT       2
+#define ID_DIT_COPY          3
+#define ID_DIT_ERASE         4
+#define ID_DIT_HEALTHCHECK   5
+#define ID_DIT_HELP          6
+#define ID_DIT_IGNORE        7
+#define ID_DIT_INSPECT       8
+#define ID_DIT_LABEL         9
+#define ID_DIT_ONBUILD      10
+#define ID_DIT_OPTIMIZE     11
+#define ID_DIT_PACKAGE      12
+#define ID_DIT_REFLECT      13
+
+
+/******************************************************************************
     * IDs for 'receive_dockerfile_instruction'
 ******************************************************************************/
 
@@ -134,6 +154,7 @@ int inspect(int argc, char **argv);
 int label(int argc, char **argv);
 int onbuild(int argc, char **argv);
 int optimize(int argc, char **argv);
+int package(int argc, char **argv);
 int reflect(int argc, char **argv);
 
 
@@ -153,6 +174,7 @@ void inspect_manual(void);
 void label_manual(void);
 void onbuild_manual(void);
 void optimize_manual(void);
+void package_manual(void);
 void reflect_manual(void);
 
 

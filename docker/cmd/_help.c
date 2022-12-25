@@ -58,6 +58,7 @@ static void inspect_description(void);
 static void label_description(void);
 static void onbuild_description(void);
 static void optimize_description(void);
+static void package_description(void);
 static void reflect_description(void);
 
 static void dit_example(void);
@@ -73,6 +74,7 @@ static void inspect_example(void);
 static void label_example(void);
 static void onbuild_example(void);
 static void optimize_example(void);
+static void package_example(void);
 static void reflect_example(void);
 
 
@@ -196,7 +198,23 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
  * @note display the commands in the same order as 'dit help'.
  */
 static void display_cmd_list(void){
-    const int cmd_rearange[] = {2, 11, 1, 7, 3, 9, 0, 5, 10, 12, 4, 8, 6, -1};
+    const int cmd_rearange[] = {
+        ID_DIT_CONVERT,
+        ID_DIT_OPTIMIZE,
+        ID_DIT_CONFIG,
+        ID_DIT_IGNORE,
+        ID_DIT_PACKAGE,
+        ID_DIT_COPY,
+        ID_DIT_LABEL,
+        ID_DIT_CMD,
+        ID_DIT_HEALTHCHECK,
+        ID_DIT_ONBUILD,
+        ID_DIT_REFLECT,
+        ID_DIT_ERASE,
+        ID_DIT_INSPECT,
+        ID_DIT_HELP,
+            -1
+    };
 
     for (const int *p_id = cmd_rearange; *p_id >= 0; p_id++){
         assert(*p_id < CMDS_NUM);
@@ -233,8 +251,6 @@ static int display_version(void){
  * @param[in]  code  serial number identifying the display content
  * @param[in]  target  target string
  * @return bool  successful or not
- *
- * @note "cfg" and "hc", which are default aliases of 'config' and 'heatlthcheck', are supported.
  */
 static bool display_help(help_conts code, const char *target){
     assert((code >= 0) && (code < HELP_CONTENTS_NUM));
@@ -257,6 +273,7 @@ static bool display_help(help_conts code, const char *target){
                 label_manual,
                 onbuild_manual,
                 optimize_manual,
+                package_manual,
                 reflect_manual
             },
             {
@@ -272,6 +289,7 @@ static bool display_help(help_conts code, const char *target){
                 label_description,
                 onbuild_description,
                 optimize_description,
+                package_description,
                 reflect_description
             },
             {
@@ -287,16 +305,13 @@ static bool display_help(help_conts code, const char *target){
                 label_example,
                 onbuild_example,
                 optimize_example,
+                package_example,
                 reflect_example
             }
         };
 
         int i;
-        i = (! strncmp(target, "cfg", 3)) ? 1 :
-            (! strncmp(target, "hc", 2)) ? 5 :
-            receive_expected_string(target, cmd_reprs, CMDS_NUM, 2);
-
-        if (i >= 0){
+        if ((i = receive_expected_string(target, cmd_reprs, CMDS_NUM, 2)) >= 0){
             assert(i < CMDS_NUM);
             topic = cmd_reprs[i];
             help_func = cmd_helps[code][i];
@@ -349,10 +364,11 @@ static void dit_manual(void){
         "  ignore         edit set of commands that are ignored "WHEN_REFLECTING"\n"
         "\n"
         "editing Dockerfile:\n"
+        "  package        install packages in an optimized manner and reflect this as a RUN instruction\n"
         "  copy           copy files from the host environment and reflect this as COPY/ADD instructions\n"
         "  label          edit list of LABEL/EXPOSE instructions\n"
-        "  cmd            set CMD/ENTRYPOINT instruction\n"
-        "  healthcheck    set HEALTHCHECK instruction\n"
+        "  cmd            set a CMD/ENTRYPOINT instruction\n"
+        "  healthcheck    set a HEALTHCHECK instruction\n"
         "  onbuild        append ONBUILD instructions\n"
         "\n"
         "utilities:\n"
@@ -503,15 +519,13 @@ void help_manual(void){
         "  -a, --all            list all dit commands available" EXIT_NORMALLY
         "  -d, --description    show the short descriptions\n"
         "  -e, --example        show the examples of use\n"
-        "  -m, --manual         show the detailed manuals\n"
+        "  -m, --manual         show the detailed manuals (default)\n"
         "  -V, --version        display the version of this tool" EXIT_NORMALLY
         "      --help           " HELP_OPTION_DESC
         "\n"
         HELP_REMARKS_STR
         "  - If no COMMANDs are specified, show information about the main interface of the dit commands.\n"
-        "  - Each COMMAND "CAN_BE_TRUNCATED", in addition\n"
-        "    'config' and 'healthcheck' can be specified by 'cfg' and 'hc' respectively.\n"
-        "  - When neither of '-dem' is given, it behaves as if '-m' is given.\n"
+        "  - Each COMMAND "CAN_BE_TRUNCATED".\n"
     , stdout);
 }
 
@@ -628,6 +642,14 @@ void optimize_manual(void){
     fputs(
         HELP_USAGES_STR
         "  dit optimize [OPTION]...\n"
+    , stdout);
+}
+
+
+void package_manual(void){
+    fputs(
+        HELP_USAGES_STR
+        "  dit package [OPTION]...\n"
     , stdout);
 }
 
@@ -750,6 +772,12 @@ static void optimize_description(void){
     , stdout);
 }
 
+static void package_description(void){
+    fputs(
+        "Perform the package installation in an optimized manner and reflect this in Dockerfile.\n"
+    , stdout);
+}
+
 static void reflect_description(void){
     fputs(
         "Append the contents of some files to "DOCKER_OR_HISTORY".\n"
@@ -766,8 +794,8 @@ static void reflect_description(void){
 
 static void dit_example(void){
     fputs(
+        "dit package  \n"
         "dit copy     \n"
-        "dit cmd      \n"
         "dit erase    \n"
         "dit optimize \n"
     , stdout);
@@ -890,6 +918,16 @@ static void optimize_example(void){
         "dit optimize \n"
         "dit optimize \n"
         "dit optimize \n"
+    , stdout);
+}
+
+
+static void package_example(void){
+    fputs(
+        "dit package \n"
+        "dit package \n"
+        "dit package \n"
+        "dit package \n"
     , stdout);
 }
 

@@ -44,6 +44,7 @@ const char * const cmd_reprs[CMDS_NUM] = {
     "label",
     "onbuild",
     "optimize",
+    "package",
     "reflect"
 };
 
@@ -186,10 +187,11 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
         healthcheck,
         help,
         ignore,
-        inspect,  // cmd_id = 8
+        inspect,
         label,
         onbuild,
         optimize,
+        package,
         reflect
     };
 
@@ -201,7 +203,7 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
             fp = stdout;
             mode = _IOLBF;
 #ifdef NDEBUG
-            if (cmd_id == 8)
+            if (cmd_id == ID_DIT_INSPECT)
                 mode = _IOFBF;
 #endif
         }
