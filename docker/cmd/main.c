@@ -714,41 +714,68 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
 /**
  * @brief analyze which instruction in Dockerfile the specified line corresponds to.
  *
- * @param[in]  line  target line with only one trailing newline character
+ * @param[in]  line  target line
  * @param[out] p_id  variable to store index number of the instruction to be compared
  * @return char*  substring that is the argument for the instruction in the target line or NULL
  *
- * @note if the content of 'p_id' is an index number, compares only with corresponding instruction.
+ * @note if the content of 'p_id' is an index number, compares only with the corresponding instruction.
  * @note when there is a corresponding instruction, its index number is stored in 'p_id'.
- * @attention the instruction must not contain unnecessary leading white spaces.
+ * @note if any instructions can be accepted, blank lines are also accepted as valid lines.
  */
 char *receive_dockerfile_instruction(char *line, int *p_id){
     assert(line);
     assert(p_id);
 
-    char *args;
+    char *tmp = NULL, instr[16];
     size_t instr_len = 0;
 
-    args = line;
-    while (! isspace((unsigned char) *(args++)))
-        instr_len++;
+    do {
+        while (isspace((unsigned char) *line))
+            line++;
 
-    char instr[instr_len + 1];
-    memcpy(instr, line, (sizeof(char) * instr_len));
-    instr[instr_len] = '\0';
+        if (! tmp){
+            if (*line){
+                tmp = line;
+                assert(tmp);
 
-    if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM)){
-        if (xstrcmp_upper_case(instr, docker_instr_reprs[*p_id]))
-            args = NULL;
-    }
-    else if ((*p_id = receive_expected_string(instr, docker_instr_reprs, DOCKER_INSTRS_NUM, 1)) < 0)
-        args = NULL;
+                do
+                    instr_len++;
+                while (*(++tmp) && (! isspace((unsigned char) *tmp)));
 
-    if (args)
-        while (isspace((unsigned char) *args))
-            args++;
+                if ((instr_len < 3) || ((instr_len > 7) && (instr_len != 10))){
+                    if (instr_len != 11)
+                        break;
 
-    return args;
+                    *p_id = ID_HEALTHCHECK;
+                }
+
+                memcpy(instr, line, (sizeof(char) * instr_len));
+                instr[instr_len] = '\0';
+
+                if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM)){
+                    if (xstrcmp_upper_case(instr, docker_instr_reprs[*p_id]))
+                        break;
+                }
+                else {
+                    *p_id = receive_expected_string(instr, docker_instr_reprs, DOCKER_INSTRS_NUM, 1);
+
+                    if (*p_id < 0)
+                        break;
+                }
+
+                line = tmp + 1;
+                continue;
+            }
+            else if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM))
+                break;
+        }
+        else if (! *line)
+            break;
+
+        return line;
+    } while (true);
+
+    return NULL;
 }
 
 
@@ -1221,17 +1248,19 @@ static void receive_dockerfile_instruction_test(void){
     // changeable part for updating test cases
     table[] = {
         { "ADD abc.tar.gz ./",                      ID_ADD,         ID_ADD,          4 },
-        { "USER root",                              ID_USER,        ID_USER,         5 },
+        { " USER root",                             ID_USER,        ID_USER,         6 },
         { "HealthCheck  Cmd sh /bin/check-running", ID_HEALTHCHECK, ID_HEALTHCHECK, 13 },
         { "EXPOSE 80/tcp 80/udp",                     -1,           ID_EXPOSE,       7 },
         { "RUN make && make clean",                   -1,           ID_RUN,          4 },
-        { "OnBuild  WorkDir /",                       -1,           ID_ONBUILD,      9 },
+        { "    OnBuild  WorkDir /",                   -1,           ID_ONBUILD,     13 },
+        { "",                                         -1,             -1,            0 },
         { "COPY ./etc/dit_install.sh /dit/etc/",    ID_ADD,         ID_COPY,        -1 },
         { "MainTainer inada",                       ID_LABEL,       ID_MAINTAINER,  -1 },
         { "form alpine:latest",                     ID_FROM,          -1,           -1 },
-        { "  Volume [ \"/myapp\" ]",                  -1,             -1,           -1 },
-        { "ENT dit inspect",                          -1,             -1,           -1 },
+        { "  Volume",                                 -1,             -1,           -1 },
+        { "En dit inspect",                           -1,             -1,           -1 },
         { "setcmd  [ \"/bin/bash\", \"--login\" ]",   -1,             -1,           -1 },
+        { "    ",                                   ID_STOPSIGNAL,    -1,           -1 },
         {  0,                                          0,              0,            0 }
     };
 

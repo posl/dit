@@ -679,8 +679,7 @@ void reflect_manual(void){
         "  - Destination "SPECIFIED_BY_TARGET".\n"
         "  - If both files are destination, the reflection contents cannot be specified by SOURCEs.\n"
         "  - If the size of destination file exceeds the upper limit (2G), it exits with the error.\n"
-        "  - When reflecting in Dockerfile, each instruction must be on one line and lines to be reflected\n"
-        "    must not contain unnecessary leading white spaces and an invalid or disallowed instruction.\n"
+        "  - When reflecting in Dockerfile, each instruction must be on one line.\n"
         "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is 1 or less.\n"
         "  - Internally, logging such as the number of reflected lines is performed.\n"
     , stdout);
