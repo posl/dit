@@ -177,9 +177,9 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
         {  0,                 0,                  0,    0  }
     };
 
-    assert(! strcmp(long_opts[ERASE_OPTID_NUMBERS].name, "numbers"));
-    assert(! strcmp(long_opts[ERASE_OPTID_UNDOES].name, "undoes"));
-    assert(! strcmp(long_opts[ERASE_OPTID_MAX_COUNT].name, "max-count"));
+    assert(! strncmp(long_opts[ERASE_OPTID_NUMBERS].name, "numbers", 7));
+    assert(! strncmp(long_opts[ERASE_OPTID_UNDOES].name, "undoes", 6));
+    assert(! strncmp(long_opts[ERASE_OPTID_MAX_COUNT].name, "max-count", 9));
 
     int c, i = -1, errcode = '\0';
     const char * const *valid_args = NULL;
