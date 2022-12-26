@@ -203,7 +203,7 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
             fp = stdout;
             mode = _IOLBF;
 #ifdef NDEBUG
-            if (cmd_id == ID_DIT_INSPECT)
+            if (cmd_id == DIT_INSPECT)
                 mode = _IOFBF;
 #endif
         }

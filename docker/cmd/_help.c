@@ -199,20 +199,20 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
  */
 static void display_cmd_list(void){
     const int cmd_rearange[] = {
-        ID_DIT_CONVERT,
-        ID_DIT_OPTIMIZE,
-        ID_DIT_CONFIG,
-        ID_DIT_IGNORE,
-        ID_DIT_PACKAGE,
-        ID_DIT_COPY,
-        ID_DIT_LABEL,
-        ID_DIT_CMD,
-        ID_DIT_HEALTHCHECK,
-        ID_DIT_ONBUILD,
-        ID_DIT_REFLECT,
-        ID_DIT_ERASE,
-        ID_DIT_INSPECT,
-        ID_DIT_HELP,
+        DIT_CONVERT,
+        DIT_OPTIMIZE,
+        DIT_CONFIG,
+        DIT_IGNORE,
+        DIT_PACKAGE,
+        DIT_COPY,
+        DIT_LABEL,
+        DIT_CMD,
+        DIT_HEALTHCHECK,
+        DIT_ONBUILD,
+        DIT_REFLECT,
+        DIT_ERASE,
+        DIT_INSPECT,
+        DIT_HELP,
             -1
     };
 

@@ -96,20 +96,20 @@
     * IDs for each dit command
 ******************************************************************************/
 
-#define ID_DIT_CMD           0
-#define ID_DIT_CONFIG        1
-#define ID_DIT_CONVERT       2
-#define ID_DIT_COPY          3
-#define ID_DIT_ERASE         4
-#define ID_DIT_HEALTHCHECK   5
-#define ID_DIT_HELP          6
-#define ID_DIT_IGNORE        7
-#define ID_DIT_INSPECT       8
-#define ID_DIT_LABEL         9
-#define ID_DIT_ONBUILD      10
-#define ID_DIT_OPTIMIZE     11
-#define ID_DIT_PACKAGE      12
-#define ID_DIT_REFLECT      13
+#define DIT_CMD           0
+#define DIT_CONFIG        1
+#define DIT_CONVERT       2
+#define DIT_COPY          3
+#define DIT_ERASE         4
+#define DIT_HEALTHCHECK   5
+#define DIT_HELP          6
+#define DIT_IGNORE        7
+#define DIT_INSPECT       8
+#define DIT_LABEL         9
+#define DIT_ONBUILD      10
+#define DIT_OPTIMIZE     11
+#define DIT_PACKAGE      12
+#define DIT_REFLECT      13
 
 
 /******************************************************************************
