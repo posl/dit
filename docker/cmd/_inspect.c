@@ -75,7 +75,6 @@ static int qcmp_ext(const void *a, const void *b);
 static int fcmp_name(const void *a, const void *b, fcmp addition);
 static int fcmp_size(const file_node *file1, const file_node *file2);
 static int fcmp_ext(const file_node *file1, const file_node *file2);
-static const char *get_file_ext(const char *name);
 
 static void destruct_dir_tree(file_node *tree, const insp_opts *opt);
 static void destruct_recursive(file_node *file, const insp_opts *opt, size_t depth);
@@ -567,32 +566,10 @@ static int fcmp_ext(const file_node *file1, const file_node *file2){
 
     const char *ext1, *ext2;
 
-    ext1 = get_file_ext(file1->name);
-    ext2 = get_file_ext(file2->name);
+    ext1 = get_suffix(file1->name, '.', false);
+    ext2 = get_suffix(file2->name, '.', false);
 
     return strcmp(ext1, ext2);
-}
-
-
-/**
- * @brief extract extension from file name.
- *
- * @param[in]  name  target file name
- * @return const char*  string representing the file extension
- */
-static const char *get_file_ext(const char *name){
-    assert(name);
-
-    const char *ext = NULL;
-
-    while (*name)
-        if (*(name++) == '.')
-            ext = name;
-
-    if (! ext)
-        ext = name;
-
-    return ext;
 }
 
 
@@ -895,7 +872,6 @@ static void append_file_test(void);
 static void fcmp_name_test(void);
 static void fcmp_size_test(void);
 static void fcmp_ext_test(void);
-static void get_file_ext_test(void);
 
 
 
@@ -905,7 +881,6 @@ void inspect_test(void){
     do_test(new_file_test);
     do_test(append_file_test);
 
-    do_test(get_file_ext_test);
     do_test(fcmp_name_test);
     do_test(fcmp_size_test);
     do_test(fcmp_ext_test);
@@ -1222,31 +1197,6 @@ static void fcmp_ext_test(void){
 }
 
 
-
-
-static void get_file_ext_test(void){
-    const struct {
-        const char * const name;
-        const char * const ext;
-    }
-    // changeable part for updating test cases
-    table[] = {
-        { "main.c",         "c"         },
-        { "README.md",      "md"        },
-        { "..",             ""          },
-        { "utils.py.test",  "test"      },
-        { "ISSUE_TEMPLATE", ""          },
-        { ".gitignore",     "gitignore" },
-        {  0,                0          }
-    };
-
-    for (int i = 0; table[i].name; i++){
-        assert(! strcmp(get_file_ext(table[i].name), table[i].ext));
-
-        print_progress_test_loop('\0', -1, i);
-        fprintf(stderr, "%-14s  '%s'\n", table[i].name, table[i].ext);
-    }
-}
 
 
 #endif // NDEBUG

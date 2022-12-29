@@ -91,6 +91,12 @@ chmod a=rx \
 # initialize the internal files, and enter a shell as the default user
 #
 
+for cmd in $( dit help -a )
+do
+    ln -s /usr/local/bin/dit /usr/local/bin/"${cmd}"
+done
+
+
 echo '0' > /dit/tmp/last-exit-status
 echo '-1' > /dit/tmp/last-history-number
 

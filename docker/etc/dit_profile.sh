@@ -2,35 +2,6 @@
 
 
 #
-# define aliases of the tool-specific commands
-#
-
-alias \
-    cmd='dit cmd' \
-    cfg='dit config' \
-    conf=cfg \
-    config=cfg \
-    conv='dit convert' \
-    convert=conv \
-    copy='dit copy' \
-    erase='dit erase' \
-    hc='dit healthcheck' \
-    healthcheck=hc \
-    ig='dit ignore' \
-    ignore=ig \
-    insp='dit inspect' \
-    inspect=insp \
-    label='dit label' \
-    onb='dit onbuild' \
-    onbuild=onb \
-    optim='dit optimize' \
-    optimize=optim \
-    refl='dit reflect' \
-    reflect=refl
-
-
-
-#
 # set shell variables that is referred every time any command line is executed
 #
 

@@ -102,7 +102,7 @@ const char * const docker_instr_reprs[DOCKER_INSTRS_NUM] = {
 
 
 /** string representing a dit command invoked */
-static const char *program_name = NULL;
+static const char *program_name = "dit";
 
 
 
@@ -119,43 +119,32 @@ static const char *program_name = NULL;
  * @param[out] argv  array of strings that are command line arguments
  * @return int  command's exit status
  *
- * @note leave the command name in a global variable for error message output.
+ * @note switches the processing to each dit command in the same way as busybox.
  * @note if unit tests were performed in 'test', it will not return to this function.
+ * @note leave the command name in a global variable for error message output.
  */
 int main(int argc, char **argv){
-    if (argc > 0){
-        assert(argv);
+    if ((argc > 0) && argv && *argv){
+        *argv = get_suffix(*argv, '/', true);
 
-        program_name = *argv;
-        assert(program_name);
-
-        const char *target = NULL;
-        int cmd_id = -3;
-
-        if (--argc){
-            target = *(++argv);
-            cmd_id = receive_expected_string(target, cmd_reprs, CMDS_NUM, 0);
-        }
+        // compare with "dit"
+        if (strncmp(*argv, program_name, 3) || (--argc && *(++argv))){
+            int cmd_id;
+            cmd_id = receive_expected_string(*argv, cmd_reprs, CMDS_NUM, 0);
 
 #ifndef NDEBUG
-        srand((unsigned int) time(NULL));
-
-        if (argc)
+            srand((unsigned int) time(NULL));
             test(argc, argv, cmd_id);
 #endif
+            if (cmd_id >= 0){
+                program_name = *argv;
+                return call_dit_command(argc, argv, cmd_id);
+            }
 
-        if (cmd_id >= 0){
-            program_name = target;
-            assert(program_name);
-
-            return call_dit_command(argc, argv, cmd_id);
+            xperror_invalid_arg('C', 1, "command", *argv);
         }
-
-        const char *desc = "command";
-        if (target)
-            xperror_invalid_arg('C', 1, desc, target);
         else
-            xperror_missing_args(desc, NULL);
+            xperror_missing_args("command", NULL);
     }
 
     xperror_suggestion(false);
@@ -835,6 +824,35 @@ int get_last_exit_status(void){
 }
 
 
+/**
+ * @brief get the suffix of target string.
+ *
+ * @param[in]  target  target string
+ * @param[in]  delimiter  delimiter character
+ * @param[in]  retain  whether to retain target string if it has no delimiter
+ * @return char*  the resulting suffix
+ *
+ * @note target string is of type 'char *', but its contents are not changed inside this function.
+ */
+char *get_suffix(char *target, int delimiter, bool retain){
+    assert(target);
+    assert(delimiter == ((char) delimiter));
+
+    char *suffix, *tmp;
+
+    suffix = (tmp = target);
+
+    while (*tmp)
+        if (*(tmp++) == delimiter)
+            suffix = tmp;
+
+    if ((! retain) && (suffix == target))
+        suffix = tmp;
+
+    return suffix;
+}
+
+
 
 
 #ifndef NDEBUG
@@ -860,6 +878,7 @@ static void receive_dockerfile_instruction_test(void);
 
 static void get_file_size_test(void);
 static void get_last_exit_status_test(void);
+static void get_suffix_test(void);
 
 
 
@@ -874,6 +893,7 @@ void dit_test(void){
 
     do_test(get_file_size_test);
     do_test(get_last_exit_status_test);
+    do_test(get_suffix_test);
 }
 
 
@@ -1103,7 +1123,7 @@ static void xstrcmp_upper_case_test(void){
         { { .name = "SIGKILL"                }, { .name = "SIGINT"                    }, COMPTEST_GREATER },
         { { .name = "Super Sento"            }, { .name = "SUPER MARKET"              }, COMPTEST_GREATER },
         { { .name = "On your marks, Set, Go" }, { .name = "ON YOUR MARK!"             }, COMPTEST_GREATER },
-        {     0,                                    0,                                      -1            }
+        { { .name =  0                       }, { .name =  0                          },    -1            }
     };
 
     const char *target, *expected;
@@ -1386,6 +1406,46 @@ static void get_last_exit_status_test(void){
         fprintf(stderr, "% 6d  % 4d\n", table[i].input, table[i].result);
     }
 }
+
+
+
+
+static void get_suffix_test(void){
+    const struct {
+        const char *target;
+        const int delimiter;
+        const bool retain;
+        const char *suffix;
+    }
+    // changeable part for updating test cases
+    table[] = {
+        { "main.c",             '/',  true, "main.c"    },
+        { "/etc/profile.d",     '/',  true, "profile.d" },
+        { "/usr/local/bin/dit", '/',  true, "dit"       },
+        { "~/.bashrc",          '/',  true, ".bashrc"   },
+        { "//var//",            '/',  true, ""          },
+        { "../test//main.sh",   '/',  true, "main.sh"   },
+        { "main.c",             '.', false, "c"         },
+        { "README.md",          '.', false, "md"        },
+        { "..",                 '.', false, ""          },
+        { "utils.py.test",      '.', false, "test"      },
+        { "ISSUE_TEMPLATE",     '.', false, ""          },
+        { ".gitignore",         '.', false, "gitignore" },
+        {  0,                    0,     0,   0          }
+    };
+
+    char target[32];
+
+    for (int i = 0; table[i].target; i++){
+        memcpy(target, table[i].target, (sizeof(char) * (strlen(table[i].target) + 1)));
+        assert(! strcmp(get_suffix(target, table[i].delimiter, table[i].retain), table[i].suffix));
+
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "%-18s  '%s'\n", table[i].target, table[i].suffix);
+    }
+}
+
+
 
 
 #endif // NDEBUG
