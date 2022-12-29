@@ -108,7 +108,7 @@ case "${BUILD_TARGET}" in
     builder)
         {
             echo 'etc'
-            echo '!etc/dit_install.sh'
+            echo '!etc/package.sh'
             echo 'test'
         } > docker/.dockerignore
         ;;

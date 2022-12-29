@@ -6,16 +6,16 @@ WORKDIR /dit/src
 
 
 # install essential packages
-COPY ./etc/dit_install.sh /dit/etc/
+COPY ./etc/package.sh /dit/etc/
 
-RUN sh -eu /dit/etc/dit_install.sh \
+RUN sh -eu /dit/etc/package.sh \
         ca-certificates \
         curl \
         gcc \
         make \
     && \
     grep -Fq 'yum' /dit/etc/package_manager || \
-    sh -eu /dit/etc/dit_install.sh \
+    sh -eu /dit/etc/package.sh \
         libc-dev
 
 
@@ -75,7 +75,7 @@ FROM product AS test
 # change not to switch users, and install the diff command as needed
 RUN echo 'root' > /dit/etc/default_user && \
     type diff > /dev/null 2>&1 || \
-    sh -eu /dit/etc/dit_install.sh \
+    sh -eu /dit/etc/package.sh \
         diffutils
 
 
