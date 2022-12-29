@@ -1144,7 +1144,7 @@ static void fcmp_name_test(void){
         { { .name = ".dockerignore" }, { .name = ".dit_history" }, COMPTEST_GREATER },
         { { .name = "abc.txt"       }, { .name = "abc.csv"      }, COMPTEST_GREATER },
         { { .name = "123 456"       }, { .name = "123\t456"     }, COMPTEST_GREATER },
-        {     0,                           0,                         -1            }
+        { { .name =  0              }, { .name =  0             },    -1            }
     };
 
     file_node *file1, *file2, node1, node2;
@@ -1176,7 +1176,7 @@ static void fcmp_size_test(void){
         { { .size =   60 }, { .size =  122 }, COMPTEST_GREATER },
         { { .size =  672 }, { .size = 3572 }, COMPTEST_GREATER },
         { { .size =    5 }, { .size =    6 }, COMPTEST_GREATER },
-        {     0,                0,               -1            }
+        { { .size =    0 }, { .size =    0 },    -1            }
     };
 
     file_node node1, node2;
@@ -1206,7 +1206,7 @@ static void fcmp_ext_test(void){
         { { .name = "Dockerfile.draft" }, { .name = ".dockerignore"            }, COMPTEST_GREATER },
         { { .name = "exec.sh"          }, { .name = "exec.bash"                }, COMPTEST_GREATER },
         { { .name = "index.html"       }, { .name = "html"                     }, COMPTEST_GREATER },
-        {     0,                              0,                                     -1            }
+        { { .name =  0                 }, { .name =  0                         },    -1            }
     };
 
     file_node node1, node2;

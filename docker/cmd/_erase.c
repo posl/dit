@@ -1722,7 +1722,7 @@ static void marklines_with_numbers_test(void){
         { "12:38-41:55",                -1,  { 0x00000000, 0x00000000 } },
         { "60-20,40, ...",              -1,  { 0x00000000, 0x00000000 } },
         { "[[:digit:]]",                -1,  { 0x00000000, 0x00000000 } },
-        {  0,                            0,      0                      }
+        {  0,                            0,  { 0 }                      }
     };
 
 
@@ -1856,11 +1856,11 @@ static void receive_range_specification_test(void){
         { "3.5,6",                      -8, { 0x00000000, 0x00000000 } },
         { "13,3-4,1o",                 -16, { 0x0000100c, 0x00000000 } },
         { "47-4,,8-11,,38,,29-33,.22", -52, { 0xf000078f, 0x000fc021 } },
-        {  0,                            0,     0                      }
+        {  0,                            0, { 0 }                      }
     };
 
 
-    int i, type, stop;
+    int type, stop;
     unsigned int check_list[2];
     size_t size;
     char range[64];

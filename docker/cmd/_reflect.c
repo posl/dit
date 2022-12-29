@@ -475,8 +475,8 @@ static int check_dockerfile_instruction(char *line, bool onbuild_flag){
         if (! errdesc){
             const int cmd_ent_ids[2] = {ID_CMD, ID_ENTRYPOINT};
 
-            char tmp[] = "^CMD^ENTRYPOINT";
-            char *cmd_ent_patterns[2] = {tmp, (tmp + 4)};
+            // char tmp[] = "^CMD^ENTRYPOINT";
+            // char *cmd_ent_patterns[2] = {tmp, (tmp + 4)};
 
             int i = 1;
             do

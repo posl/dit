@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS ?= -O2 -march=native
+CFLAGS ?= -O2 -march=native -Wall -Werror
 LDFLAGS ?=
 
 PROG := dit

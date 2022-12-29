@@ -1031,21 +1031,23 @@ int check_if_ignored(int argc, char **argv, int target_c){
                 for (ictn = yyjson_arr_get_first(ictn); size--; ictn = unsafe_yyjson_get_next(ictn)){
                     yyjson_arr_iter_init(ictn, &arr_iter);
 
+                    name = NULL;
+                    colons = 3;
+
                     for (tmp = 0; (ival = yyjson_arr_iter_next(&arr_iter)); tmp++){
                         switch (tmp){
                             case 0:
-                                if ((! (name = yyjson_get_str(ival))) || strpbrk(name, ":=?"))
-                                    break;
+                                name = yyjson_get_str(ival);
                                 continue;
                             case 1:
-                                if ((! yyjson_is_uint(ival)) || ((colons = yyjson_get_uint(ival)) >= 3))
-                                    break;
-                            default:
+                                if (yyjson_is_uint(ival))
+                                    colons = yyjson_get_uint(ival);
                                 continue;
                         }
                         break;
                     }
-                    if (tmp != 2)
+
+                    if ((! name) || strpbrk(name, ":=?") || (colons >= 3))
                         continue;
 
                     for (

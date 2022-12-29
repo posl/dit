@@ -153,14 +153,20 @@ bool check_if_alphabetical_order(const char * const *reprs, size_t size){
 bool comptest_result_check(int type, int result){
     assert((type >= 0) && (type < COMPTESTS_NUM));
 
+    bool correct;
+
     switch (type){
         case COMPTEST_EQUAL:
-            return (! result);
+            correct = (! result);
+            break;
         case COMPTEST_LESSER:
-            return (result < 0);
+            correct = (result < 0);
+            break;
         case COMPTEST_GREATER:
-            return (result > 0);
+            correct = (result > 0);
     }
+
+    return correct;
 }
 
 
