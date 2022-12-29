@@ -10,6 +10,8 @@
 
 #include "main.h"
 
+#define VERSION_FILE "/dit/etc/dit_version"
+
 #define HELP_CONTENTS_NUM 3
 
 #define HELP_USAGES_STR "Usages:\n"

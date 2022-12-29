@@ -54,7 +54,7 @@
     * commonly used Internal Files
 ******************************************************************************/
 
-#define VERSION_FILE "/dit/etc/dit_version"
+#define DIT_PROFILE "/tmp/dit_profile.sh"
 
 #define DOCKER_FILE_DRAFT "/dit/mnt/Dockerfile.draft"
 #define HISTORY_FILE "/dit/mnt/.dit_history"

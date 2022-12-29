@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash -eu
 
 
 #
@@ -56,8 +56,6 @@ if [ ! -e /dit/var ]; then
 fi
 
 touch \
-    /dit/etc/dit_version \
-    \
     /dit/tmp/convert-result.dock \
     /dit/tmp/convert-result.hist \
     /dit/tmp/erase-result.dock \
@@ -88,7 +86,7 @@ chmod a=rx \
 
 
 #
-# initialize the internal files, and enter a shell as the default user
+# define symbolic links for each dit command, and initialize the internal files
 #
 
 for cmd in $( dit help -a )
@@ -100,16 +98,83 @@ done
 echo '0' > /dit/tmp/last-exit-status
 echo '-1' > /dit/tmp/last-history-number
 
-dit config -r
-dit ignore -dhr
-dit optimize -r
-dit reflect
+: > /tmp/dit_profile.sh
 
+config -r
+ignore -dhr
+optimize -r
+reflect
+
+
+
+#
+# set shell variables that is referred every time any command line is executed
+#
+
+PROMPT_REFLECT(){
+    local LAST_EXIT_STATUS="$?"
+    local PROMPT_STRING=' [d:?? h:??] \u:\w \$ '
+
+    if history 1 | awk -f /dit/etc/parse_history.awk; then
+        echo "${LAST_EXIT_STATUS}" > /dit/tmp/last-exit-status
+
+        if dit convert -qs; then
+            dit reflect -dh
+        fi
+
+        : > /dit/tmp/reflect-report.real
+        if dit reflect; then
+            PROMPT_STRING="$( cat /dit/tmp/reflect-report.real )"
+        fi
+    fi
+
+    if unset PS1 2> /dev/null; then
+        PS1="${PROMPT_STRING}"
+    fi
+}
+
+PROMPT_OPTION(){
+    :
+}
+
+readonly -f PROMPT_REFLECT
+export -f PROMPT_REFLECT PROMPT_OPTION
+
+
+PROMPT_COMMAND='{ PROMPT_REFLECT; PROMPT_OPTION; } > /dev/null'
+
+readonly PROMPT_COMMAND
+export PROMPT_COMMAND
+
+
+
+#
+# enter a shell as the default user, and reproduce the environment under construction if necessary
+#
 
 DEFAULT_USER="$( head -n1 /dit/etc/default_user )"
 rm -f /dit/etc/default_user
 
-export ENV=/dit/etc/dit_profile.sh
+
+cat <<EOF > /tmp/dit_profile.sh
+if [ -s /dit/mnt/.dit_history ]; then
+    echo 'Reproducing the environment under construction ...'
+
+    set -ex
+    . /dit/mnt/.dit_history > /dev/null
+    set +ex
+
+    echo 'Done!'
+    history -r /dit/mnt/.dit_history
+fi
+
+unset ENV
+rm -f /tmp/dit_profile.sh
+EOF
+
+chown "${DEFAULT_USER}" /tmp/dit_profile.sh
+
+export ENV=/tmp/dit_profile.sh
 
 
 if [ "${DEFAULT_USER}" != 'root' ]; then

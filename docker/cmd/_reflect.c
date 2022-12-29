@@ -528,7 +528,7 @@ static int record_reflected_lines(void){
     if (! exit_status)
         exit_status = tmp;
 
-    if (exit_status && (! get_file_size(VERSION_FILE)))
+    if (exit_status && (! get_file_size(DIT_PROFILE)))
         exit_status = SUCCESS;
 
     FILE *fp;

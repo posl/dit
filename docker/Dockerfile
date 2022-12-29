@@ -64,7 +64,7 @@ RUN whoami > /dit/etc/default_user && \
 # initialization process is performed by the privileged user
 USER root
 
-ENTRYPOINT [ "/bin/sh", "/dit/etc/dit_entry.sh" ]
+ENTRYPOINT [ "/bin/bash", "-eu", "/dit/etc/entrypoint.sh" ]
 CMD [ "/bin/bash", "--posix" ]
 
 
