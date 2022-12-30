@@ -492,7 +492,7 @@ exit
             \item 履歴ファイル
             \item ユーザがコンテナ内にコピーしたいファイル
         \end{itemize}
-        \item ツールの機能の利用・設定の変更は/usr/local/binにあるdit\footnotemark[1]コマンドから行う．（エイリアスあり）
+        \item ツールの機能の利用は，busyboxと同じような形式で/usr/local/binにあるdit\footnotemark[1]コマンドから行う．
         \item /dit\footnotemark[1]ディレクトリにツールが利用するファイルが入るが，不用意にそれらに触れてはいけない．
     \end{itemize}
 
@@ -778,7 +778,7 @@ dit erase -diy -E '^LABEL[[:space:]]'
         \item 順序に意味がない命令をそれぞれ集めて，並べ替える．
         \item 可読性を向上させるための整形を行う．
         \item ENV・ARG命令の重複や無意味な再定義を取り除く．
-        \item 連続するRUN命令をリスト実行の\textcolor{red!75}{\&\&}でまとめる．
+        \item 連続するRUN命令をANDリストでまとめる．
     \end{itemize}
 \end{frame}
 
