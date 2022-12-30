@@ -111,7 +111,8 @@ reflect
 # set shell variables that is referred every time any command line is executed
 #
 
-PROMPT_REFLECT(){
+PROMPT_REFLECT()
+{
     local LAST_EXIT_STATUS="$?"
     local PROMPT_STRING=' [d:?? h:??] \u:\w \$ '
 
@@ -133,7 +134,8 @@ PROMPT_REFLECT(){
     fi
 }
 
-PROMPT_OPTION(){
+PROMPT_OPTION()
+{
     :
 }
 
@@ -177,8 +179,4 @@ chown "${DEFAULT_USER}" /tmp/dit_profile.sh
 export ENV=/tmp/dit_profile.sh
 
 
-if [ "${DEFAULT_USER}" != 'root' ]; then
-    exec su-exec "${DEFAULT_USER}" "$@"
-else
-    exec "$@"
-fi
+exec su-exec "${DEFAULT_USER}" "$@"
