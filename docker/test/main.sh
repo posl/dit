@@ -1,4 +1,4 @@
-#!/bin/sh -eux
+#!/bin/bash -eux
 
 
 #
@@ -7,13 +7,12 @@
 
 if dit test; then
     set +x
+    shopt -s nullglob
 
     for script in _*.sh
     do
-        if [ "${script}" != '_*.sh' ]; then
-            echo
-            sh -eux "${script}"
-        fi
+        echo
+        sh -eux "${script}"
     done
 else
     exit 1

@@ -83,4 +83,4 @@ RUN echo 'root' > /dit/etc/default_user && \
 WORKDIR /dit/test
 COPY ./test ./
 
-CMD [ "/bin/sh", "-eux", "main.sh" ]
+CMD [ "/bin/bash", "-eux", "main.sh" ]
