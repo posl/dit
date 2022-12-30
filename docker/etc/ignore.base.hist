@@ -1,3 +1,93 @@
 {
+    ":": null,
+    "alias": {
+        "short_opts": "p",
+        "first_args": [
+            null
+        ]
+    },
+    "bind": {
+        "short_opts": "lpqsvPSV",
+        "first_args": [
+            null
+        ]
+    },
+    "caller": null,
+    "compgen": null,
+    "complete": "alias",
+    "declare": {
+        "short_opts": "aAfFgilprtux",
+        "first_args": [
+            null
+        ]
+    },
+    "typeset": "declare",
+    "dirs": {
+        "short_opts": "lnpv"
+    },
+    "echo": null,
+    "enable": {
+        "short_opts": "anps",
+        "first_args": [
+            null
+        ]
+    },
+    "exec": {
+        "first_args": [
+            null
+        ]
+    },
+    "export": {
+        "first_args": [
+            null
+        ]
+    },
+    "false": null,
+    "hash": {
+        "short_opts": "lt",
+        "first_args": [
+            null
+        ]
+    },
+    "help": null,
+    "history": {
+        "short_opts": "p"
+    },
+    "jobs": {
+        "short_opts": "lnprs"
+    },
+    "local": "declare",
+    "logout": null,
+    "printf": {
+        "short_opts": ""
+    },
+    "pwd": null,
+    "readonly": "export",
+    "shift": {
+        "first_args": [
+            "0"
+        ]
+    },
+    "test": null,
+    "[": null,
+    "times": null,
+    "trap": {
+        "short_opts": "lp",
+        "first_args": [
+            null
+        ]
+    },
+    "true": null,
+    "type": null,
+    "ulimit": "export",
+    "umask": "export",
+    "unalias": {
+        "short_opts": "",
+        "first_args": [
+            null
+        ]
+    },
+    "unset": "unalias"
 
+    
 }

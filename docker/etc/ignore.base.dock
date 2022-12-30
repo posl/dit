@@ -1,3 +1,78 @@
 {
-    "ls": null
+    ":": null,
+    "alias": null,
+    "bg": null,
+    "bind": null,
+    "caller": null,
+    "compgen": null,
+    "complete": null,
+    "compopt": null,
+    "declare": {
+        "short_opts": "aAfFgilprtux",
+        "first_args": [
+            null
+        ]
+    },
+    "typeset": "declare",
+    "dirs": {
+        "short_opts": "lnpv"
+    },
+    "disown": null,
+    "echo": null,
+    "enable": null,
+    "exec": {
+        "first_args": [
+            null
+        ]
+    },
+    "export": {
+        "first_args": [
+            null
+        ]
+    },
+    "false": null,
+    "fc": null,
+    "fg": null,
+    "hash": {
+        "short_opts": "lt",
+        "first_args": [
+            null
+        ]
+    },
+    "help": null,
+    "history": null,
+    "jobs": null,
+    "kill": null,
+    "local": null,
+    "logout": null,
+    "printf": {
+        "short_opts": ""
+    },
+    "pwd": null,
+    "readonly": "export",
+    "return": null,
+    "shift": {
+        "first_args": [
+            "0"
+        ]
+    },
+    "suspend": null,
+    "test": null,
+    "[": null,
+    "times": null,
+    "trap": null,
+    "true": null,
+    "type": null,
+    "ulimit": "export",
+    "umask": "export",
+    "unalias": null,
+    "unset": {
+        "short_opts": "",
+        "first_args": [
+            null
+        ]
+    },
+    "wait": null
+
+    
 }
