@@ -353,10 +353,11 @@ static bool display_help(help_conts code, const char *target){
 static void dit_manual(void){
     fputs(
         HELP_USAGES_STR
-        "  dit [COMMAND] [ARG]...\n"
-        "Use the tool-specific functions corresponding to the specified COMMAND.\n"
+        "  dit COMMAND [ARG]...\n"
+        "  SYMLINK [ARG]...\n"
+        "Use the tool-specific functions corresponding to the specified COMMAND or SYMLINK.\n"
         "\n"
-        "Commands:\n"
+        "Commands or Symlinks:\n"
         "main features of this tool:\n"
         "  convert        show how a command line is reflected in "DOCKER_OR_HISTORY"\n"
         "  optimize       do refactoring and optimization on Dockerfile based on its best practices\n"
@@ -697,7 +698,7 @@ void reflect_manual(void){
 
 static void dit_description(void){
     fputs(
-        "Use the tool-specific functions as the subcommand.\n"
+        "Use the tool-specific functions as the subcommand or the command linked to this command.\n"
     , stdout);
 }
 
