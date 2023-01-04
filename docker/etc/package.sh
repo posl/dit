@@ -8,7 +8,6 @@
 if type apk > /dev/null 2>&1; then
     readonly PACKAGE_MANAGER='apk'
 
-    apk update
     apk add --no-cache "$@"
 
 elif type apt-get > /dev/null 2>&1; then
@@ -16,15 +15,12 @@ elif type apt-get > /dev/null 2>&1; then
 
     apt-get update
     apt-get install -y --no-install-recommends "$@"
-    apt-get clean
     rm -rf /var/lib/apt/lists/*
 
 elif type yum > /dev/null 2>&1; then
     readonly PACKAGE_MANAGER='yum'
 
-    yum update -y
     yum install -y "$@"
-    yum clean all
     rm -rf /var/cache/yum
 
 else
