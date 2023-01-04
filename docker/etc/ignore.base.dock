@@ -1,78 +1,467 @@
 {
     ":": null,
+    "[": null,
     "alias": null,
     "bg": null,
     "bind": null,
     "caller": null,
+    "command": {
+        "short_opts": "vV",
+        "detect_anymatch": true
+    },
     "compgen": null,
     "complete": null,
     "compopt": null,
     "declare": {
-        "short_opts": "aAfFgilprtux",
-        "first_args": [
-            null
-        ]
+        "max_argc": 0
     },
-    "typeset": "declare",
-    "dirs": {
-        "short_opts": "lnpv"
-    },
+    "dirs": null,
     "disown": null,
     "echo": null,
     "enable": null,
-    "exec": {
-        "first_args": [
-            null
-        ]
-    },
-    "export": {
-        "first_args": [
-            null
-        ]
-    },
+    "exec": "declare",
+    "export": "declare",
     "false": null,
     "fc": null,
     "fg": null,
+    "getopts": null,
     "hash": {
         "short_opts": "lt",
-        "first_args": [
-            null
-        ]
+        "max_argc": 0
     },
     "help": null,
     "history": null,
     "jobs": null,
-    "kill": null,
+    "kill": {
+        "short_opts": "l",
+        "detect_anymatch": true
+    },
+    "let": null,
     "local": null,
     "logout": null,
     "printf": {
         "short_opts": ""
     },
     "pwd": null,
-    "readonly": "export",
+    "readonly": "declare",
     "return": null,
-    "shift": {
-        "first_args": [
-            "0"
-        ]
-    },
+    "shift": null,
+    "shopt": "declare",
     "suspend": null,
     "test": null,
-    "[": null,
     "times": null,
     "trap": null,
     "true": null,
     "type": null,
-    "ulimit": "export",
-    "umask": "export",
+    "typeset": "declare",
+    "ulimit": null,
+    "umask": "declare",
     "unalias": null,
-    "unset": {
-        "short_opts": "",
+    "unset": "declare",
+    "wait": null,
+
+    "apk": {
+        "long_opts": [
+            [ "print-arch", 0 ]
+        ],
         "first_args": [
-            null
+            "audit",
+            "dot",
+            "info",
+            "list",
+            "manifest",
+            "policy",
+            "search",
+            "stats",
+            "verify",
+            "version"
+        ],
+        "detect_anymatch": true
+    },
+    "apt": {
+        "first_args": [
+            "depends",
+            "edit-sources",
+            "list",
+            "policy",
+            "rdepends",
+            "search",
+            "show",
+            "showsrc"
         ]
     },
-    "wait": null
-
-    
+    "apt-cache": null,
+    "apt-cdrom": {
+        "short_opts": "n",
+        "long_opts": [
+            [ "just-print", 0 ],
+            [ "no-act", 0 ],
+            [ "recon", 0 ]
+        ],
+        "first_args": [
+            "ident"
+        ],
+        "detect_anymatch": true
+    },
+    "apt-config": null,
+    "apt-get": {
+        "short_opts": "s",
+        "long_opts": [
+            [ "dry-run", 0 ],
+            [ "just-print", 0 ],
+            [ "no-act", 0 ],
+            [ "recon", 0 ],
+            [ "simulate", 0 ]
+        ],
+        "detect_anymatch": true
+    },
+    "apt-key": {
+        "first_args": [
+            "export",
+            "exportall",
+            "finger",
+            "list"
+        ]
+    },
+    "apt-mark": {
+        "first_args": [
+            "showauto",
+            "showhold",
+            "showinstall",
+            "showmanual",
+            "showpurge",
+            "showremove"
+        ]
+    },
+    "ash": "sh",
+    "base32": null,
+    "base64": null,
+    "basename": null,
+    "basenc": null,
+    "bash": {
+        "short_opts": "nD",
+        "long_opts": [
+            [ "dump-po-strings", 0 ],
+            [ "dump-strings", 0 ]
+        ],
+        "detect_anymatch": true
+    },
+    "bashbug": null,
+    "bashbug-64": null,
+    "bunzip2": "gzip",
+    "bzcat": null,
+    "bzip2": "gzip",
+    "cal": null,
+    "cat": null,
+    "chsh": {
+        "short_opts": "l",
+        "long_opts": [
+            [ "list-shells", 0 ]
+        ],
+        "detect_anymatch": true
+    },
+    "cksum": null,
+    "clear": null,
+    "cmp": null,
+    "comm": null,
+    "curl": {
+        "short_opts": "o:D:O",
+        "long_opts": [
+            [ "dump-header", 1 ],
+            [ "output", 1 ],
+            [ "remote-name", 0 ],
+            [ "remote-name-all", 0 ]
+        ],
+        "detect_anymatch": true,
+        "invert_flag": true
+    },
+    "cut": null,
+    "dash": "sh",
+    "date": {
+        "short_opts": "s:u",
+        "long_opts": [
+            [ "set", 1 ],
+            [ "universal", 0 ],
+            [ "utc", 0 ]
+        ],
+        "detect_anymatch": true,
+        "invert_flag": true
+    },
+    "df": null,
+    "diff": null,
+    "diff3": null,
+    "dir": null,
+    "dircolors": null,
+    "dirname": null,
+    "du": null,
+    "egrep": null,
+    "env": "declare",
+    "ex": null,
+    "expand": null,
+    "expr": null,
+    "factor": null,
+    "fgrep": null,
+    "findfs": null,
+    "findmnt": null,
+    "fmt": null,
+    "fold": null,
+    "getconf": null,
+    "getent": null,
+    "getopt": null,
+    "grep": null,
+    "groups": null,
+    "gtar": "tar",
+    "gunzip": "gzip",
+    "gzip": {
+        "short_opts": "clt",
+        "long_opts": [
+            [ "list", 0 ],
+            [ "stdout", 0 ],
+            [ "test", 0 ],
+            [ "to-stdout", 0 ]
+        ],
+        "detect_anymatch": true
+    },
+    "hd": null,
+    "head": null,
+    "hexdump": null,
+    "hostid": null,
+    "iconv": {
+        "short_opts": "o:",
+        "long_opts": [
+            [ "output", 1 ]
+        ],
+        "detect_anymatch": true,
+        "invert_flag": true
+    },
+    "id": null,
+    "iostat": null,
+    "killall": {
+        "short_opts": "l",
+        "max_argc": 0
+    },
+    "last": null,
+    "lastb": null,
+    "lastlog": null,
+    "ldd": null,
+    "less": null,
+    "locale": null,
+    "localedef": {
+        "long_opts": [
+            [ "list-archive", 0 ]
+        ],
+        "max_argc": 0
+    },
+    "logger": {
+        "long_opts": [
+            [ "no-act", 0 ]
+        ],
+        "detect_anymatch": true
+    },
+    "login": null,
+    "logname": null,
+    "ls": null,
+    "lsattr": null,
+    "lsblk": null,
+    "lscpu": null,
+    "lsipc": null,
+    "lslocks": null,
+    "lslogins": null,
+    "lsmem": null,
+    "lsmod": null,
+    "lsns": null,
+    "lsof": null,
+    "lsusb": null,
+    "lzcat": null,
+    "lzma": "gzip",
+    "lzop": "gzip",
+    "lzopcat": null,
+    "md5sum": null,
+    "mesg": null,
+    "mktemp": {
+        "short_opts": "u",
+        "long_opts": [
+            [ "dry-run", 0 ]
+        ],
+        "detect_anymatch": true
+    },
+    "more": null,
+    "mount": {
+        "short_opts": "hlV",
+        "max_argc": 0
+    },
+    "mountpoint": null,
+    "namei": null,
+    "netstat": null,
+    "nice": "declare",
+    "nl": null,
+    "nologin": null,
+    "nproc": null,
+    "nslookup": null,
+    "numfmt": null,
+    "od": null,
+    "paste": null,
+    "pathchk": null,
+    "pgrep": null,
+    "pidof": null,
+    "ping": null,
+    "ping6": null,
+    "pinky": null,
+    "pldd": null,
+    "pmap": null,
+    "pr": null,
+    "printenv": null,
+    "ps": null,
+    "pstree": null,
+    "ptx": {
+        "short_opts": "G",
+        "long_opts": [
+            [ "traditional", 0 ]
+        ],
+        "detect_anymatch": true,
+        "invert_flag": true
+    },
+    "pwdx": null,
+    "rbash": "bash",
+    "rdate": {
+        "short_opts": "pu"
+    },
+    "readlink": null,
+    "realpath": null,
+    "rev": null,
+    "rgrep": null,
+    "sdiff": "iconv",
+    "sed": {
+        "short_opts": "i::",
+        "long_opts": [
+            [ "in-place", 2 ]
+        ],
+        "detect_anymatch": true,
+        "invert_flag": true
+    },
+    "seq": null,
+    "setpriv": {
+        "short_opts": "d",
+        "long_opts": [
+            [ "dump", 0 ]
+        ],
+        "max_argc": 0
+    },
+    "sh": {
+        "short_opts": "n",
+        "detect_anymatch": true
+    },
+    "sha1sum": null,
+    "sha224sum": null,
+    "sha256sum": null,
+    "sha384sum": null,
+    "sha3sum": null,
+    "sha512sum": null,
+    "showkey": null,
+    "shuf": "iconv",
+    "sleep": null,
+    "sort": "iconv",
+    "stat": null,
+    "strings": null,
+    "stty": null,
+    "sum": null,
+    "tac": null,
+    "tail": null,
+    "tar": {
+        "short_opts": "cruxA",
+        "long_opts": [
+            [ "append", 0 ],
+            [ "catenate", 0 ],
+            [ "concatenate", 0 ],
+            [ "create", 0 ],
+            [ "delete", 0 ],
+            [ "extract", 0 ],
+            [ "get", 0 ],
+            [ "update", 0 ]
+        ],
+        "detect_anymatch": true,
+        "invert_flag": true
+    },
+    "tarcat": null,
+    "tee": "declare",
+    "top": null,
+    "tr": null,
+    "traceroute": null,
+    "traceroute6": null,
+    "tsort": null,
+    "tty": null,
+    "tzselect": null,
+    "umount": {
+        "short_opts": "hV",
+        "max_argc": 0
+    },
+    "uname": null,
+    "uncompress": "gzip",
+    "unexpand": null,
+    "uniq": null,
+    "unlzma": "gzip",
+    "unlzop": "gzip",
+    "unxz": "gzip",
+    "unzip": {
+        "short_opts": "clptvz",
+        "detect_anymatch": true
+    },
+    "uptime": null,
+    "useradd": {
+        "short_opts": "D",
+        "max_argc": 0
+    },
+    "users": null,
+    "usleep": null,
+    "vi": null,
+    "view": null,
+    "wc": null,
+    "wget": {
+        "short_opts": "O:",
+        "long_opts": [
+            [ "output-document", 1 ]
+        ],
+        "optargs": {
+            "output-document": "O",
+            "O": [
+                "-"
+            ]
+        },
+        "detect_anymatch": true
+    },
+    "whereis": null,
+    "which": null,
+    "who": null,
+    "whoami": null,
+    "whois": null,
+    "xargs": "declare",
+    "xxd": {
+        "max_argc": 1
+    },
+    "xzcat": null,
+    "yes": null,
+    "yum": {
+        "first_args": [
+            "check",
+            "check-update",
+            "deplist",
+            "help",
+            "info",
+            "list",
+            "provides",
+            "repolist",
+            "repoquery",
+            "search",
+            "updateinfo"
+        ]
+    },
+    "zcat": null,
+    "zcmp": null,
+    "zdiff": null,
+    "zdump": null,
+    "zegrep": null,
+    "zfgrep": null,
+    "zgrep": null,
+    "zless": null,
+    "zmore": null
 }
