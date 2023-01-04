@@ -406,9 +406,9 @@ void config_manual(void){
         "\n"
         "Modes:\n"
         "   0,  no-reflect    in the first place, do not reflect\n"
-        "   1,  strict        ignore all of them, strictly\n"
-        "   2,  normal        ignore them while respecting the dependencies between commands (default)\n"
-        "   3,  simple        ignore them only if the command line contains only one command\n"
+        "   1,  strict        ignore unnecessary parts as much as possible\n"
+        "   2,  normal        ignore unnecessary parts with an awareness of the processing unity (default)\n"
+        "   3,  simple        ignore unnecessary one only if it contains only one command\n"
         "   4,  no-ignore     ignore nothing\n"
         "\n"
         HELP_REMARKS_STR
