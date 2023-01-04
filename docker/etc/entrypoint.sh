@@ -159,6 +159,9 @@ rm -f /dit/etc/default_user
 
 
 cat <<EOF > /tmp/dit_profile.sh
+set -a
+shopt -u expand_aliases
+
 if [ -s /dit/mnt/.dit_history ]; then
     echo 'Reproducing the environment under construction ...'
 
