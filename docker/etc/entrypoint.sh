@@ -72,7 +72,9 @@ touch \
     /dit/var/erase.log.hist \
     /dit/var/ignore.json.dock \
     /dit/var/ignore.json.hist \
-    /dit/var/optimize.json
+    /dit/var/optimize.json \
+    \
+    /tmp/dit_profile.sh
 
 umask "${DEFAULT_UMASK_VALUE}"
 
@@ -91,7 +93,7 @@ chmod a=rx \
 
 for cmd in $( dit help -a )
 do
-    ln -s /usr/local/bin/dit /usr/local/bin/"${cmd}"
+    ln -s dit /usr/local/bin/"${cmd}"
 done
 
 
