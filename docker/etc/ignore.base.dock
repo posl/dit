@@ -61,9 +61,9 @@
     "wait": null,
 
     "apk": {
-        "long_opts": [
-            [ "print-arch", 0 ]
-        ],
+        "long_opts": {
+            "print-arch": 0
+        },
         "first_args": [
             "audit",
             "dot",
@@ -93,11 +93,11 @@
     "apt-cache": null,
     "apt-cdrom": {
         "short_opts": "n",
-        "long_opts": [
-            [ "just-print", 0 ],
-            [ "no-act", 0 ],
-            [ "recon", 0 ]
-        ],
+        "long_opts": {
+            "just-print": 0,
+            "no-act": 0,
+            "recon": 0
+        },
         "first_args": [
             "ident"
         ],
@@ -106,13 +106,13 @@
     "apt-config": null,
     "apt-get": {
         "short_opts": "s",
-        "long_opts": [
-            [ "dry-run", 0 ],
-            [ "just-print", 0 ],
-            [ "no-act", 0 ],
-            [ "recon", 0 ],
-            [ "simulate", 0 ]
-        ],
+        "long_opts": {
+            "dry-run": 0,
+            "just-print": 0,
+            "no-act": 0,
+            "recon": 0,
+            "simulate": 0
+        },
         "detect_anymatch": true
     },
     "apt-key": {
@@ -140,10 +140,10 @@
     "basenc": null,
     "bash": {
         "short_opts": "nD",
-        "long_opts": [
-            [ "dump-po-strings", 0 ],
-            [ "dump-strings", 0 ]
-        ],
+        "long_opts": {
+            "dump-po-strings": 0,
+            "dump-strings": 0
+        },
         "detect_anymatch": true
     },
     "bashbug": null,
@@ -155,9 +155,9 @@
     "cat": null,
     "chsh": {
         "short_opts": "l",
-        "long_opts": [
-            [ "list-shells", 0 ]
-        ],
+        "long_opts": {
+            "list-shells": 0
+        },
         "detect_anymatch": true
     },
     "cksum": null,
@@ -166,12 +166,12 @@
     "comm": null,
     "curl": {
         "short_opts": "o:D:O",
-        "long_opts": [
-            [ "dump-header", 1 ],
-            [ "output", 1 ],
-            [ "remote-name", 0 ],
-            [ "remote-name-all", 0 ]
-        ],
+        "long_opts": {
+            "dump-header": 1,
+            "output": 1,
+            "remote-name": 0,
+            "remote-name-all": 0
+        },
         "detect_anymatch": true,
         "invert_flag": true
     },
@@ -179,11 +179,11 @@
     "dash": "sh",
     "date": {
         "short_opts": "s:u",
-        "long_opts": [
-            [ "set", 1 ],
-            [ "universal", 0 ],
-            [ "utc", 0 ]
-        ],
+        "long_opts": {
+            "set": 1,
+            "universal": 0,
+            "utc": 0
+        },
         "detect_anymatch": true,
         "invert_flag": true
     },
@@ -214,12 +214,12 @@
     "gunzip": "gzip",
     "gzip": {
         "short_opts": "clt",
-        "long_opts": [
-            [ "list", 0 ],
-            [ "stdout", 0 ],
-            [ "test", 0 ],
-            [ "to-stdout", 0 ]
-        ],
+        "long_opts": {
+            "list": 0,
+            "stdout": 0,
+            "test": 0,
+            "to-stdout": 0
+        },
         "detect_anymatch": true
     },
     "hd": null,
@@ -228,9 +228,9 @@
     "hostid": null,
     "iconv": {
         "short_opts": "o:",
-        "long_opts": [
-            [ "output", 1 ]
-        ],
+        "long_opts": {
+            "output": 1
+        },
         "detect_anymatch": true,
         "invert_flag": true
     },
@@ -247,15 +247,15 @@
     "less": null,
     "locale": null,
     "localedef": {
-        "long_opts": [
-            [ "list-archive", 0 ]
-        ],
+        "long_opts": {
+            "list-archive": 0
+        },
         "max_argc": 0
     },
     "logger": {
-        "long_opts": [
-            [ "no-act", 0 ]
-        ],
+        "long_opts": {
+            "no-act": 0
+        },
         "detect_anymatch": true
     },
     "login": null,
@@ -280,9 +280,9 @@
     "mesg": null,
     "mktemp": {
         "short_opts": "u",
-        "long_opts": [
-            [ "dry-run", 0 ]
-        ],
+        "long_opts": {
+            "dry-run": 0
+        },
         "detect_anymatch": true
     },
     "more": null,
@@ -315,9 +315,9 @@
     "pstree": null,
     "ptx": {
         "short_opts": "G",
-        "long_opts": [
-            [ "traditional", 0 ]
-        ],
+        "long_opts": {
+            "traditional": 0
+        },
         "detect_anymatch": true,
         "invert_flag": true
     },
@@ -333,18 +333,18 @@
     "sdiff": "iconv",
     "sed": {
         "short_opts": "i::",
-        "long_opts": [
-            [ "in-place", 2 ]
-        ],
+        "long_opts": {
+            "in-place": 2
+        },
         "detect_anymatch": true,
         "invert_flag": true
     },
     "seq": null,
     "setpriv": {
         "short_opts": "d",
-        "long_opts": [
-            [ "dump", 0 ]
-        ],
+        "long_opts": {
+            "dump": 0
+        },
         "max_argc": 0
     },
     "sh": {
@@ -369,16 +369,16 @@
     "tail": null,
     "tar": {
         "short_opts": "cruxA",
-        "long_opts": [
-            [ "append", 0 ],
-            [ "catenate", 0 ],
-            [ "concatenate", 0 ],
-            [ "create", 0 ],
-            [ "delete", 0 ],
-            [ "extract", 0 ],
-            [ "get", 0 ],
-            [ "update", 0 ]
-        ],
+        "long_opts": {
+            "append": 0,
+            "catenate": 0,
+            "concatenate": 0,
+            "create": 0,
+            "delete": 0,
+            "extract": 0,
+            "get": 0,
+            "update": 0
+        },
         "detect_anymatch": true,
         "invert_flag": true
     },
@@ -418,9 +418,9 @@
     "wc": null,
     "wget": {
         "short_opts": "O:",
-        "long_opts": [
-            [ "output-document", 1 ]
-        ],
+        "long_opts": {
+            "output-document": 1
+        },
         "optargs": {
             "output-document": "O",
             "O": [
