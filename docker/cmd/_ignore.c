@@ -26,14 +26,28 @@
 
 #define IG_INITIAL_LONG_OPTS_MAX 16
 
+#define IG_CONDITIONS_NUM  7
+
+#define IG_SHORT_OPTS       0
+#define IG_LONG_OPTS        1
+#define IG_OPTARGS          2
+#define IG_FIRST_ARGS       3
+#define IG_MAX_ARGC         4
+#define IG_DETECT_ANYMATCH  5
+#define IG_INVERT_FLAG      6
+
 
 /** Data type for storing the results of option parse */
 typedef struct {
     int target_c;                /** character representing the target ignore-file ('d', 'h' or 'b') */
+    bool invert_flag;            /** whether to describe about the command that should be reflected */
     bool unset_flag;             /** whether to only remove the contents of the ignore-file */
     bool print_flag;             /** whether to print the contents of the ignore-file */
     int reset_flag;              /** whether to reset the ignore-file */
     bool additional_settings;    /** whether to accept the additional settings in the arguments */
+    bool detect_anymatch;        /** whether to change how to use detailed conditions */
+    const char *eq_name;         /** the name of the command with equivalent detailed conditions */
+    int max_argc;                /** the maximum number of non-optional arguments as detailed conditions */
     char *nothing;               /** string meaning no arguments in the additional settings */
 } ig_opts;
 
@@ -82,8 +96,8 @@ static int parse_optarg(const char *target, additional_settings *data, optarg_in
 static bool append_optarg(additional_settings *data, const optarg_info *p_info, const char *nothing);
 
 static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yyjson_write_err *write_err);
-static bool edit_ignore_set(yyjson_mut_doc *mdoc, int argc, char **argv, bool unset_flag);
-static bool append_ignore_set(yyjson_mut_doc *mdoc, const additional_settings *data, const char *nothing);
+static bool edit_ignore_set(yyjson_mut_doc *mdoc, int argc, char **argv, const ig_opts *opt);
+static bool append_ignore_set(yyjson_mut_doc *mdoc, const additional_settings *data, ig_opts *opt);
 
 static bool check_if_contained(const char *target, yyjson_val *ival, yyjson_arr_iter *p_arr_iter);
 
@@ -98,11 +112,14 @@ static const char * const ignore_files[2][2] = {
 };
 
 /** array of keys pointing to each detailed condition */
-static const char * const additional_settings_keys[4] = {
-    "short_opts",  // length = 10
-    "long_opts",   // length = 9
-    "optargs",     // length = 7
-    "first_args"   // length = 10
+static const char * const conditions_keys[IG_CONDITIONS_NUM] = {
+    "short_opts",
+    "long_opts",
+    "optargs",
+    "first_args",
+    "max_argc",
+    "detect_anymatch",
+    "invert_flag"
 };
 
 
@@ -153,28 +170,37 @@ int ignore(int argc, char **argv){
 static int parse_opts(int argc, char **argv, ig_opts *opt){
     assert(opt);
 
-    const char *short_opts = "dhnprA";
+    const char *short_opts = "dhinprAX";
 
     int flag;
     const struct option long_opts[] = {
-        { "unset",               no_argument,        NULL, 'n'   },
-        { "print",               no_argument,        NULL, 'p'   },
-        { "reset",               no_argument,        NULL, 'r'   },
-        { "additional-settings", no_argument,        NULL, 'A'   },
-        { "help",                no_argument,        NULL,  1    },
-        { "target",              required_argument, &flag, true  },
-        { "same-as-nothing",     required_argument, &flag, false },
-        {  0,                     0,                  0,    0    }
+        { "invert",              no_argument,        NULL, 'i' },
+        { "unset",               no_argument,        NULL, 'n' },
+        { "print",               no_argument,        NULL, 'p' },
+        { "reset",               no_argument,        NULL, 'r' },
+        { "additional-settings", no_argument,        NULL, 'A' },
+        { "detect-anymatch",     no_argument,        NULL, 'X' },
+        { "help",                no_argument,        NULL,  1  },
+        { "equivalent-to",       required_argument, &flag, 'E' },
+        { "max-argc",            required_argument, &flag, 'M' },
+        { "same-as-nothing",     required_argument, &flag, 'S' },
+        { "target",              required_argument, &flag, 'T' },
+        {  0,                     0,                  0,    0  }
     };
 
     opt->target_c = '\0';
+    opt->invert_flag = false;
     opt->unset_flag = false;
     opt->print_flag = false;
     opt->reset_flag = false;
     opt->additional_settings = false;
+    opt->detect_anymatch = false;
+    opt->eq_name = NULL;
+    opt->max_argc = -1;
     opt->nothing = NULL;
 
-    int c, i;
+    int c, i, errcode = 'O';
+
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0)
         switch (c){
             case 'd':
@@ -182,6 +208,9 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
                 break;
             case 'h':
                 assign_both_or_either(opt->target_c, 'd', 'b', 'h');
+                break;
+            case 'i':
+                opt->invert_flag = true;
                 break;
             case 'n':
                 opt->unset_flag = true;
@@ -195,29 +224,48 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
             case 'A':
                 opt->additional_settings = true;
                 break;
+            case 'X':
+                opt->detect_anymatch = true;
+                break;
             case 1:
                 ignore_manual();
                 return POSSIBLE_ERROR;
             case 0:
-                if (flag){
-                    if ((c = receive_expected_string(optarg, target_args, ARGS_NUM, 2)) >= 0){
-                        opt->target_c = *(target_args[c]);
+                switch (flag){
+                    case 'E':
+                        opt->eq_name = optarg;
+                        continue;
+                    case 'M':
+                        if ((c = receive_positive_integer(optarg, NULL)) >= 0){
+                            opt->max_argc = c;
+                            continue;
+                        }
+                        errcode = 'N';
+                        c = 1;
                         break;
-                    }
-                }
-                else {
-                    if (optarg && (! strchr(optarg, '='))){
-                        opt->nothing = optarg;
+                    case 'S':
+                        if (optarg && (! strchr(optarg, '='))){
+                            opt->nothing = optarg;
+                            continue;
+                        }
+                        c = 1;
                         break;
-                    }
-                    c = 1;
+                    default:
+                        assert(flag == 'T');
+                        if ((c = receive_expected_string(optarg, target_args, ARGS_NUM, 2)) >= 0){
+                            opt->target_c = *(target_args[c]);
+                            continue;
+                        }
                 }
-                xperror_invalid_arg('O', c, long_opts[i].name, optarg);
+                xperror_invalid_arg(errcode, c, long_opts[i].name, optarg);
                 if (c < 0)
                     xperror_valid_args(target_args, ARGS_NUM);
             default:
                 return ERROR_EXIT;
         }
+
+    if (opt->invert_flag && (! opt->additional_settings))
+        opt->unset_flag = true;
 
     assert(opt->reset_flag == ((bool) opt->reset_flag));
 
@@ -264,7 +312,7 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
 
     if (argc > 0){
         if (opt->additional_settings){
-            if ((argc == 1) || opt->unset_flag || opt->print_flag){
+            if (opt->unset_flag || opt->print_flag || opt->eq_name){
                 argc = 1;
                 opt->additional_settings = false;
             }
@@ -300,8 +348,8 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
                         if ((mdoc = yyjson_doc_mut_copy(idoc, NULL))){
                             success =
                                 (! opt->additional_settings) ?
-                                edit_ignore_set(mdoc, argc, argv, opt->unset_flag) :
-                                append_ignore_set(mdoc, &data, opt->nothing);
+                                edit_ignore_set(mdoc, argc, argv, opt) :
+                                append_ignore_set(mdoc, &data, opt);
 
                             if (success)
                                 yyjson_mut_write_file(file_name, mdoc, IG_WRITER_FLAG, NULL, &write_err);
@@ -361,103 +409,97 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
  * @return int  successful or not
  */
 static bool parse_additional_settings(int argc, char **argv, additional_settings *data, const char *nothing){
-    assert(argc > 1);
+    assert(argc > 0);
     assert(argv);
     assert(data);
     assert(nothing);
 
-    assert(! data->cmd_name);
-    assert(! data->short_opts);
-    assert(! data->long_opts);
-    assert(! data->long_opts_max);
-    assert(! data->long_opts_num);
-    assert(! data->optargs);
-    assert(! data->first_args);
-    assert(! data->first_args_num);
-
-    int phase = 0;
     const char *errdesc = NULL;
-    yyjson_mut_doc *mdoc;
-    yyjson_mut_val *mobj;
-    optarg_info info[--argc];
-    size_t optargs_num = 0;
 
     if (! (data->cmd_name = *argv))
         goto errexit;
 
-    do {
-        if (! *(++argv))
-            goto errexit;
+    if (--argc){
+        int phase = 0;
+        yyjson_mut_doc *mdoc;
+        yyjson_mut_val *mobj;
+        optarg_info info[argc];
+        size_t optargs_num = 0;
 
-        switch (phase){
-            case 0:
-                switch (parse_short_opts(*argv)){
-                    case SUCCESS:
-                        data->short_opts = *argv;
-                        phase = 1;
-                        continue;
-                    case POSSIBLE_ERROR:
-                        phase = 2;
-                        break;
-                    case UNEXPECTED_ERROR:
-                        errdesc = "short opts";
-                    default:
-                        goto errexit;
-                }
-            case 1:
-                assert((phase == 1) || (phase == 2));
-                if (phase == 1)
-                    switch (parse_long_opts(*argv, data)){
+        do {
+            if (! *(++argv))
+                goto errexit;
+
+            switch (phase){
+                case 0:
+                    switch (parse_short_opts(*argv)){
                         case SUCCESS:
+                            data->short_opts = *argv;
+                            phase = 1;
                             continue;
                         case POSSIBLE_ERROR:
                             phase = 2;
                             break;
                         case UNEXPECTED_ERROR:
-                            errdesc = "long opts";
+                            errdesc = "short opts";
                         default:
                             goto errexit;
                     }
-            case 2:
-                assert(phase == 2);
-                if (strchrcmp(*argv, '=')){
-                    phase = 4;
-                    continue;
-                }
-                if (! ((mdoc = yyjson_mut_doc_new(NULL)) && (mobj = yyjson_mut_obj(mdoc))))
-                    goto errexit;
-                data->optargs = mdoc;
-                data->optargs->root = mobj;
-                phase = 3;
-            case 3:
-                switch (parse_optarg(*argv, data, (info + optargs_num))){
-                    case SUCCESS:
-                        optargs_num++;
-                        continue;
-                    case POSSIBLE_ERROR:
+                case 1:
+                    assert((phase == 1) || (phase == 2));
+                    if (phase == 1)
+                        switch (parse_long_opts(*argv, data)){
+                            case SUCCESS:
+                                continue;
+                            case POSSIBLE_ERROR:
+                                phase = 2;
+                                break;
+                            case UNEXPECTED_ERROR:
+                                errdesc = "long opts";
+                            default:
+                                goto errexit;
+                        }
+                case 2:
+                    assert(phase == 2);
+                    if (strchrcmp(*argv, '=')){
                         phase = 4;
-                        break;
-                    case UNEXPECTED_ERROR:
-                        errdesc = "optarg";
-                    default:
+                        continue;
+                    }
+                    if (! ((mdoc = yyjson_mut_doc_new(NULL)) && (mobj = yyjson_mut_obj(mdoc))))
                         goto errexit;
-                }
-            case 4:
-                assert(phase == 4);
-                data->first_args = argv;
-                data->first_args_num = argc;
-                phase = 5;
-            case 5:
-                if (strchr(*argv, '=')){
-                    errdesc = "first arg";
-                    goto errexit;
-                }
-        }
-    } while (--argc);
+                    data->optargs = mdoc;
+                    data->optargs->root = mobj;
+                    phase = 3;
+                case 3:
+                    switch (parse_optarg(*argv, data, (info + optargs_num))){
+                        case SUCCESS:
+                            optargs_num++;
+                            continue;
+                        case POSSIBLE_ERROR:
+                            phase = 4;
+                            break;
+                        case UNEXPECTED_ERROR:
+                            errdesc = "optarg";
+                        default:
+                            goto errexit;
+                    }
+                case 4:
+                    assert(phase == 4);
+                    data->first_args = argv;
+                    data->first_args_num = argc;
+                    phase = 5;
+                case 5:
+                    if (strchr(*argv, '=')){
+                        errdesc = "first arg";
+                        goto errexit;
+                    }
+            }
+        } while (--argc);
 
-    for (optarg_info *p_info = info; optargs_num--; p_info++)
-        if (! append_optarg(data, p_info, nothing))
-            goto errexit;
+        for (optarg_info *p_info = info; optargs_num--; p_info++)
+            if (! append_optarg(data, p_info, nothing))
+                goto errexit;
+    }
 
     return true;
 
@@ -772,7 +814,7 @@ static bool append_optarg(additional_settings *data, const optarg_info *p_info, 
 
 
 /******************************************************************************
-    * Individual Functions that handle set of ignored commands
+    * Individual Functions of the dit command 'ignore'
 ******************************************************************************/
 
 
@@ -782,39 +824,60 @@ static bool append_optarg(additional_settings *data, const optarg_info *p_info, 
  * @param[in]  idoc  immutable JSON data that is the contents of the ignore-file
  * @param[in]  argc  the number of non-optional arguments
  * @param[out] argv  array of strings that are non-optional arguments
+ * @param[out] err  variable to store the error information for JSON writer
  *
- * @note in order to use 'receive_expected_string', sorts the argument vector in alphabetical order.
+ * @note the order of command names specified in non-optional arguments make sense.
  */
-static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yyjson_write_err *write_err){
+static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yyjson_write_err *err){
     assert(idoc);
     assert(argv);
-    assert(write_err);
+    assert(err);
 
-    if (argc > 0)
-        qsort(argv, argc, sizeof(char *), qstrcmp);
+    size_t size;
 
-    size_t idx, max;
-    yyjson_val *ikey, *ival;
-    const char *cmd_name;
-    char *skey, *sval;
+    if ((size = yyjson_obj_size(idoc->root))){
+        size_t i, j;
+        yyjson_val *ikey;
+        const char *cmd_name;
+        char *jsons[2];
+        bool success;
 
-    yyjson_obj_foreach(idoc->root, idx, max, ikey, ival){
-        cmd_name = yyjson_get_str(ikey);
-        assert(cmd_name);
+        if (argc < 0)
+            argc = 0;
 
-        if ((argc > 0) && (receive_expected_string(cmd_name, ((void *) argv), argc, 0) < 0))
-            continue;
+        do {
+            for (i = 0, ikey = idoc->root + 1; i++ < size; ikey = unsafe_yyjson_get_next(ikey + 1)){
+                cmd_name = yyjson_get_str(ikey);
+                assert(cmd_name);
 
-        if ((skey = yyjson_val_write_opts(ikey, YYJSON_WRITE_NOFLAG, NULL, NULL, write_err))){
-            if ((sval = yyjson_val_write_opts(ival, YYJSON_WRITE_PRETTY, NULL, NULL, write_err))){
-                fprintf(stdout, "%s: %s\n", skey, sval);
-                free(sval);
+                if (argc){
+                    if (! *argv)
+                        break;
+                    if (strcmp(*argv, cmd_name))
+                        continue;
+                }
+
+                for (j = 0; j < 2; j++)
+                    if (! (jsons[j] = yyjson_val_write_opts(ikey + j, YYJSON_WRITE_PRETTY, NULL, NULL, err)))
+                        break;
+
+                if ((success = (j == 2)))
+                    fprintf(stdout, "%s: %s\n", jsons[0], jsons[1]);
+
+                while (j--)
+                    free(jsons[j]);
+
+                if (! success)
+                    return;
+                if (argc)
+                    break;
             }
-            free(skey);
-        }
 
-        if (! (skey && sval))
-            break;
+            if (argc-- > 1)
+                argv++;
+            else
+                break;
+        } while (true);
     }
 }
 
@@ -827,24 +890,31 @@ static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yy
  * @param[out] mdoc  variable to store JSON data that is the result of editing
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
- * @param[in]  unset_flag  whether to only remove the contents of the ignore-file
+ * @param[in]  opt  variable to store the results of option parse
  * @return bool  successful or not
  *
  * @note make sure new commands are appended to the end of the ignore-file.
  */
-static bool edit_ignore_set(yyjson_mut_doc *mdoc, int argc, char **argv, bool unset_flag){
+static bool edit_ignore_set(yyjson_mut_doc *mdoc, int argc, char **argv, const ig_opts *opt){
     assert(mdoc);
     assert(argc > 0);
     assert(argv);
+    assert(opt);
 
     const char *key;
+    yyjson_mut_val *mkey, *mval;
 
     do {
         key = *(argv++);
         yyjson_mut_obj_remove_key(mdoc->root, key);
 
-        if (! (unset_flag || yyjson_mut_obj_add_null(mdoc, mdoc->root, key)))
-            return false;
+        if (! opt->unset_flag){
+            mkey = yyjson_mut_str(mdoc, key);
+            mval = opt->eq_name ? yyjson_mut_str(mdoc, opt->eq_name) : yyjson_mut_null(mdoc);
+
+            if (! yyjson_mut_obj_add(mdoc->root, mkey, mval))
+                return false;
+        }
     } while (--argc);
 
     return true;
@@ -858,59 +928,46 @@ static bool edit_ignore_set(yyjson_mut_doc *mdoc, int argc, char **argv, bool un
  *
  * @param[out] mdoc  variable to store JSON data that is the result of editing
  * @param[in]  data  variable to store the results of parsing the additional settings
- * @param[in]  nothing  string meaning no arguments in the additional settings
+ * @param[out] opt  variable to store the results of option parse
  * @return bool  successful or not
  *
  * @note make sure new commands are appended to the end of the ignore-file.
  * @note in order to reduce waste, the duplication between first args are removed.
  */
-static bool append_ignore_set(yyjson_mut_doc *mdoc, const additional_settings *data, const char *nothing){
+static bool append_ignore_set(yyjson_mut_doc *mdoc, const additional_settings *data, ig_opts *opt){
     assert(mdoc);
     assert(data);
     assert(data->cmd_name);
-    assert(nothing);
+    assert(opt);
 
-    yyjson_mut_val *mobj, *mkey, *mval;
+    yyjson_mut_val *mval, *mobj;
     size_t size;
 
-    mobj = mdoc->root;
-    mkey = yyjson_mut_str(mdoc, data->cmd_name);
-    mval = yyjson_mut_obj(mdoc);
+    mval = yyjson_mut_str(mdoc, data->cmd_name);
+    mobj = yyjson_mut_obj(mdoc);
 
-    if (! yyjson_mut_obj_put(mobj, mkey, mval))
+    if (! yyjson_mut_obj_put(mdoc->root, mval, mobj))
         return false;
 
-    mobj = mval;
-
     assert(data->short_opts || (! data->long_opts));
-    if (data->short_opts){
-        mkey = yyjson_mut_strn(mdoc, additional_settings_keys[0], 10);  // short_opts
-        mval = yyjson_mut_str(mdoc, data->short_opts);
 
-        if (! yyjson_mut_obj_add(mobj, mkey, mval))
+    if (data->short_opts){
+        if (! yyjson_mut_obj_add_str(mdoc, mobj, conditions_keys[IG_SHORT_OPTS], data->short_opts))
             return false;
 
         if (data->long_opts){
-            mkey = yyjson_mut_strn(mdoc, additional_settings_keys[1], 9);  // long_opts
-            mval = yyjson_mut_arr(mdoc);
+            mval = yyjson_mut_obj(mdoc);
 
-            if (! yyjson_mut_obj_add(mobj, mkey, mval))
+            if (! yyjson_mut_obj_add_val(mdoc, mobj, conditions_keys[IG_LONG_OPTS], mval))
                 return false;
-
-            mkey = mval;
 
             long_opt_info *p_long_opt;
             for (p_long_opt = data->long_opts, size = data->long_opts_num; size--; p_long_opt++){
-                if (! (mval = yyjson_mut_arr_add_arr(mdoc, mkey)))
-                    return false;
-
                 assert(p_long_opt->name);
                 assert(p_long_opt->name_len > 0);
-                if (! yyjson_mut_arr_add_strn(mdoc, mval, p_long_opt->name, p_long_opt->name_len))
-                    return false;
-
                 assert((p_long_opt->colons >= 0) && (p_long_opt->colons < 3));
-                if (! yyjson_mut_arr_add_uint(mdoc, mval, p_long_opt->colons))
+
+                if (! yyjson_mut_obj_add_uint(mdoc, mval, p_long_opt->name, p_long_opt->colons))
                     return false;
             }
         }
@@ -918,57 +975,78 @@ static bool append_ignore_set(yyjson_mut_doc *mdoc, const additional_settings *d
 
     if (data->optargs){
         assert(data->optargs->root);
-        mkey = yyjson_mut_strn(mdoc, additional_settings_keys[2], 7);  // optargs
         mval = yyjson_mut_val_mut_copy(mdoc, data->optargs->root);
 
-        if (! yyjson_mut_obj_add(mobj, mkey, mval))
+        if (! yyjson_mut_obj_add_val(mdoc, mobj, conditions_keys[IG_OPTARGS], mval))
             return false;
     }
 
     if (data->first_args){
-        mkey = yyjson_mut_strn(mdoc, additional_settings_keys[3], 10);  // first_args
-        mval = yyjson_mut_arr(mdoc);
-
-        if (! yyjson_mut_obj_add(mobj, mkey, mval))
-            return false;
-
         size = data->first_args_num;
         assert(size > 0);
 
-        char no_args[size];
-        memset(no_args, false, size);
-
-        size_t i, j;
-        bool success;
+        size_t i, j, count = 0;
+        const char *array[size];
+        bool first_null = true;
 
         for (i = 0; i < size; i++){
             assert(data->first_args[i]);
-            no_args[i] = (! xstrcmp_upper_case(data->first_args[i], nothing));
 
-            for (j = 0; j < i; j++){
-                if (no_args[i]){
-                    if (no_args[j])
+            if (xstrcmp_upper_case(data->first_args[i], opt->nothing)){
+                for (j = 0; j < i; j++)
+                    if (! strcmp(data->first_args[i], data->first_args[j]))
                         break;
-                }
-                else if (! (no_args[j] || strcmp(data->first_args[i], data->first_args[j])))
-                    break;
+
+                if (i == j)
+                    array[count++] = data->first_args[i];
             }
+            else if (first_null){
+                array[count++] = NULL;
+                first_null = false;
+            }
+        }
 
-            if (i == j){
-                success = no_args[i] ?
-                    yyjson_mut_arr_add_null(mdoc, mval) :
-                    yyjson_mut_arr_add_str(mdoc, mval, data->first_args[i]);
+        assert((count > 0) && (count <= size));
 
-                if (! success)
+        if (opt->detect_anymatch || (count > 1) || *array){
+            mval = yyjson_mut_arr(mdoc);
+
+            if (! yyjson_mut_obj_add_val(mdoc, mobj, conditions_keys[IG_FIRST_ARGS], mval))
+                return false;
+
+            for (const char * const *pf = array; count--; pf++){
+                if (! (*pf ? yyjson_mut_arr_add_str(mdoc, mval, *pf) : yyjson_mut_arr_add_null(mdoc, mval)))
                     return false;
             }
         }
+        else
+            opt->max_argc = 0;
+    }
+
+    if (opt->max_argc >= 0){
+        if (! yyjson_mut_obj_add_uint(mdoc, mobj, conditions_keys[IG_MAX_ARGC], opt->max_argc))
+            return false;
+    }
+
+    if (opt->detect_anymatch){
+        if (! yyjson_mut_obj_add_true(mdoc, mobj, conditions_keys[IG_DETECT_ANYMATCH]))
+            return false;
+    }
+
+    if (opt->invert_flag){
+        if (! yyjson_mut_obj_add_true(mdoc, mobj, conditions_keys[IG_INVERT_FLAG]))
+            return false;
     }
 
     return true;
 }
 
 
+
+
+/******************************************************************************
+    * Function used in separate files
+******************************************************************************/
 
 
 /**
@@ -1006,7 +1084,7 @@ int check_if_ignored(int argc, char **argv, int target_c){
                 const char *short_opts;
                 bool no_short_opts = false;
 
-                p_key = additional_settings_keys;
+                p_key = conditions_keys;
                 ival = yyjson_obj_iter_getn(&obj_iter, *(p_key++), 10);  // short_opts
                 short_opts = yyjson_get_str(ival);
 
@@ -1074,11 +1152,12 @@ int check_if_ignored(int argc, char **argv, int target_c){
                 ictn = yyjson_obj_iter_getn(&obj_iter, *(p_key++), 7);  // optargs
 
                 optind = 0;
-                opterr = 0;
+                // opterr = 0;
 
                 int c, i;
                 while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0){
                     switch (c){
+                        case ':':
                         case '?':
                             if (no_short_opts && (! long_opts_num))
                                 continue;
@@ -1127,7 +1206,6 @@ int check_if_ignored(int argc, char **argv, int target_c){
 
 exit:
     optind = 0;
-    opterr = 1;
     return offset;
 }
 
@@ -1145,7 +1223,6 @@ static bool check_if_contained(const char *target, yyjson_val *ival, yyjson_arr_
 
     if (yyjson_arr_iter_init(ival, p_arr_iter)){
         const char *name;
-        size_t name_len;
 
         do {
             if (! (ival = yyjson_arr_iter_next(p_arr_iter)))
@@ -1155,12 +1232,8 @@ static bool check_if_contained(const char *target, yyjson_val *ival, yyjson_arr_
                 if (! target)
                     break;
             }
-            else if (target && (name = yyjson_get_str(ival))){
-                name_len = yyjson_get_len(ival);
-
-                if (! strncmp(target, name, name_len))
-                    break;
-            }
+            else if (target && (name = yyjson_get_str(ival)) && (! strcmp(target, name)))
+                break;
         } while (true);
     }
 
