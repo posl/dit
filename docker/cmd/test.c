@@ -63,7 +63,7 @@ void test(int argc, char **argv, int cmd_id){
         test_func = test_funcs[cmd_id];
     }
     else if (argc == 1)
-        test_flag = (! strncmp(*argv, "test", 4));
+        test_flag = (! strcmp(*argv, "test"));
 
     if (test_flag){
         test_func();

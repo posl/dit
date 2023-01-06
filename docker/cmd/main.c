@@ -23,7 +23,7 @@ typedef struct {
     char **p_start;          /** pointer to the beginning of a series of strings or NULL */
     char *dest;              /** pointer to the beginning of dynamic memory allocated */
     size_t curr_size;        /** the size of dynamic memory currently in use */
-    size_t curr_len;      /** the total length of the preserved strings including null characters */
+    size_t curr_len;         /** the total length of the preserved strings including null characters */
 } xfgets_info;
 
 
@@ -128,7 +128,7 @@ int main(int argc, char **argv){
         *argv = get_suffix(*argv, '/', true);
 
         // compare with "dit"
-        if (strncmp(*argv, program_name, 3) || (--argc && *(++argv))){
+        if (strcmp(*argv, program_name) || (--argc && *(++argv))){
             int cmd_id;
             cmd_id = receive_expected_string(*argv, cmd_reprs, CMDS_NUM, 0);
 
@@ -559,8 +559,8 @@ int qstrcmp(const void *a, const void *b){
     assert(b);
 
     const char *str1, *str2;
-    str1 = *((char **) a);
-    str2 = *((char **) b);
+    str1 = *((const char **) a);
+    str2 = *((const char **) b);
 
     return str1 ? (str2 ? strcmp(str1, str2) : -1) : (str2 ? 1 : 0);
 }
