@@ -116,7 +116,6 @@ reflect
 PROMPT_REFLECT()
 {
     local LAST_EXIT_STATUS="$?"
-    local PROMPT_STRING=' [d:?? h:??] \u:\w \$ '
 
     if history 1 | awk -f /dit/etc/parse_history.awk; then
         echo "${LAST_EXIT_STATUS}" > /dit/tmp/last-exit-status
@@ -126,13 +125,9 @@ PROMPT_REFLECT()
         fi
 
         : > /dit/tmp/reflect-report.real
-        if dit reflect; then
-            PROMPT_STRING="$( cat /dit/tmp/reflect-report.real )"
+        if dit reflect && unset PS1 2> /dev/null; then
+            PS1="$( cat /dit/tmp/reflect-report.real )"
         fi
-    fi
-
-    if unset PS1 2> /dev/null; then
-        PS1="${PROMPT_STRING}"
     fi
 }
 
@@ -145,10 +140,11 @@ readonly -f PROMPT_REFLECT
 export -f PROMPT_REFLECT PROMPT_OPTION
 
 
+PS1=' [d:?? h:??] \u:\w \$ '
 PROMPT_COMMAND='{ PROMPT_REFLECT; PROMPT_OPTION; } > /dev/null'
 
 readonly PROMPT_COMMAND
-export PROMPT_COMMAND
+export PS1 PROMPT_COMMAND
 
 
 
