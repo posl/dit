@@ -182,7 +182,7 @@ void reflect_manual(void);
     * Functions used in separate files
 ******************************************************************************/
 
-int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
+int get_config(const char *config_arg, int modes[2]);
 
 int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assume_c);
 int update_erase_logs(unsigned short prov_reflecteds[2]);

@@ -25,9 +25,9 @@ int convert(int argc, char **argv){
         }
 
         if (line){
-            int mode2d, mode2h;
+            int modes[2];
 
-            if (! (errid || get_config(NULL, &mode2d, &mode2h))){
+            if (! (errid || get_config(NULL, modes))){
                 int offset = 0, mode;
                 const char *file_name;
                 FILE* fp;
@@ -36,11 +36,11 @@ int convert(int argc, char **argv){
 
                 do {
                     if (! offset){
-                        mode = mode2d;
+                        mode = modes[0];
                         file_name = CONVERT_RESULT_FILE_D;
                     }
                     else {
-                        mode = mode2h;
+                        mode = modes[1];
                         file_name = CONVERT_RESULT_FILE_H;
                     }
 

@@ -230,16 +230,12 @@ static int config_contents(unsigned int code, ...){
  * @brief get the modes of the dit command 'convert' and hand over it to the command.
  *
  * @param[in]  config_arg  string for determining the modes
- * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
- * @param[out] p_mode2h  variable to store the mode used when reflecting in history-file
+ * @param[out] modes  array for storing the modes used when reflecting in Dockerfile and history-file
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
-int get_config(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
-    assert(p_mode2d);
-    assert(p_mode2h);
-
+int get_config(const char *config_arg, int modes[2]){
     assert(CONF_GET_FROM_CONVERT == 4);
-    return config_contents(CONF_GET_FROM_CONVERT, config_arg, p_mode2d, p_mode2h);
+    return config_contents(CONF_GET_FROM_CONVERT, config_arg, modes, (modes + 1));
 }
 
 
