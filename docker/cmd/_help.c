@@ -581,8 +581,8 @@ void ignore_manual(void){
         "    a flag indicating that the conditions for reflection are described as the additional settings.\n"
         "  - When '-p' is given, '-r' toggles to show the default settings, and\n"
         "    NAMEs narrow down the settings to be displayed to just those specified.\n"
-        "  - If either of '-np' or '--equivalent-to' is given, the additional settings make no sense."
-        "  - If given at the same time, '-p' takes precedence over '-n', '-n' over '--equivalent-to'."
+        "  - If either of '-np' or '--equivalent-to' is given, the additional settings make no sense.\n"
+        "  - If given at the same time, '-p' takes precedence over '-n', '-n' over '--equivalent-to'.\n"
         "\n"
         "Remarks about Condition Specification:\n"
         "  - By default, the conditions are used to determine whether to ignore the executed\n"
@@ -598,9 +598,14 @@ void ignore_manual(void){
         "    has the same meaning as a short option, or when you want to give an alias that does\n"
         "    not match any options to a long option that requires specifying many arguments.\n"
         "  - If you want to specify FIRST_ARG without specifying OPTARG, use one '=' instead of OPTARG.\n"
+        "\n"
+        HELP_REMARKS_STR
         "  - The settings here are recorded in the ignore-file in json format, and as long as you use this\n"
         "    command, no invalid, incorrect or meaningless settings will be recorded, but even if you edit\n"
         "    the file in another way, the contents will be checked so that no problems will occur.\n"
+        "  - Any null-terminated string can be specified for NAME, but at that time, it is necessary to\n"
+        "    consider the specification that the file path specified in the first argument, its base\n"
+        "    name, and the empty string are used in this order to search for commands in the ignore-file.\n"
     , stdout);
 }
 
