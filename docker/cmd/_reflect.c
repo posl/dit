@@ -401,7 +401,7 @@ static int reflect_line(char *line, int target_c, int next_target_c, bool verbos
  * @attention this function must be called until NULL is passed to 'line' to close the destination file.
  * @attention internally, it may use 'xfgets_for_loop' with a depth of 1.
  */
-int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag){
+int reflect_to_dockerfile(char *line, bool verbose, bool onbuild_flag){
     return reflect_line(line, 'd', '\0', verbose, onbuild_flag);
 }
 

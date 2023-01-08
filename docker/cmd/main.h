@@ -82,7 +82,7 @@
     * commonly used Functions
 ******************************************************************************/
 
-#define print_target_repr(offset)  fprintf(stdout, ("\n < %s >\n" + offset), target_args[2 - offset])
+#define print_target_repr(offset)  fprintf(stdout, ("\n < %s >\n" + (offset)), target_args[2 - (offset)])
 
 #define xperror_config_arg(target)  xperror_invalid_arg('C', 0, "mode", target)
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
@@ -189,7 +189,7 @@ int update_erase_logs(unsigned short prov_reflecteds[2]);
 
 int check_if_ignored(int argc, char **argv, int target_c);
 
-int reflect_to_Dockerfile(char *line, bool verbose, bool onbuild_flag);
+int reflect_to_dockerfile(char *line, bool verbose, bool onbuild_flag);
 int read_provisional_report(unsigned short prov_reflecteds[2]);
 int write_provisional_report(unsigned short prov_reflecteds[2]);
 
