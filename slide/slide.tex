@@ -41,9 +41,7 @@
 \definecolor{bracket}{RGB}{20,100,175}
 
 \lstdefinelanguage{json}{
-    morestring=[b]{"},
-    stringstyle=\color{red!60!gray},
-    keywords={null},
+    keywords={null, true, false},
     keywordstyle=\color{blue!60!black},
     literate=
        *{0}{{{\color{number}0}}}{1}
@@ -442,12 +440,12 @@ exit
 \begin{frame}{今後の展望}
     \begin{itemize}
         \setlength{\itemsep}{1.0zh}
-        \item Dockerfileに命令を追加する機能を充実させる．
-        \item 既存の機能を少し豪華にする．
+        \item 実装途中の部分を完成させる．
         \begin{itemize}
-            \item 対応するパッケージマネージャの種類を増やす．
-            \item copy関連のリファクタリング・最適化機能を増やす．
+            \item 
+            \item 
         \end{itemize}
+        \item Dockerfileに命令を追加する機能を充実させる．
         \item マルチステージビルドに対応する．
         \item 標準入力を捕捉できるようにする．
         \begin{itemize}
@@ -480,19 +478,19 @@ exit
 
 
 % ページ番号を合わせる
-\section{参考資料（p.34〜）}
+\section{参考資料（p.33〜）}
 
 \begin{frame}{基本情報}
     \begin{itemize}
         \setlength{\itemsep}{0.8zh}
         \item ツールのDockerfileから開発用のコンテナを起動し，bashコマンドを用いて，対話的に作業する．
-        \item バインドマウントしたディレクトリに以下などが入る．
+        \item 開発用のディレクトリには，以下などが入る．
         \begin{itemize}
             \item Dockerfile（下書き・完成版）
             \item 履歴ファイル
             \item ユーザがコンテナ内にコピーしたいファイル
         \end{itemize}
-        \item ツールの機能の利用は，busyboxと同じような形式で/usr/local/binにあるdit\footnotemark[1]コマンドから行う．
+        \item ツールの機能の利用は，dit\footnotemark[1]コマンドから行う．
         \item /dit\footnotemark[1]ディレクトリにツールが利用するファイルが入るが，不用意にそれらに触れてはいけない．
     \end{itemize}
 
@@ -506,7 +504,7 @@ exit
             \setbeamercovered{dynamic}
             \setlength{\itemsep}{0.8zh}
             \item<#1> シェルで任意のコマンドを実行するたびに，その必要性を判断して，対応する命令をDockerfileに追加する機能．
-            \item<#2> CUIからDockerfileを編集する機能．
+            \item<#2> CUI上でDockerfileを編集する機能．
             \item<#3> ベストプラクティスに基づいて，作成されたDockerfileのリファクタリング・最適化を行う機能．
             \item<#4> Dockerfileの開発を任意のタイミングで中断・再開できるようにする機能．
         \end{enumerate}
@@ -547,14 +545,14 @@ PROMPT_COMMAND='echo "$?" > /tmp/exit-status'
 \begin{frame}{機能１\\「対応する命令をDockerfileに追加する」}
     以下のような変換規則
     \begin{itemize}
-        \item 単独のcdコマンド $\longrightarrow$ WORKDIR命令
-        \item コマンドを伴わない代入文 $\longrightarrow$ ARG命令
+        \item 代入文 $\longrightarrow$ ARG命令
+        \item cdコマンド $\longrightarrow$ WORKDIR命令
     \end{itemize}
 
     以下のような反映ルール
     \begin{itemize}
         \item 通常ファイルへのリダイレクトを行う部分は反映する．
-        \item パイプラインは前後関係が反映の要否に影響する．
+        \item パイプラインの切り詰めは右からのみ行う．
     \end{itemize}
     を適用して，追加処理を行う．
 
@@ -567,19 +565,19 @@ PROMPT_COMMAND='echo "$?" > /tmp/exit-status'
     ５つの反映モード
     \begin{description}
         \item[no-reflect] Dockerfileに命令を追加しない
-        \item[strict] 反映の要否の決定に処理の流れを考慮しない
-        \item[normal] 処理の流れを汲んで，反映の要否を変更する
+        \item[strict] できる限り，ignoreファイルの設定に従う
+        \item[normal] 処理のまとまりを考え，反映の要否を変更する
         \item[simple] 単純なコマンド以外はそのまま反映する
-        \item[no-ignore] ignoreファイル・反映ルールを適用しない
+        \item[no-ignore] 実行されたコマンドラインは必ず反映する
     \end{description}
 
     \vskip1.0zh
     \textcolor{red!75}{strictとnormalの違い}
 
-    `hoge; piyo'が実行された場合，
+    `hoge \&\& piyo'が実行された場合，
     \begin{description}
-        \item[strict] 互いに独立して反映するかどうかを決める
-        \item[normal] piyoを反映するならば，必ずhogeも反映する
+        \item[strict] hogeだけを反映する可能性がある
+        \item[normal] ひとまとめに，反映の要否を決定する
     \end{description}
 \end{frame}
 
@@ -589,18 +587,19 @@ PROMPT_COMMAND='echo "$?" > /tmp/exit-status'
 \begin{lstlisting}[language=json]
 {
     "ls": null,
-    "export": {
-        "short_opts": "p",
-        "cmdargs": [
-            null
-        ]
-    },
-    "bash": {
-        "short_opts": "nD",
-        "long_opts": [
-            [ "dump-strings", 0 ],
-            [ "dump-po-strings", 0 ]
-        ]
+    "dir": "ls",
+    "wget": {
+        "short_opts": "O:",
+        "long_opts": {
+            "output-document": 1
+        },
+        "optargs": {
+            "output-document": "O",
+            "O": [
+                "-"
+            ]
+        },
+        "detect_anymatch": true
     }
 }
 \end{lstlisting}
@@ -658,8 +657,8 @@ PROMPT_COMMAND='echo "$?" > /tmp/exit-status'
     \vskip1.0zh
     コマンドライン
 \begin{lstlisting}[language=sh]
-# lists information about the current directory
-ls -AlR | ( bash -n ./fmt.sh && ./fmt.sh )
+# URL=https://ftp.gnu.org/gnu/bash/bash-5.1.16.tar.gz
+wget -O - "${URL}" | tar -xvz && dir -AFl bash-5.1.16
 \end{lstlisting}
 
 \end{frame}
@@ -668,9 +667,9 @@ ls -AlR | ( bash -n ./fmt.sh && ./fmt.sh )
 \begin{frame}{機能１　変換処理の具体例（convert）}
     コマンドラインの解析・展開後
     \xytree[3]{
-        & \xynode[-1,1]{`$|$'}  \\
-        \xynode{`ls -AlR'} & & \xynode[-1,1]{`\&\&'}  \\
-        & \xynode{`bash -n ./fmt.sh'} & & \xynode{`./fmt.sh'}
+        & & \xynode[-1,1]{`\&\&'}  \\
+        & \xynode[-1,1]{`$|$'} & & \xynode{`dir -AFl bash-5.1.16'}  \\
+        \xynode{`wget -O - "\$\{URL\}"'} & & \xynode{`tar -xvz'}
     }
 
     \vskip0.5zh
@@ -678,19 +677,49 @@ ls -AlR | ( bash -n ./fmt.sh && ./fmt.sh )
         \centering
         \begin{tabular}{lccc}
             \hline
-            適用 & `ls -AlR' & `bash -n ./fmt.sh' & `./fmt.sh' \\
+            適用 & `wget' & `tar' & `dir' \\
             \hline \hline
-            ignoreファイル \onslide<2->{& 反映しない & 反映しない & 反映する} \\
-            反映ルール \onslide<3->{& \textcolor{red!75}{反映する} & 反映しない & 反映する} \\
+            ignoreファイル \onslide<2->{& 反映しない & 反映する & 反映しない} \\
+            反映ルール \onslide<3->{& \textcolor{red!75}{反映する} & 反映する & 反映しない} \\
             \hline
         \end{tabular}
     \end{table}
 
-    \onslide<4>{よって，`RUN ls -AlR $|$  ./fmt.sh'を追加する．}
+    \onslide<4>{よって，`RUN wget -O - "\$\{URL\}" $|$ tar -xvz'を追加する．}
 \end{frame}
 
 
 \MyFunctionTable{0}{1}{0}{0}
+
+
+\begin{frame}{機能２\\「ホスト環境からファイルをコピーする」}
+    \textcolor{blue!75}{dit copy}
+
+    \hskip1.0zw
+    ホスト環境からコンテナ内へのファイルのコピーを行い，その内容をCOPY・ADD命令としてDockerfileに反映する．
+    \vskip2.0zh
+
+    このコマンドを使うと，
+    \begin{itemize}
+        \item COPY命令とcpコマンドの仕様の違いを意識せず済む．
+        \item ADD命令のtar展開機能を利用できる．
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{機能２\\「パッケージをインストールする」}
+    \textcolor{blue!75}{dit package}
+
+    \hskip1.0zw
+    最適化された形式で，パッケージのインストールを行い，その内容をRUN命令としてDockerfileに反映する．
+    \vskip2.0zh
+
+    このコマンドを使うと，
+    \begin{itemize}
+        \item イメージサイズの削減に効果的な方法で実行される．
+        \item パッケージマネージの違いをあまり意識せず済む．
+    \end{itemize}
+\end{frame}
 
 
 \begin{frame}[fragile]{機能２\\「Dockerfileに命令を追加する」}
@@ -707,7 +736,7 @@ dit reflect -d instr.txt
 \end{lstlisting}
 
 \begin{lstlisting}[language=sh]
-# reflects the input contents in Dockerfile
+# reflects the input contents as they are in Dockerfile
 dit reflect -dp -
 \end{lstlisting}
 
@@ -738,34 +767,6 @@ dit erase -diy -E '^LABEL[[:space:]]'
 \MyFunctionTable{0}{0}{1}{0}
 
 
-\begin{frame}{機能３\\「ホスト環境からファイルをコピーする」}
-    \textcolor{blue!75}{dit copy}
-
-    \hskip1.0zw
-    ホスト環境からコンテナ内へ，ファイルをコピーする．
-
-    \vskip2.0zh
-    この時，ホスト環境にある\textcolor{red!75}{.dockerignore}の編集も行う．
-
-    これにより，ビルド時間が短縮できるようになる．
-\end{frame}
-
-
-\begin{frame}{機能３\\「パッケージをインストールする」}
-    \textcolor{blue!75}{dit package}
-
-    \hskip1.0zw
-    最適化された形式で，パッケージのインストールを行う．
-    \vskip2.0zh
-
-    このコマンドを使うと，
-    \begin{itemize}
-        \item イメージサイズの削減に効果的な方法で実行される．
-        \item 最後に，更なるリファクタリング・最適化が行える．
-    \end{itemize}
-\end{frame}
-
-
 \begin{frame}{機能３\\「Dockerfileのリファクタリング・最適化を行う」}
     \textcolor{blue!75}{dit optimize}
 
@@ -773,12 +774,12 @@ dit erase -diy -E '^LABEL[[:space:]]'
     下書きのDockerfileから，完成版のDockerfileを生成する．
     \vskip1.0zh
 
-    処理内容
+    処理内容の例
     \begin{itemize}
-        \item 順序に意味がない命令をそれぞれ集めて，並べ替える．
-        \item 可読性を向上させるための整形を行う．
+        \item WORKDIR命令のオペランドを絶対パスにする．
         \item ENV・ARG命令の重複や無意味な再定義を取り除く．
-        \item 連続するRUN命令をANDリストでまとめる．
+        \item 連続するRUN命令をまとめる．
+        \item 可読性を向上させるための整形を行う．
     \end{itemize}
 \end{frame}
 
@@ -793,7 +794,7 @@ dit erase -diy -E '^LABEL[[:space:]]'
     \begin{description}
         \setlength{\itemsep}{1.0zh}
         \setlength{\leftskip}{-1.0zw}
-        \item[中断前] 履歴ファイル用の反映モードとignoreファイルを別で用意し，Dockerfileと同じようにして編集する．
+        \item[開発中] 履歴ファイル用の反映モードとignoreファイルを別で用意し，Dockerfileと同じようにして編集する．
         \item[再開時] sourceコマンド・historyコマンドで履歴ファイルを読み込み，環境を再現する．
     \end{description}
 \end{frame}
