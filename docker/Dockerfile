@@ -56,7 +56,10 @@ ARG BASE_VERSION
 RUN whoami > /dit/etc/default_user && \
     { \
         echo "FROM ${BASE_NAME}:${BASE_VERSION}" && \
-        ( type /bin/bash > /dev/null 2>&1 || dit package -v bash ) && \
+        echo "WORKDIR $( pwd )" && \
+        { \
+            type /bin/bash > /dev/null 2>&1 || dit package -v bash; \
+        } && \
         echo 'SHELL [ "/bin/bash", "--posix", "-c" ]'; \
     } > /dit/etc/Dockerfile.base
 
