@@ -134,9 +134,9 @@
     % 仮想化技術としてのメリットもある
     \begin{itembox}[l]{ソフトウェア開発面でのメリット}
         \begin{itemize}
-            \item ハードやOSの違いを意識せず，開発に専念できる
-            \item 既存の成果物を活用できる
-            \item アプリケーションのデブロイ・スケーリングが容易
+            \item ハードやOSの違いを意識せず，開発に専念できる．
+            \item 既存の成果物を活用できる．
+            \item アプリケーションのデプロイ・スケーリングが容易．
         \end{itemize}
     \end{itembox}
 \end{frame}
@@ -441,17 +441,10 @@ exit
     \begin{itemize}
         \setlength{\itemsep}{1.0zh}
         \item 実装途中の部分を完成させる．
-        \begin{itemize}
-            \item 
-            \item 
-        \end{itemize}
+        \item ドキュメントページを作成する．
         \item Dockerfileに命令を追加する機能を充実させる．
         \item マルチステージビルドに対応する．
         \item 標準入力を捕捉できるようにする．
-        \begin{itemize}
-            \item `apt-get install'など確認作業があるコマンドに効果大．
-            \item 上の例なら，-yオプションを付けなくても良くなる．
-        \end{itemize}
     \end{itemize}
 \end{frame}
 
@@ -564,11 +557,11 @@ PROMPT_COMMAND='echo "$?" > /tmp/exit-status'
 \begin{frame}{機能１　設定情報（config）}
     ５つの反映モード
     \begin{description}
-        \item[no-reflect] Dockerfileに命令を追加しない
-        \item[strict] できる限り，ignoreファイルの設定に従う
-        \item[normal] 処理のまとまりを考え，反映の要否を変更する
-        \item[simple] 単純なコマンド以外はそのまま反映する
-        \item[no-ignore] 実行されたコマンドラインは必ず反映する
+        \item[no-reflect] Dockerfileに命令を追加しない．
+        \item[strict] できる限り，ignoreファイルの設定に従う．
+        \item[normal] 処理のまとまりを考え，反映の要否を変更する．
+        \item[simple] 単純なコマンド以外はそのまま反映する．
+        \item[no-ignore] 実行されたコマンドラインは必ず反映する．
     \end{description}
 
     \vskip1.0zh
@@ -717,7 +710,7 @@ wget -O - "${URL}" | tar -xvz && dir -AFl bash-5.1.16
     このコマンドを使うと，
     \begin{itemize}
         \item イメージサイズの削減に効果的な方法で実行される．
-        \item パッケージマネージの違いをあまり意識せず済む．
+        \item パッケージマネージャの違いをあまり意識せず済む．
     \end{itemize}
 \end{frame}
 
