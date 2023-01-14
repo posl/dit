@@ -893,10 +893,10 @@ static void help_example(void){
 
 static void ignore_example(void){
     fputs(
-        "dit ignore -d diff vim             Prevent 'diff' and 'vim' from being reflected in Dockerfile.\n"
-        "dit ignore -hn declare             Make 'declare' a command that is reflected in history-file.\n"
-        "dit ignore -dhA export p = none    Set the detailed conditions for ignoring 'export'.\n"
-        "dit ignore -dhpr sed awk           Display the default ignore settings for 'sed' and 'awk'.\n"
+        "dit ignore -d diff ls               Prevent 'diff' and 'ls' from being reflected in Dockerfile.\n"
+        "dit ignore -hn grep                 Make 'grep' a command that is reflected in history-file.\n"
+        "dit ignore -dhA useradd D = none    Set the detailed conditions for ignoring 'useradd'.\n"
+        "dit ignore -dhpr curl wget          Display the default ignore settings for 'curl' and 'wget'.\n"
     , stdout);
 }
 
