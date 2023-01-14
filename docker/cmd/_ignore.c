@@ -437,13 +437,13 @@ static bool parse_additional_settings(int argc, char **argv, additional_settings
             switch (phase){
                 case 0:
                     switch (parse_short_opts(*argv)){
-                        case POSSIBLE_ERROR:
-                            phase = 2;
-                            break;
                         case SUCCESS:
                             data->short_opts = *argv;
                             phase = 1;
                             continue;
+                        case POSSIBLE_ERROR:
+                            phase = 2;
+                            break;
                         case UNEXPECTED_ERROR:
                             errdesc = "short opts";
                         default:
@@ -453,12 +453,12 @@ static bool parse_additional_settings(int argc, char **argv, additional_settings
                     assert((phase == 1) || (phase == 2));
                     if (phase == 1)
                         switch (parse_long_opts(*argv, data)){
+                            case SUCCESS:
+                                assert(data->long_opts_num < INT_MAX);
+                                continue;
                             case POSSIBLE_ERROR:
                                 phase = 2;
                                 break;
-                            case SUCCESS:
-                                if (data->long_opts_num <= INT_MAX)
-                                    continue;
                             case UNEXPECTED_ERROR:
                                 errdesc = "long opts";
                             default:
@@ -477,12 +477,12 @@ static bool parse_additional_settings(int argc, char **argv, additional_settings
                     phase = 3;
                 case 3:
                     switch (parse_optarg(*argv, data, (info + optargs_num))){
-                        case POSSIBLE_ERROR:
-                            phase = 4;
-                            break;
                         case SUCCESS:
                             optargs_num++;
                             continue;
+                        case POSSIBLE_ERROR:
+                            phase = 4;
+                            break;
                         case UNEXPECTED_ERROR:
                             errdesc = "optarg";
                         default:
@@ -603,10 +603,14 @@ static int parse_long_opts(const char *target, additional_settings *data){
                 }
                 switch (append_long_opt(data, name, count, colons)){
                     case SUCCESS:
-                        name = target;
-                        colons = 0;
-                        count = 1;
-                        continue;
+                        if (data->long_opts_num < INT_MAX){
+                            name = target;
+                            colons = 0;
+                            count = 1;
+                            continue;
+                        }
+                    case POSSIBLE_ERROR:
+                        break;
                     case UNEXPECTED_ERROR:
                         exit_status = UNEXPECTED_ERROR;
                 }
@@ -861,7 +865,7 @@ static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yy
 
     if ((size = yyjson_obj_size(idoc->root))){
         yyjson_val *ikey;
-        const char *cmd_name;
+        const char *cmd_name = NULL, *key;
         int i;
         char *jsons[2];
         bool success;
@@ -870,16 +874,15 @@ static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yy
             argc = 0;
 
         do {
-            for (ikey = idoc->root + 1; size--; ikey = unsafe_yyjson_get_next(ikey + 1)){
-                cmd_name = yyjson_get_str(ikey);
-                assert(cmd_name);
+            if (argc && (! (cmd_name = *(argv++))))
+                continue;
 
-                if (argc){
-                    if (! *argv)
-                        break;
-                    if (strcmp(*argv, cmd_name))
-                        continue;
-                }
+            for (ikey = idoc->root + 1; size--; ikey = unsafe_yyjson_get_next(ikey + 1)){
+                key = yyjson_get_str(ikey);
+                assert(key);
+
+                if (cmd_name && strcmp(cmd_name, key))
+                    continue;
 
                 for (i = 0; i < 2; i++)
                     if (! (jsons[i] = yyjson_val_write_opts(ikey + i, YYJSON_WRITE_PRETTY, NULL, NULL, err)))
@@ -893,15 +896,10 @@ static void display_ignore_set(const yyjson_doc *idoc, int argc, char **argv, yy
 
                 if (! success)
                     return;
-                if (argc)
+                if (cmd_name)
                     break;
             }
-
-            if (argc-- > 1)
-                argv++;
-            else
-                break;
-        } while (true);
+        } while (--argc > 0);
     }
 }
 
