@@ -219,7 +219,7 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
 /**
  * @brief print an error message about invalid argument to stderr.
  *
- * @param[in]  code  error code ('O' (for optarg), 'N' (for number) or 'C' (for cmdarg))
+ * @param[in]  code_c  error code ('O' (for optarg), 'N' (for number) or 'C' (for cmdarg))
  * @param[in]  state  error state (0 (unrecognized), -1 (ambiguous) or others (invalid))
  * @param[in]  desc  the description for the argument
  * @param[in]  arg  actual argument passed on the command line
@@ -310,7 +310,7 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
 void xperror_too_many_args(int limit){
     assert(limit < 2);
 
-    char format[] = "%s: No %sarguments allowed when reflecting in both files\n";
+    char format[] = "%s: no %sarguments allowed when reflecting in both files\n";
     const char *adjective = "";
 
     switch (limit){
@@ -353,6 +353,26 @@ void xperror_message(const char * restrict msg, const char * restrict addition){
 
 
 /**
+ * @brief print the error message about the contents of the specified file to stderr.
+ *
+ * @param[in]  file_name  file name of NULL to indicate that the source is standard input
+ * @param[in]  lineno  the line number
+ * @param[in]  msg  the error message
+ *
+ * @note line number starts from 1.
+ */
+void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg){
+    assert(lineno > 0);
+    assert(msg);
+
+    if (! file_name)
+        file_name = "/dev/stdin";
+
+    fprintf(stderr, "%s: %s: line %d: %s\n", program_name, file_name, lineno, msg);
+}
+
+
+/**
  * @brief print a suggenstion message to stderr.
  *
  * @param[in]  cmd_flag  whether to suggest displaying the manual of each dit command
@@ -389,7 +409,7 @@ void xperror_suggestion(bool cmd_flag){
  * @note read to the end of the file by using it as a conditional expression in a loop statement.
  * @note this function can be nested up to a depth of 'XFGETS_NESTINGS_MAX' by passing different 'src_file'.
  * @note if 'p_start' is non-NULL, preserves read line into the dynamic memory pointed to by its contents.
- * @note all lines of the file whose size is too large to be represented by int type cannot be preserved.
+ * @note all lines of the file whose size is larger than 'INT_MAX' cannot be preserved.
  * @note this function updates the contents of 'p_errid' only when an error occurs while opening the file.
  * @note if the contents of 'p_errid' was set to something other than 0, performs finish processing.
  * @note the trailing newline character of the line that is the return value is stripped.
@@ -711,7 +731,7 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
  * @note when there is a corresponding instruction, its index number is stored in 'p_id'.
  * @note if any instructions can be accepted, blank lines are also accepted as valid lines.
  */
-char *receive_dockerfile_instruction(char *line, int *p_id){
+char *receive_dockerfile_instr(char *line, int *p_id){
     assert(line);
     assert(p_id);
 
@@ -731,12 +751,13 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
                     instr_len++;
                 while (*(++tmp) && (! isspace((unsigned char) *tmp)));
 
-                if ((instr_len < 3) || ((instr_len > 7) && (instr_len != 10))){
-                    if (instr_len != 11)
-                        break;
+                if (! *tmp)
+                    break;
 
+                if (instr_len == 11)
                     *p_id = ID_HEALTHCHECK;
-                }
+                else if ((instr_len < 3) || ((instr_len > 7) && (instr_len != 10)))
+                    break;
 
                 memcpy(instr, line, (sizeof(char) * instr_len));
                 instr[instr_len] = '\0';
@@ -781,7 +802,7 @@ char *receive_dockerfile_instruction(char *line, int *p_id){
  * @param[in]  file_name  target file name
  * @return int  the resulting file size, -1 (unexpected error) or -2 (too large)
  *
- * @note if the file is too large, sets an error number indicating that.
+ * @note if the file is too large to pass to 'xfgets_for_loop', sets an error number indicating that.
  */
 int get_file_size(const char *file_name){
     assert(file_name);
@@ -790,8 +811,8 @@ int get_file_size(const char *file_name){
     int i = -1;
 
     if (! stat(file_name, &file_stat)){
-        if ((file_stat.st_size >= 0) && (file_stat.st_size <= INT_MAX))
-            i = (int) file_stat.st_size;
+        if ((file_stat.st_size >= 0) && (file_stat.st_size < INT_MAX))
+            i = file_stat.st_size;
         else {
             i = -2;
             errno = EFBIG;
@@ -874,7 +895,7 @@ static void xstrcmp_upper_case_test(void);
 
 static void receive_positive_integer_test(void);
 static void receive_expected_string_test(void);
-static void receive_dockerfile_instruction_test(void);
+static void receive_dockerfile_instr_test(void);
 
 static void get_file_size_test(void);
 static void get_last_exit_status_test(void);
@@ -889,7 +910,7 @@ void dit_test(void){
 
     do_test(receive_positive_integer_test);
     do_test(receive_expected_string_test);
-    do_test(receive_dockerfile_instruction_test);
+    do_test(receive_dockerfile_instr_test);
 
     do_test(get_file_size_test);
     do_test(get_last_exit_status_test);
@@ -1258,7 +1279,7 @@ static void receive_expected_string_test(void){
 
 
 
-static void receive_dockerfile_instruction_test(void){
+static void receive_dockerfile_instr_test(void){
     const struct {
         char * const line;
         const int expected_id;
@@ -1290,7 +1311,7 @@ static void receive_dockerfile_instruction_test(void){
 
     for (i = 0; (line = table[i].line); i++){
         id = table[i].expected_id;
-        args = receive_dockerfile_instruction(line, &id);
+        args = receive_dockerfile_instr(line, &id);
 
         if (table[i].offset >= 0){
             assert(args == (line + table[i].offset));

@@ -7,7 +7,7 @@
  * @author Tsukasa Inada
  * @date 2022/09/21
  *
- * @note In the provisional report file, two integers are stored as unsigned short.
+ * @note In the provisional report file, two provisional numbers of reflected lines are stored.
  * @note In the conclusive report file, the text to show on prompt the number of reflected lines is stored.
  */
 
@@ -18,31 +18,42 @@
 #define REFLECT_FILE_P "/dit/tmp/reflect-report.prov"
 #define REFLECT_FILE_R "/dit/tmp/reflect-report.real"
 
-#define CC(target)  "\\[\\e[1;%dm\\]" target "\\[\\e[m\\]"
+#define REFL_INITIAL_LINES_MAX 32
 
-#define update_provisional_report(curr_reflecteds)  manage_provisional_report(curr_reflecteds, "r+w\0")
-#define reset_provisional_report(prov_reflecteds)  manage_provisional_report(prov_reflecteds, "r\0w\0")
+#define update_provisional_report(reflecteds)  manage_provisional_report(reflecteds, "r+w\0")
+#define reset_provisional_report(reflecteds)  manage_provisional_report(reflecteds, "r\0w\0")
+
+#define CC(target)  "\\[\\e[1;%dm\\]" target "\\[\\e[m\\]"
 
 
 /** Data type for storing the results of option parse */
 typedef struct {
-    int target_c;    /** character representing destination file ('d', 'h' or 'b') */
-    int blank_c;     /** how to handle the empty lines ('p', 's' or 't') */
-    bool verbose;    /** whether to display reflected lines on screen */
+    int target_c;         /** character representing the destination file ('d', 'h' or 'b') */
+    int blank_c;          /** how to handle the empty lines ('p', 's' or 't') */
+    bool verbose;         /** whether to display reflected lines on screen */
 } refl_opts;
+
+
+/** Data type for storing some data commonly used in this command */
+typedef struct {
+    size_t lines_num;     /** the number of lines to be reflected */
+    char **lines;         /** array of lines to be reflected */
+    size_t ptrs_num;      /** the number of dynamic memory allocated */
+    char **ptrs;          /** array of pointers to the beginning of dynamic memory allocated */
+    int reflecteds[2];    /** array of length 2 for storing the provisional number of reflected lines */
+    bool cmd_flag;        /** whether to reflect CMD or ENTRYPOINT instruction in Dockerfile */
+    bool onbuild_flag;    /** whether to convert normal Dockerfile instructions to ONBUILD instructions */
+} refl_data;
 
 
 static int parse_opts(int argc, char **argv, refl_opts *opt);
 static int do_reflect(int argc, char **argv, refl_opts *opt);
 
-static int reflect_file(const char *src_file, int target_c, const refl_opts *opt, int *p_errid);
-static int reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag);
-
-static int init_dockerfile(FILE *fp);
-static int check_dockerfile_instruction(char *line, bool onbuild_flag);
+static int construct_refl_data(refl_data *data, int argc, char **argv, const refl_opts *opt);
+static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag);
 
 static int record_reflected_lines(void);
-static int manage_provisional_report(unsigned short reflecteds[2], const char *mode);
+static int manage_provisional_report(int reflecteds[2], const char *mode);
 
 
 extern const char * const blank_args[ARGS_NUM];
@@ -116,11 +127,11 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
 
     int flag;
     const struct option long_opts[] = {
-        { "verbose", no_argument,        NULL, 'v'   },
-        { "help",    no_argument,        NULL,  1    },
-        { "blank",   required_argument, &flag, true  },
-        { "target",  required_argument, &flag, false },
-        {  0,         0,                  0,    0    }
+        { "verbose", no_argument,        NULL, 'v' },
+        { "help",    no_argument,        NULL,  1  },
+        { "blank",   required_argument, &flag, 'B' },
+        { "target",  required_argument, &flag, 'T' },
+        {  0,         0,                  0,    0  }
     };
 
     opt->target_c = '\0';
@@ -149,13 +160,15 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
                 reflect_manual();
                 return NORMALLY_EXIT;
             case 0:
-                if (flag){
-                    ptr = &(opt->blank_c);
-                    valid_args = blank_args;
-                }
-                else {
-                    ptr = &(opt->target_c);
-                    valid_args = target_args;
+                switch (flag){
+                    case 'B':
+                        ptr = &(opt->blank_c);
+                        valid_args = blank_args;
+                        break;
+                    default:
+                        assert(flag == 'T');
+                        ptr = &(opt->target_c);
+                        valid_args = target_args;
                 }
                 if ((c = receive_expected_string(optarg, valid_args, ARGS_NUM, 2)) >= 0){
                     *ptr = *(valid_args[c]);
@@ -178,65 +191,97 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
 
 
 /**
- * @brief parse the arguments to determine the target files and reflect their contents one by one.
+ * @brief perform the reflect processing in order for each target file.
  *
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
  * @param[out] opt  variable to store the results of option parse
  * @return int  0 (success), 1 (possible error) or negative integer (unexpected error)
- *
- * @note if no non-optional arguments, uses the convert-file prepared by this tool and reset it after use.
- * @note 'opt->target_c' keeps updating in the loop to represent the next 'target_c'.
  */
 static int do_reflect(int argc, char **argv, refl_opts *opt){
-    int target_c, errid, tmp, exit_status = SUCCESS;
-    const char *src_file;
-    FILE *fp;
+    assert(opt);
+
+    int tmp, exit_status = SUCCESS;
+    bool both_flag = false;
+
+    tmp = argc;
+
+    if (argc <= 0){
+        argc = 0;
+        tmp = 1;
+    }
+
+    if (opt->target_c == 'b'){
+        opt->target_c = 'd';
+        both_flag = true;
+    }
+
+    char *ptrs[tmp], **p_ptr;
+    refl_data data = { .reflecteds = {0}, .ptrs = ptrs };
 
     do {
-        target_c = opt->target_c;
+        assert((opt->target_c == 'd') || (opt->target_c == 'h'));
 
-        if (argc-- > 0){
-            if (! argc)
-                opt->target_c = '\0';
-
-            src_file = *(argv++);
-            if (check_if_stdin(src_file))
-                src_file = NULL;
+        if (! construct_refl_data(&data, argc, argv, opt)){
+            if ((tmp = reflect_lines(&data, opt, both_flag)) && (exit_status >= 0))
+                exit_status = tmp;
         }
-        else {
-            opt->target_c = '\0';
+        else if (! exit_status)
+            exit_status = POSSIBLE_ERROR;
 
-            switch (target_c){
-                case 'b':
-                    target_c = 'd';
-                    opt->target_c = 'h';
-                case 'd':
-                    src_file = CONVERT_RESULT_FILE_D;
-                    break;
-                default:
-                    src_file = CONVERT_RESULT_FILE_H;
-            }
-        }
+        if (data.lines)
+            free(data.lines);
+        for (p_ptr = data.ptrs; data.ptrs_num--; p_ptr++)
+            free(*p_ptr);
 
-        errid = 0;
-        if ((tmp = reflect_file(src_file, target_c, opt, &errid)) && (exit_status >= 0))
-            exit_status = tmp;
+        if (both_flag && (opt->target_c != 'h'))
+            opt->target_c = 'h';
+        else
+            break;
+    } while (true);
 
-        if (argc < 0){
-            if ((fp = fopen(src_file, "w")))
-                fclose(fp);
-            else
-                exit_status = UNEXPECTED_ERROR;
-        }
-        else if (errid){
-            if (errid < 0)
-                break;
-            if (! exit_status)
-                exit_status = POSSIBLE_ERROR;
-            xperror_standards(errid, src_file);
-        }
-    } while (opt->target_c);
+    if (update_provisional_report(data.reflecteds))
+        exit_status = UNEXPECTED_ERROR;
+
+    return exit_status;
+}
+
+
+/**
+ * @brief reflect the specified lines in Dockerfile, and record the number of reflected lines.
+ *
+ * @param[in]  lines  array of lines to be reflected
+ * @param[in]  size  array size
+ * @param[in]  cmd_flag  whether to reflect CMD or ENTRYPOINT instruction
+ * @param[in]  flag_c  flag code ('C' (cmd_flag), 'O' (onbuild_flag) or '\0' (no flags))
+ * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
+ *
+ * @note if the return value is -1, an internal file error has occurred, but the processing can be continued.
+ * @attention internally, it may use 'xfgets_for_loop' with a depth of 1.
+ */
+int reflect_to_dockerfile(char **lines, size_t size, bool verbose, int flag_c){
+    assert(lines);
+    assert((flag_c == 'C') || (flag_c == 'O') || (! flag_c));
+
+    int exit_status;
+
+    refl_data data = {
+        .lines_num = size,
+        .lines = lines,
+        .reflecteds = {0},
+        .cmd_flag = (flag_c == 'C'),
+        .onbuild_flag = (flag_c == 'O')
+    };
+
+    refl_opts opt = {
+        .target_c = 'd',
+        .verbose = verbose
+    };
+
+    exit_status = reflect_lines(&data, &opt, false);
+
+    if (update_provisional_report(data.reflecteds) && (exit_status >= 0))
+        exit_status = UNEXPECTED_ERROR - exit_status;
 
     return exit_status;
 }
@@ -250,31 +295,57 @@ static int do_reflect(int argc, char **argv, refl_opts *opt){
 
 
 /**
- * @brief reflect the contents of the specified files in Dockerfile or history-file.
+ * @brief construct the array of lines to be reflected in Dockerfile or history-file.
  *
- * @param[in]  src_file  source file name
- * @param[in]  target_c  character representing destination file ('d' or 'h')
+ * @param[out] data  variable to store the data commonly used in this command
+ * @param[in]  argc  the number of non-optional arguments
+ * @param[in]  argv  array of strings that are non-optional arguments
  * @param[in]  opt  variable to store the results of option parse
- * @param[out] p_errid  variable for recording the occured error, if necessary
- * @return int  0 (success), 1 (possible error) or negative integer (unexpected error)
+ * @return int  0 (success) or 1 (possible error)
  *
+ * @note if no non-optional arguments, uses the convert-file prepared by this tool and reset it after use.
  * @note squeezing repeated empty lines is done across multiple source files.
- * @note whether there is an error when opening the source file is not reflected in the return value.
- * @note if the content of 'p_errid' is -1 after this call, processing used the same source should be aborted.
+ * @note each CMD and ENTRYPOINT instruction must meet the limit of 1 or less.
  */
-static int reflect_file(const char *src_file, int target_c, const refl_opts *opt, int *p_errid){
-    static bool first_blank = true;
+static int construct_refl_data(refl_data *data, int argc, char **argv, const refl_opts *opt){
+    assert(data);
+    assert(data->ptrs);
+    assert(argc >= 0);
+    assert(argv);
+    assert(opt);
 
-    char *line;
-    int tmp, exit_status = SUCCESS;
+    char **p_ptr, *line;
+    const char *src_file, *errdesc = NULL;
+    int exit_status = SUCCESS, lineno, instr_id;
+    bool first_blank = true, first_cmd = true, first_entrypoint = true;
+    size_t curr_size = 0, old_size = 0;
+    void *ptr;
+    FILE *fp;
 
-    if (! p_errid){
-        int errid = 0;
-        p_errid = &errid;
-    }
+    data->lines_num = 0;
+    data->lines = NULL;
+    data->ptrs_num = 0;
+    p_ptr = data->ptrs;
 
     do {
-        if ((line = xfgets_for_loop(src_file, NULL, p_errid))){
+        if (argc){
+            if (! (src_file = *(argv++)))
+                continue;
+            if (check_if_stdin(src_file))
+                src_file = NULL;
+        }
+        else if (opt->target_c == 'd')
+            src_file = CONVERT_RESULT_FILE_D;
+        else
+            src_file = CONVERT_RESULT_FILE_H;
+
+        if (src_file && (get_file_size(src_file) < 0)){
+            exit_status = POSSIBLE_ERROR;
+            xperror_standards(errno, src_file);
+            break;
+        }
+
+        for (lineno = 0; (line = xfgets_for_loop(src_file, p_ptr, &exit_status)); lineno++){
             if (! *line){
                 switch (opt->blank_c){
                     case 's':
@@ -284,220 +355,212 @@ static int reflect_file(const char *src_file, int target_c, const refl_opts *opt
                         }
                     case 't':
                         continue;
+                    default:
+                        assert(opt->blank_c == 'p');
                 }
             }
             else
                 first_blank = true;
-        }
-        if ((tmp = reflect_line(line, target_c, opt->target_c, opt->verbose, false))){
-            if (exit_status >= 0)
-                exit_status = tmp;
-            if (tmp != UNEXPECTED_ERROR)
-                *p_errid = -1;
-        }
-    } while (line);
 
-    return exit_status;
-}
+            if (argc && (opt->target_c == 'd')){
+                instr_id = -1;
 
+                if (receive_dockerfile_instr(line, &instr_id)){
+                    assert((instr_id >= -1) && (instr_id < DOCKER_INSTRS_NUM));
 
-
-
-/**
- * @brief reflect the specified line in Dockerfile or history-file, and record the number of reflected lines.
- *
- * @param[in]  line  target line
- * @param[in]  target_c  character representing destination file ('d' or 'h')
- * @param[in]  next_target_c  the next 'target_c' if there are files waiting to be processed or '\0'
- * @param[in]  verbose  whether to display reflected lines on screen
- * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
- * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
- *
- * @note if the destination file is too large to be represented by int type, exits with the error.
- * @note if both files are destination, it will be indicated when reflecting the first line in each.
- * @note record the number of reflected lines after there are no more lines to be reflected.
- * @note if the return value is -1, an internal file error has occurred, but processing can be continued.
- *
- * @attention this function must be called until NULL is passed to 'line' to close the destination file.
- */
-static int reflect_line(char *line, int target_c, int next_target_c, bool verbose, bool onbuild_flag){
-    static FILE *fp = NULL;
-    static unsigned short curr_reflecteds[2] = {0};
-    static int prev_target_c = '\0';
-
-    int exit_status = SUCCESS;
-
-    if (line){
-        const char *dest_file, *format = "ONBUILD %s\n";
-        unsigned int target_id;
-        int size;
-
-        do {
-            if (target_c == 'd'){
-                if ((exit_status = check_dockerfile_instruction(line, onbuild_flag)) &&
-                    (exit_status != UNEXPECTED_ERROR))
-                        break;
-                dest_file = DOCKER_FILE_DRAFT;
-                target_id = 0;
-            }
-            else {
-                dest_file = HISTORY_FILE;
-                target_id = 1;
-            }
-
-            if (((size = get_file_size(dest_file)) == -2) || (! (fp || (fp = fopen(dest_file, "a"))))){
-                exit_status = exit_status ? (UNEXPECTED_ERROR + ERROR_EXIT) : POSSIBLE_ERROR;
-                xperror_standards(errno, dest_file);
-                break;
-            }
-            if ((size <= 0) && (! target_id) && ((curr_reflecteds[0] += init_dockerfile(fp)) != 3)){
-                exit_status = UNEXPECTED_ERROR + ERROR_EXIT;
-                break;
-            }
-
-            if (! onbuild_flag)
-                format += 8;
-
-            curr_reflecteds[target_id]++;
-            fprintf(fp, format, line);
-
-            if (verbose){
-                if (prev_target_c != target_c){
-                    if ((target_c != next_target_c) && (next_target_c != prev_target_c))
-                        fprintf(stdout, ("\n < %s >\n" + (target_id ^ 1)), target_args[target_id + 1]);
-
-                    prev_target_c = target_c;
+                    switch (instr_id){
+                        case ID_CMD:
+                            if (! first_cmd)
+                                errdesc = "duplicated CMD instruction";
+                            first_cmd = false;
+                            break;
+                        case ID_ENTRYPOINT:
+                            if (! first_entrypoint)
+                                errdesc = "duplicated ENTRYPOINT instruction";
+                            first_entrypoint = false;
+                            break;
+                        case ID_FROM:
+                        case ID_MAINTAINER:
+                            errdesc = "instruction not allowed";
+                    }
                 }
-                fprintf(stdout, format, line);
+                else
+                    errdesc = "invalid instruction";
+
+                if (errdesc){
+                    exit_status = -1;
+                    continue;
+                }
             }
-        } while (false);
-    }
-    else if (target_c != next_target_c){
-        if (fp){
-            fclose(fp);
-            fp = NULL;
+
+            if (data->lines_num == curr_size){
+                curr_size = old_size ? (old_size * 2) : REFL_INITIAL_LINES_MAX;
+
+                if ((old_size < curr_size) && (ptr = realloc(data->lines, (sizeof(char *) * curr_size)))){
+                    data->lines = (char **) ptr;
+                    old_size = curr_size;
+                }
+                else {
+                    exit_status = -1;
+                    continue;
+                }
+            }
+
+            assert(data->lines);
+            data->lines[data->lines_num++] = line;
         }
-        if (! next_target_c){
-            exit_status = update_provisional_report(curr_reflecteds);
-            curr_reflecteds[0] = 0;
-            curr_reflecteds[1] = 0;
+
+        if (*p_ptr){
+            data->ptrs_num++;
+            p_ptr++;
         }
-    }
+        if (exit_status){
+            exit_status = POSSIBLE_ERROR;
+
+            if (errdesc)
+                xperror_file_contents(src_file, lineno, errdesc);
+            break;
+        }
+        if (! argc){
+            assert(src_file);
+            assert(! errdesc);
+
+            if ((fp = fopen(src_file, "w")))
+                fclose(fp);
+        }
+    } while (--argc > 0);
+
+    data->cmd_flag = false;
+    data->onbuild_flag = false;
+
+    if (! (first_cmd && first_entrypoint))
+        data->cmd_flag = true;
 
     return exit_status;
 }
 
 
+
+
 /**
- * @brief reflect the specified line in Dockerfile, and record the number of reflected lines.
+ * @brief reflect the specified lines in Dockerfile or history-file.
  *
- * @param[in]  line  target line
- * @param[in]  verbose  whether to display reflected lines on screen
- * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
+ * @param[out] data  variable to store the data commonly used in this command
+ * @param[in]  opt  variable to store the results of option parse
+ * @param[in]  both_flag  whether to edit both Dockerfile and history-file
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
- * @note if the return value is -1, an internal file error has occurred, but processing can be continued.
- *
- * @attention this function must be called until NULL is passed to 'line' to close the destination file.
- * @attention internally, it may use 'xfgets_for_loop' with a depth of 1.
+ * @note if the return value is -1, an internal file error has occurred, but the processing can be continued.
+ * @note if the Dockerfile.draft is empty, it will be initialized based on its base file.
  */
-int reflect_to_dockerfile(char *line, bool verbose, bool onbuild_flag){
-    return reflect_line(line, 'd', '\0', verbose, onbuild_flag);
-}
+static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag){
+    assert(data);
+    assert(opt);
 
+    unsigned int target_id;
+    const char *dest_file;
+    int file_size, exit_status = SUCCESS;
 
-
-
-/******************************************************************************
-    * Functions related to Dockerfile
-******************************************************************************/
-
-
-/**
- * @brief reflect the Dockerfile base instructions in an empty Dockerfile.
- *
- * @param[out] fp  handler for destination file
- * @return int  the number of reflected lines
- *
- * @note reflect FROM, SHELL and WORKDIR instructions exactly one by one in this order, otherwise an error.
- */
-static int init_dockerfile(FILE *fp){
-    char *line;
-    int errid = 0, reflected = 0;
-
-    int instr_ids[3] = {
-        ID_FROM,
-        ID_SHELL,
-        ID_WORKDIR
-    };
-
-    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, NULL, &errid))){
-        if ((reflected < 3) && (receive_dockerfile_instruction(line, (instr_ids + reflected)))){
-            reflected++;
-            fprintf(fp, "%s\n", line);
-        }
-        else
-            errid = -1;
+    if (opt->target_c == 'd'){
+        target_id = 0;
+        dest_file = DOCKER_FILE_DRAFT;
+    }
+    else {
+        target_id = 1;
+        dest_file = HISTORY_FILE;
     }
 
-    return reflected;
-}
+    assert(! data->reflecteds[target_id]);
 
+    if ((file_size = get_file_size(dest_file)) != -2){
+        if (data->cmd_flag && (file_size >= 0)){
+            char seq[] = "^[[:space:]]*CMD[[:space:]]\0^[[:space:]]*ENTRYPOINT[[:space:]]";
+            char *patterns[2] = { seq, (seq + 28) };
 
-/**
- * @brief check the validity of the target line as Dockerfile instruction.
- *
- * @param[in]  line  target line
- * @param[in]  onbuild_flag  whether to convert normal Dockerfile instructions to ONBUILD instructions
- * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
- *
- * @note satisfy the restriction that each of CMD and ENTRYPOINT instructions is one or less in Dockerfile.
- * @note if the return value is -1, an internal file error has occurred, but processing can be continued.
- *
- * TODO: error checking function by parsing
- */
-static int check_dockerfile_instruction(char *line, bool onbuild_flag){
-    static bool cmd_ent_duplicates[2] = {true, true};
+            exit_status = delete_from_dockerfile(patterns, 2, false, 'Y');
+        }
 
-    const char *errdesc;
-    int instr_id = -1, exit_status = SUCCESS;
+        if ((exit_status == SUCCESS) || (exit_status == UNEXPECTED_ERROR)){
+            FILE *fps[2];
 
-    if (*line){
-        errdesc =
-            (! (receive_dockerfile_instruction(line, &instr_id))) ?
-                "Invalid Instruction" :
-            ((instr_id == ID_FROM) || (instr_id == ID_MAINTAINER)) ?
-                "Instruction not Allowed" :
-            (onbuild_flag && (instr_id == ID_ONBUILD)) ?
-                "Instruction Format Error" :
-            NULL;
+            if ((fps[0] = fopen(dest_file, "a"))){
+                int i, fpn = 1, phase = 1, id = 0, addition = 1;
+                size_t remain, new_size;
+                char **p_line, *line;
+                const char *format = "%s\n";
 
-        if (! errdesc){
-            const int cmd_ent_ids[2] = {ID_CMD, ID_ENTRYPOINT};
+                if (opt->verbose){
+                    if (both_flag){
+                        i = target_id ^ 1;
+                        print_target_repr(i);
+                    }
+                    fps[fpn++] = stdout;
+                }
 
-            // char tmp[] = "^CMD^ENTRYPOINT";
-            // char *cmd_ent_patterns[2] = {tmp, (tmp + 4)};
+                if (file_size <= 0){
+                    file_size = 0;
+                    if (opt->target_c == 'd')
+                        phase = 0;
+                }
 
-            int i = 1;
-            do
-                if (instr_id == cmd_ent_ids[i]){
-                    if (cmd_ent_duplicates[i]){
-                        // exit_status = delete_from_dockerfile(cmd_ent_patterns, 2, false, 'Y');
-                        // TODO: waiting the implementation of cmd commnad
+                remain = data->lines_num;
+                p_line = data->lines;
 
-                        cmd_ent_duplicates[0] = false;
-                        cmd_ent_duplicates[1] = false;
+                new_size = file_size;
+
+                do {
+                    switch (phase){
+                        case 0:
+                            if ((line = xfgets_for_loop(DOCKER_FILE_BASE, NULL, &id))){
+                                id = -1;
+                                if (receive_dockerfile_instr(line, &id) && (file_size || (id == ID_FROM))){
+                                    id = 0;
+                                    break;
+                                }
+                                continue;
+                            }
+                            if (id){
+                                exit_status = FATAL_ERROR;
+                                break;
+                            }
+                        case 1:
+                            if (data->onbuild_flag){
+                                format = "ONBUILD %s\n";
+                                addition += 8;
+                            }
+                            phase = 2;
+                        default:
+                            line = (remain--) ? *(p_line++) : NULL;
+                    }
+                    if (! line)
+                        break;
+
+                    assert(addition);
+                    new_size += strlen(line) + addition;
+
+                    if ((file_size < new_size) && (new_size < INT_MAX)){
+                        file_size = new_size;
+                        data->reflecteds[target_id]++;
+
+                        for (i = fpn; i--;)
+                            fprintf(fps[i], format, line);
+                    }
+                    else {
+                        exit_status = (! exit_status) ? POSSIBLE_ERROR : FATAL_ERROR;
+                        xperror_message("file size overflow detected, ending soon", dest_file);
                         break;
                     }
-                    else
-                        cmd_ent_duplicates[i] = true;
-                }
-            while (i--);
+                } while (true);
+
+                fclose(fps[0]);
+            }
+            else
+                exit_status = (! exit_status) ? POSSIBLE_ERROR : FATAL_ERROR;
         }
-        else {
-            exit_status = POSSIBLE_ERROR;
-            xperror_message(line, errdesc);
-        }
+    }
+    else {
+        exit_status = POSSIBLE_ERROR;
+        xperror_standards(errno, dest_file);
     }
 
     return exit_status;
@@ -519,12 +582,11 @@ static int check_dockerfile_instruction(char *line, bool onbuild_flag){
  * @note some functions detect errors when initializing each file, but they are ignored.
  */
 static int record_reflected_lines(void){
-    int exit_status, tmp;
+    int exit_status, tmp, reflecteds[2] = {0};
 
-    unsigned short reflecteds[2] = {0};
     exit_status = reset_provisional_report(reflecteds);
-
     tmp = update_erase_logs(reflecteds);
+
     if (! exit_status)
         exit_status = tmp;
 
@@ -566,18 +628,25 @@ static int record_reflected_lines(void){
  * @attention 'mode' of length 4 should be specified to read and write sequentially with one call.
  * @attention unless the end of 'mode' is '\0' at the last call, cannot release the file handler.
  */
-static int manage_provisional_report(unsigned short reflecteds[2], const char *mode){
+static int manage_provisional_report(int reflecteds[2], const char *mode){
+    assert(reflecteds);
+    assert(reflecteds[0] >= 0);
+    assert(reflecteds[1] >= 0);
+    assert(mode);
+
     static FILE *fp = NULL;
 
-    int mode_c, keep_c, exit_status = SUCCESS;
+    int *array_for_write, mode_c, keep_c, array_for_read[2], exit_status = SUCCESS;
     char fm[] = "rb+";
-    unsigned short array_for_read[2], *array_for_write;
 
     array_for_write = reflecteds;
 
     do {
         mode_c = (unsigned char) *(mode++);
         keep_c = (unsigned char) *(mode++);
+
+        assert((mode_c == 'r') || (mode_c == 'w'));
+        assert((keep_c == '+') || (! keep_c));
 
         if (! fp){
             fm[0] = mode_c;
@@ -587,15 +656,17 @@ static int manage_provisional_report(unsigned short reflecteds[2], const char *m
 
         if (fp){
             if (mode_c == 'r'){
-                if (fread(array_for_read, sizeof(unsigned short), 2, fp) == 2){
+                if (fread(array_for_read, sizeof(int), 2, fp) == 2){
                     reflecteds[0] += array_for_read[0];
                     reflecteds[1] += array_for_read[1];
+                    assert(reflecteds[0] >= array_for_read[0]);
+                    assert(reflecteds[1] >= array_for_read[1]);
                 }
                 else
                     exit_status = UNEXPECTED_ERROR;
             }
             else
-                fwrite(array_for_write, sizeof(unsigned short), 2, fp);
+                fwrite(array_for_write, sizeof(int), 2, fp);
 
             if (! keep_c){
                 fclose(fp);
@@ -623,27 +694,27 @@ static int manage_provisional_report(unsigned short reflecteds[2], const char *m
 /**
  * @brief read the provisional number of reflected lines from the file that recorded them.
  *
- * @param[out] prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
+ * @param[out] reflecteds  array of length 2 for storing the provisional number of reflected lines
  * @return int  0 (success) or -1 (unexpected error)
  *
- * @attention each element of 'prov_reflecteds' must be initialized with 0 before calling this function.
+ * @attention each element of 'reflecteds' must be initialized with 0 before calling this function.
  * @attention the file handler cannot be released without calling 'write_provisional_report' after this call.
  */
-int read_provisional_report(unsigned short prov_reflecteds[2]){
-    return manage_provisional_report(prov_reflecteds, "r+");
+int read_provisional_report(int reflecteds[2]){
+    return manage_provisional_report(reflecteds, "r+");
 }
 
 
 /**
  * @brief write the provisional number of reflected lines to the file that records them.
  *
- * @param[in]  prov_reflecteds  array of length 2 for storing the provisional number of reflected lines
+ * @param[in]  reflecteds  array of length 2 for storing the provisional number of reflected lines
  * @return int  0 (success) or -1 (unexpected error)
  *
  * @note basically read the current values by 'read_provisional_report' before calling this function.
  */
-int write_provisional_report(unsigned short prov_reflecteds[2]){
-    return manage_provisional_report(prov_reflecteds, "w\0");
+int write_provisional_report(int reflecteds[2]){
+    return manage_provisional_report(reflecteds, "w\0");
 }
 
 
@@ -655,6 +726,7 @@ int write_provisional_report(unsigned short prov_reflecteds[2]){
 /******************************************************************************
     * Unit Test Functions
 ******************************************************************************/
+
 
 void reflect_test(void){
     fputs("reflect test\n", stdout);

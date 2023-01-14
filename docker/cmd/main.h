@@ -44,6 +44,7 @@
 
 #define POSSIBLE_ERROR 1
 #define UNEXPECTED_ERROR (-1)
+#define FATAL_ERROR  (UNEXPECTED_ERROR + ERROR_EXIT)
 
 #define CMDS_NUM 14
 #define ARGS_NUM 3
@@ -113,7 +114,7 @@
 
 
 /******************************************************************************
-    * IDs for 'receive_dockerfile_instruction'
+    * IDs for 'receive_dockerfile_instr'
 ******************************************************************************/
 
 #define ID_ADD           0
@@ -185,13 +186,13 @@ void reflect_manual(void);
 int get_config(const char *config_arg, int modes[2]);
 
 int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assume_c);
-int update_erase_logs(unsigned short prov_reflecteds[2]);
+int update_erase_logs(int reflecteds[2]);
 
 bool check_if_ignored(const yyjson_doc *idoc, int argc, char **argv);
 
-int reflect_to_dockerfile(char *line, bool verbose, bool onbuild_flag);
-int read_provisional_report(unsigned short prov_reflecteds[2]);
-int write_provisional_report(unsigned short prov_reflecteds[2]);
+int reflect_to_dockerfile(char **lines, size_t size, bool verbose, int flag_c);
+int read_provisional_report(int reflecteds[2]);
+int write_provisional_report(int reflecteds[2]);
 
 
 
@@ -207,6 +208,7 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
 void xperror_too_many_args(int limit);
 
 void xperror_message(const char * restrict msg, const char * restrict addition);
+void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg);
 void xperror_suggestion(bool cmd_flag);
 
 
@@ -225,7 +227,7 @@ int qstrcmp(const void *a, const void *b);
 
 int receive_positive_integer(const char *target, int *p_left);
 int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode);
-char *receive_dockerfile_instruction(char *line, int *p_id);
+char *receive_dockerfile_instr(char *line, int *p_id);
 
 
 /******************************************************************************

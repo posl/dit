@@ -694,13 +694,16 @@ void reflect_manual(void){
         "\n"
         HELP_REMARKS_STR
         "  - If no SOURCEs are specified, it uses the results of the previous dit command 'convert'.\n"
-        "  - If '-' is specified as SOURCE, it read standard input until 'EOF' is entered.\n"
+        "  - If '-' is specified as SOURCE, it read standard input until reading 'EOF' character.\n"
         "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
         "  - Destination "SPECIFIED_BY_TARGET".\n"
         "  - If both files are destination, the reflection contents cannot be specified by SOURCEs.\n"
-        "  - If the size of destination file exceeds the upper limit (2G), it exits with the error.\n"
-        "  - When reflecting in Dockerfile, each instruction must be on one line.\n"
-        "  - Dockerfile is adjusted so that each of CMD and ENTRYPOINT instructions is 1 or less.\n"
+        "  - If the size of destination file exceeds the upper limit (2G), it exits with the error, and\n"
+        "    if the upper limit is exceeded during reflection, it aborts the processing in the middle.\n"
+        "  - When reflecting in Dockerfile, each instruction to be reflected must be on one line.\n"
+        "  - When reflecting CMD or ENTRYPOINT instruction in Dockerfile, each of them must be one or\n"
+        "    less, and the existing CMD and ENTRYPOINT instructions are deleted before reflection.\n"
+        "  - When reflecting in history-file, it does not check the syntax of the lines to be reflected.\n"
         "  - Internally, logging such as the number of reflected lines is performed.\n"
     , stdout);
 }
