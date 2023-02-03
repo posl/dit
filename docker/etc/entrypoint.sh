@@ -134,7 +134,7 @@ PROMPT_REFLECT()
 
         : > /dit/tmp/reflect-report.real
         if dit reflect && unset PS1 2> /dev/null; then
-            PS1="$( cat /dit/tmp/reflect-report.real )"
+            PS1="$( < /dit/tmp/reflect-report.real )"
         fi
     fi
 }

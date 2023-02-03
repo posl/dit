@@ -4,7 +4,7 @@
 
 // if you want to test each command, comment out the line immediately after
 #ifndef NDEBUG
-// #define NDEBUG
+#define NDEBUG
 #endif
 
 
@@ -236,7 +236,7 @@ char *receive_dockerfile_instr(char *line, int *p_id);
 
 int get_file_size(const char *file_name);
 int get_last_exit_status(void);
-char * get_suffix(char *target, int delimiter, bool retain);
+char *get_suffix(char *target, int delimiter, bool retain);
 
 
 #endif // DOCKER_INTERACTIVE_TOOL
