@@ -8,38 +8,39 @@ WORKDIR /dit/src
 # install essential packages
 COPY ./etc/package.sh /dit/etc/
 
-RUN sh -eu /dit/etc/package.sh \
+RUN set -eux; \
+    sh -eu /dit/etc/package.sh \
         ca-certificates \
         curl \
         gcc \
         make \
-    && \
+    ; \
     grep -Fq 'yum' /dit/etc/package_manager || \
     sh -eu /dit/etc/package.sh \
-        libc-dev
+        libc-dev \
+    ;
 
 
 # build the command to switch users
 ARG COMMIT_ID='212b75144bbc06722fbd7661f651390dc47a43d1'
 
-RUN curl -L "https://github.com/ncopa/su-exec/archive/${COMMIT_ID}.tar.gz" | tar -xvz && \
-    cd "su-exec-${COMMIT_ID}" && \
-    make CC='gcc' && \
-    mv su-exec /usr/local/bin/ && \
-    cd .. && \
-    rm -rf "su-exec-${COMMIT_ID}"
+RUN set -eux; \
+    curl -L "https://github.com/ncopa/su-exec/archive/${COMMIT_ID}.tar.gz" | tar -xvz; \
+    cd "su-exec-${COMMIT_ID}"; \
+    make CC='gcc'; \
+    mv su-exec /usr/local/bin/; \
+    cd ..; \
+    rm -rf "su-exec-${COMMIT_ID}";
 
 
 # generate the dit command
 COPY ./cmd ./
 
-RUN make && make clean
+RUN set -eux; \
+    make; \
+    make clean;
 
 
-
-
-ARG BASE_NAME
-ARG BASE_VERSION
 
 FROM "${BASE_NAME}:${BASE_VERSION}" AS product
 
@@ -53,15 +54,16 @@ COPY ./etc /dit/etc/
 ARG BASE_NAME
 ARG BASE_VERSION
 
-RUN whoami > /dit/etc/default_user && \
+RUN set -eux; \
+    whoami > /dit/etc/default_user; \
     { \
-        echo "FROM ${BASE_NAME}:${BASE_VERSION}" && \
-        echo "WORKDIR $( pwd )" && \
+        echo "FROM ${BASE_NAME}:${BASE_VERSION}"; \
+        echo "WORKDIR $( pwd )"; \
         { \
             type /bin/bash > /dev/null 2>&1 || dit package -v bash; \
-        } && \
+        }; \
         echo 'SHELL [ "/bin/bash", "--posix", "-c" ]'; \
-    } > /dit/etc/Dockerfile.base
+    } > /dit/etc/Dockerfile.base;
 
 
 # initialization process is performed by the privileged user
@@ -76,10 +78,12 @@ CMD [ "/bin/bash", "--posix" ]
 FROM product AS test
 
 # change not to switch users, and install the diff command as needed
-RUN echo 'root' > /dit/etc/default_user && \
+RUN set -eux; \
+    echo 'root' > /dit/etc/default_user; \
     type diff > /dev/null 2>&1 || \
     sh -eu /dit/etc/package.sh \
-        diffutils
+        diffutils \
+    ;
 
 
 # verify all dit commands work properly
