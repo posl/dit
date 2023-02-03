@@ -21,6 +21,14 @@ if [ -s /dit/mnt/Dockerfile.draft ]; then
     fi
 fi
 
+if [ ! -s /dit/mnt/.dockerignore ]; then
+    {
+        echo .dit_history;
+        echo Dockerfile.draft;
+    } > /dit/mnt/.dockerignore
+fi
+
+
 touch \
     /dit/mnt/.dit_history \
     /dit/mnt/.dockerignore \
