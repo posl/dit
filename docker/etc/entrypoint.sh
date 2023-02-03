@@ -41,7 +41,8 @@ touch \
 # set the permissions on several files specific to this tool
 #
 
-chmod a=x /usr/local/bin/dit
+chown root /usr/local/bin/dit
+chmod a=x,u+s /usr/local/bin/dit
 
 find /dit/etc -type f -exec chmod a=r {} +
 

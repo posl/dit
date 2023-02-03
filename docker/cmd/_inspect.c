@@ -960,8 +960,8 @@ static void new_file_test(void){
     file_node *file;
     mode_t mode;
 
-    uid = getuid();
-    gid = getgid();
+    uid = geteuid();
+    gid = getegid();
 
 
     // when specifying a regular file
