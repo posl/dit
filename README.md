@@ -1,13 +1,14 @@
 <!-- omit in toc -->
-# Interactive Tool for Docker
+# dit
 
-1. [Procedure](#procedure)
+1. [How to use](#how-to-use)
+
 
 
 <br>
 
 
-## Procedure
+## How to use
 
 1. prepare a directory to be used for development with Docker.
 

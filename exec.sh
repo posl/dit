@@ -141,4 +141,4 @@ case "${BUILD_TARGET}" in
     esac
 
 
-( [ -n "${NO_BUILD}" ] || docker-compose build ) && docker-compose run --rm dit
+( [ -n "${NO_BUILD}" ] || docker-compose build ) && docker-compose run --rm dev

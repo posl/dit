@@ -2,7 +2,7 @@ version: "3.8"
 
 
 services:
-  dit:
+  dev:
     build:
       context: ./docker
       target: "${BUILD_TARGET:?}"
