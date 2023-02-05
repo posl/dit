@@ -145,14 +145,12 @@ PROMPT_OPTION()
     :
 }
 
-readonly -f PROMPT_REFLECT
 export -f PROMPT_REFLECT PROMPT_OPTION
 
 
 PS1=' [d:?? h:??] \u:\w \$ '
 PROMPT_COMMAND='{ PROMPT_REFLECT; PROMPT_OPTION; } > /dev/null'
 
-readonly PROMPT_COMMAND
 export PS1 PROMPT_COMMAND
 
 
@@ -169,6 +167,9 @@ cat <<EOF > /tmp/dit_profile.sh
 set -a
 shopt -u expand_aliases
 enable -n help
+
+readonly PROMPT_COMMAND
+readonly -f PROMPT_REFLECT
 
 if [ -s /dit/mnt/.dit_history ]; then
     echo 'Reproducing the environment under construction ...'
