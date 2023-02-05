@@ -1,0 +1,50 @@
+\section{簡単な使い方}
+
+\begin{frame}[fragile]{手順 １/４\\「提案ツールのソースコードを取得する」}
+    提案ツールの\href{https://github.com/posl/dit}{リポジトリ}をクローンする．
+    \vskip2.0zh
+
+    実行例
+\begin{lstlisting}[]
+URL=https://github.com/posl/dit.git
+git clone --depth 1 "${URL}"
+\end{lstlisting}
+
+\end{frame}
+
+
+\begin{frame}[fragile]{手順 ２/４\\「開発用のコンテナを起動し，開発を開始する」}
+    開発用のディレクトリを設定しながら，\textcolor{red!75}{exec.sh}を実行する．\\
+    実行後は，指定したベースイメージに\textcolor{red!75}{bash}で入った状態．
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{img/usage1.pdf}
+    \end{figure}
+\end{frame}
+
+
+\begin{frame}{手順 ３/４\\「動作確認しながら，目的の環境構築を行う」}
+    コンテナ内で動作確認しながら，環境構築することで，\\
+    それと同時に，\textcolor{red!75}{自動的に}Dockerfileが作られていく．
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.8\linewidth]{img/usage2.pdf}
+    \end{figure}
+\end{frame}
+
+
+\begin{frame}{手順 ４/４\\「Dockerfileを完成させる」}
+    次の処理は，提案ツールの機能を使う．
+    \begin{description}[labelwidth=6.0zw]
+        \item[dit package] パッケージのインストール
+        \item[dit copy] ホスト環境からのファイルのコピー
+        \item[dit optimize] Dockerfileのリファクタリング・最適化
+    \end{description}
+
+    \vskip2.0zh
+    最後に，Dockerfileのリファクタリング・最適化を行う．
+
+    これで，目的のDockerfileが完成する．
+\end{frame}

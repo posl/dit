@@ -1,0 +1,47 @@
+\section{背景と目的}
+
+\begin{frame}{イメージが抱える課題とその解決手法}
+    \begin{multicols}{2}
+        \begin{list}{}{\setlength{\itemsep}{1.0zh}}
+            \setlength{\itemindent}{-3.0zw}
+            \item ビルド時間の短縮
+            \item イメージサイズの削減
+            \item イメージ分析
+            \item サイバー攻撃への対策
+            \item 同一性の確認
+            \item 再現性の確保
+            \item イメージ開発の効率化
+            \item 保守性の確保
+        \columnbreak
+        \setlength{\itemindent}{-4.6zw}
+            \begin{onlyenv}<2->
+                \item[→] キャッシュの利用，BuildKit
+                \item[→] マルチステージビルド，Slim
+                \item[→] dive，dlayer
+                \item[→] Distrolessイメージ，BuildKit
+                \item[→] ハッシュによる確認，イメージ署名
+                \item[→] ？
+            \end{onlyenv}
+            \begin{onlyenv}<2-3>
+                \item[→] ？
+                \item[→] ？
+            \end{onlyenv}
+            \begin{onlyenv}<4>
+                \item[→] \textcolor{red!75}{インタラクティブツール}
+                \item[→] \textcolor{red!75}{リファクタリング・最適化の機能}
+            \end{onlyenv}
+        \end{list}
+    \end{multicols}
+
+    \begin{tikzpicture}[remember picture]
+        \useasboundingbox (0.0, 0.0);
+        \begin{scope}[shift={(current page.south west)}]
+            \begin{tikzpicture}[remember picture, overlay]
+                \begin{onlyenv}<3>
+                    \node[callout, callout absolute pointer={(5.6, 2.2)}] at (8.8, 1.8) {提案ツールで解決したい};
+                    \node[callout, callout absolute pointer={(5.6, 1.2)}] at (8.8, 1.8) {提案ツールで解決したい};
+                \end{onlyenv}
+            \end{tikzpicture}
+        \end{scope}
+    \end{tikzpicture}
+\end{frame}
