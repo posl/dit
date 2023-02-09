@@ -608,6 +608,17 @@ int qstrcmp(const void *a, const void *b){
 
 
 
+
+int xexecv(const char *cmd_path, char * const argv[]){
+    assert(cmd_path);
+    assert(argv);
+
+    
+}
+
+
+
+
 /******************************************************************************
     * String Recognizers
 ******************************************************************************/
