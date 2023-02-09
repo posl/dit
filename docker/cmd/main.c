@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-#define EXIT_STATUS_FILE "/dit/tmp/last-exit-status"
+#define EXIT_STATUS_FILE "/dit/srv/last-exit-status"
 
 #define XFGETS_NESTINGS_MAX 2
 #define XFGETS_INITIAL_SIZE 1023
@@ -366,7 +366,7 @@ void xperror_file_contents(const char * restrict file_name, int lineno, const ch
     assert(msg);
 
     if (! file_name)
-        file_name = "/dev/stdin";
+        file_name = "stdin";
 
     fprintf(stderr, "%s: %s: line %d: %s\n", program_name, file_name, lineno, msg);
 }

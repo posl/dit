@@ -56,8 +56,8 @@ chmod a=rw \
 DEFAULT_UMASK_VALUE="$( umask )"
 umask 0000
 
-if [ ! -e /dit/tmp ]; then
-    mkdir /dit/tmp
+if [ ! -e /dit/srv ]; then
+    mkdir /dit/srv
 fi
 
 if [ ! -e /dit/var ]; then
@@ -65,15 +65,15 @@ if [ ! -e /dit/var ]; then
 fi
 
 touch \
-    /dit/tmp/convert-result.dock \
-    /dit/tmp/convert-result.hist \
-    /dit/tmp/erase-result.dock \
-    /dit/tmp/erase-result.hist \
-    /dit/tmp/last-command-line \
-    /dit/tmp/last-exit-status \
-    /dit/tmp/last-history-number \
-    /dit/tmp/reflect-report.prov \
-    /dit/tmp/reflect-report.real \
+    /dit/srv/convert-result.dock \
+    /dit/srv/convert-result.hist \
+    /dit/srv/erase-result.dock \
+    /dit/srv/erase-result.hist \
+    /dit/srv/last-command-line \
+    /dit/srv/last-exit-status \
+    /dit/srv/last-history-number \
+    /dit/srv/reflect-report.prov \
+    /dit/srv/reflect-report.real \
     \
     /dit/var/cmd.log \
     /dit/var/config.stat \
@@ -81,9 +81,7 @@ touch \
     /dit/var/erase.log.hist \
     /dit/var/ignore.json.dock \
     /dit/var/ignore.json.hist \
-    /dit/var/optimize.json \
-    \
-    /tmp/dit_profile.sh
+    /dit/var/optimize.json
 
 umask "${DEFAULT_UMASK_VALUE}"
 
@@ -91,7 +89,7 @@ umask "${DEFAULT_UMASK_VALUE}"
 chmod a=rx \
     /dit \
     /dit/etc \
-    /dit/tmp \
+    /dit/srv \
     /dit/var
 
 
@@ -106,10 +104,10 @@ do
 done
 
 
-echo '0' > /dit/tmp/last-exit-status
-echo '-1' > /dit/tmp/last-history-number
+echo '0' > /dit/srv/last-exit-status
+echo '-1' > /dit/srv/last-history-number
 
-: > /tmp/dit_profile.sh
+: > /dit/tmp/.profile
 
 config -r
 ignore -dhr
@@ -127,15 +125,15 @@ PROMPT_REFLECT()
     local LAST_EXIT_STATUS="$?"
 
     if history 1 | awk -f /dit/etc/parse_history.awk; then
-        echo "${LAST_EXIT_STATUS}" > /dit/tmp/last-exit-status
+        echo "${LAST_EXIT_STATUS}" > /dit/srv/last-exit-status
 
         if dit convert -qs; then
             dit reflect -dh
         fi
 
-        : > /dit/tmp/reflect-report.real
+        : > /dit/srv/reflect-report.real
         if dit reflect && unset PS1 2> /dev/null; then
-            PS1="$( < /dit/tmp/reflect-report.real )"
+            PS1="$( < /dit/srv/reflect-report.real )"
         fi
     fi
 }
@@ -159,11 +157,11 @@ export PS1 PROMPT_COMMAND
 # enter a shell as the default user, and reproduce the environment under construction if necessary
 #
 
-DEFAULT_USER="$( head -n1 /dit/etc/default_user )"
-rm -f /dit/etc/default_user
+DEFAULT_USER="$( head -n1 /dit/tmp/default_user )"
+rm -f /dit/tmp/default_user
 
 
-cat <<EOF > /tmp/dit_profile.sh
+cat <<EOF > /dit/tmp/.profile
 set -a
 shopt -u expand_aliases
 enable -n help
@@ -183,12 +181,12 @@ if [ -s /dit/mnt/.dit_history ]; then
 fi
 
 unset ENV
-rm -f /tmp/dit_profile.sh
+rm -f /dit/tmp/.profile
 EOF
 
-chown "${DEFAULT_USER}" /tmp/dit_profile.sh
+chown "${DEFAULT_USER}" /dit/tmp/.profile
 
-export ENV=/tmp/dit_profile.sh
+export ENV=/dit/tmp/.profile
 
 
 exec su-exec "${DEFAULT_USER}" "$@"

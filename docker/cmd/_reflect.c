@@ -15,8 +15,8 @@
 
 #define DOCKER_FILE_BASE "/dit/etc/Dockerfile.base"
 
-#define REFLECT_FILE_P "/dit/tmp/reflect-report.prov"
-#define REFLECT_FILE_R "/dit/tmp/reflect-report.real"
+#define REFLECT_FILE_P "/dit/srv/reflect-report.prov"
+#define REFLECT_FILE_R "/dit/srv/reflect-report.real"
 
 #define REFL_INITIAL_LINES_MAX 32
 
@@ -28,9 +28,9 @@
 
 /** Data type for storing the results of option parse */
 typedef struct {
-    int target_c;         /** character representing the destination file ('d', 'h' or 'b') */
-    int blank_c;          /** how to handle the empty lines ('p', 's' or 't') */
-    bool verbose;         /** whether to display reflected lines on screen */
+    int target_c;    /** character representing the destination file ('d', 'h' or 'b') */
+    int blank_c;     /** how to handle the empty lines ('p', 's' or 't') */
+    bool verbose;    /** whether to display reflected lines on screen */
 } refl_opts;
 
 
@@ -123,6 +123,8 @@ int reflect(int argc, char **argv){
  * @note the arguments are expected to be passed as-is from main function.
  */
 static int parse_opts(int argc, char **argv, refl_opts *opt){
+    assert(opt);
+
     const char *short_opts = "dhpsv";
 
     int flag;

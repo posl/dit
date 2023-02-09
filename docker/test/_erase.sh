@@ -18,7 +18,7 @@ set +x
 end_processing(){
     if [ -n "${DIR}" ]; then
         mv -f "${DIR}"/.dit_history "${DIR}"/Dockerfile.draft /dit/mnt
-        mv -f "${DIR}"/erase-result.* "${DIR}"/reflect-report.* /dit/tmp
+        mv -f "${DIR}"/erase-result.* "${DIR}"/reflect-report.* /dit/srv
         mv -f "${DIR}"/erase.log.* /dit/var
     fi
 
@@ -42,8 +42,8 @@ mkdir "${TARGET}"
 cp -fp \
     /dit/mnt/.dit_history \
     /dit/mnt/Dockerfile.draft \
-    /dit/tmp/erase-result.* \
-    /dit/tmp/reflect-report.* \
+    /dit/srv/erase-result.* \
+    /dit/srv/reflect-report.* \
     /dit/var/erase.log.* \
     "${TARGET}"
 
@@ -104,7 +104,7 @@ init_target_file(){
 #define ERASE_CONFIRMATION_MAX 8
 EOF
 
-    : > /dit/tmp/reflect-report.prov
+    : > /dit/srv/reflect-report.prov
     dit erase "-$1r" 2>&1 | grep -F '' && exit 1
 
     if [ "$1" != 'd' ]; then
@@ -114,7 +114,7 @@ EOF
             echo '# dit erase processing'
         } | tee -a "${TMP1}" | dit reflect -hp -
 
-        : > /dit/tmp/reflect-report.real
+        : > /dit/srv/reflect-report.real
         dit reflect
 
         {
@@ -179,7 +179,7 @@ do_test(){
 #   <logs_array>    sequence of unsigned char type integers representing the array of the log-data
 #
 check_log_file(){
-    : > /dit/tmp/reflect-report.real
+    : > /dit/srv/reflect-report.real
     dit reflect
 
     OUTPUT="$( od -An -tuC /dit/var/erase.log."$1" | awk "{ for (i = $# - 1; i--;) print \$(NF - i) }" )"

@@ -5,8 +5,8 @@
 
 BEGIN {
     N = 0
-    HNF = "/dit/tmp/last-history-number"
-    CLF = "/dit/tmp/last-command-line"
+    HNF = "/dit/srv/last-history-number"
+    CLF = "/dit/srv/last-command-line"
 }
 
 NR == 1 {

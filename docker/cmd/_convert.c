@@ -1,10 +1,10 @@
 #include "main.h"
 
 
-#define COMMAND_LINE_FILE "/dit/tmp/last-command-line"
+#define COMMAND_LINE_FILE "/dit/srv/last-command-line"
 
-#define CONVERT_RESULT_FILE_D "/dit/tmp/convert-result.dock"
-#define CONVERT_RESULT_FILE_H "/dit/tmp/convert-result.hist"
+#define CONVERT_RESULT_FILE_D "/dit/srv/convert-result.dock"
+#define CONVERT_RESULT_FILE_H "/dit/srv/convert-result.hist"
 
 
 

@@ -55,16 +55,16 @@
     * commonly used Internal Files
 ******************************************************************************/
 
-#define DIT_PROFILE "/tmp/dit_profile.sh"
+#define DIT_PROFILE "/dit/tmp/.profile"
 
 #define DOCKER_FILE_DRAFT "/dit/mnt/Dockerfile.draft"
 #define HISTORY_FILE "/dit/mnt/.dit_history"
 
-#define CONVERT_RESULT_FILE_D "/dit/tmp/convert-result.dock"
-#define CONVERT_RESULT_FILE_H "/dit/tmp/convert-result.hist"
+#define CONVERT_RESULT_FILE_D "/dit/srv/convert-result.dock"
+#define CONVERT_RESULT_FILE_H "/dit/srv/convert-result.hist"
 
-#define ERASE_RESULT_FILE_D "/dit/tmp/erase-result.dock"
-#define ERASE_RESULT_FILE_H "/dit/tmp/erase-result.hist"
+#define ERASE_RESULT_FILE_D "/dit/srv/erase-result.dock"
+#define ERASE_RESULT_FILE_H "/dit/srv/erase-result.hist"
 
 
 

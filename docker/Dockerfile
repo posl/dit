@@ -55,7 +55,8 @@ ARG BASE_NAME
 ARG BASE_VERSION
 
 RUN set -eux; \
-    whoami > /dit/etc/default_user; \
+    mkdir -m a=rwx,o+t /dit/tmp; \
+    whoami > /dit/tmp/default_user; \
     { \
         echo "FROM ${BASE_NAME}:${BASE_VERSION}"; \
         echo "WORKDIR $( pwd )"; \
@@ -79,7 +80,7 @@ FROM product AS test
 
 # change not to switch users, and install the diff command as needed
 RUN set -eux; \
-    echo 'root' > /dit/etc/default_user; \
+    echo 'root' > /dit/tmp/default_user; \
     type diff > /dev/null 2>&1 || \
     sh -eu /dit/etc/package.sh \
         diffutils \
