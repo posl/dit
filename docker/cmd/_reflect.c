@@ -343,7 +343,7 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, const ref
 
         if (src_file && (get_file_size(src_file) < 0)){
             exit_status = POSSIBLE_ERROR;
-            xperror_standards(errno, src_file);
+            xperror_file_handling(src_file, errno);
             break;
         }
 
@@ -562,7 +562,7 @@ static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag){
     }
     else {
         exit_status = POSSIBLE_ERROR;
-        xperror_standards(errno, dest_file);
+        xperror_file_handling(dest_file, errno);
     }
 
     return exit_status;

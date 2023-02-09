@@ -10,20 +10,25 @@
 
 #include <assert.h>
 #include <ctype.h>
-#include <dirent.h>
 #include <errno.h>
-#include <getopt.h>
-#include <grp.h>
 #include <limits.h>
-#include <pwd.h>
-#include <regex.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <time.h>
+
+#include <sys/types.h>
+
+#include <dirent.h>
+#include <getopt.h>
+#include <grp.h>
+#include <pthread.h>
+#include <pwd.h>
+#include <regex.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "test.h"
@@ -88,7 +93,6 @@
 #define xperror_config_arg(target)  xperror_invalid_arg('C', 0, "mode", target)
 #define xperror_target_files()  xperror_missing_args(NULL, NULL)
 
-#define xperror_standards(errid, addition)  xperror_message(strerror(errid), addition)
 #define xperror_individually(msg)  xperror_message(msg, NULL)
 #define xperror_internal_file()  xperror_individually(NULL)
 
@@ -208,12 +212,14 @@ void xperror_missing_args(const char * restrict desc, const char * restrict befo
 void xperror_too_many_args(int limit);
 
 void xperror_message(const char * restrict msg, const char * restrict addition);
-void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg);
 void xperror_suggestion(bool cmd_flag);
+
+int xperror_file_handling(const char *file_name, int errid);
+void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg);
 
 
 /******************************************************************************
-    * Extensions of Standard Library Functions
+    * Extensions of Library Functions
 ******************************************************************************/
 
 char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid);

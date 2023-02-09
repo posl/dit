@@ -353,26 +353,6 @@ void xperror_message(const char * restrict msg, const char * restrict addition){
 
 
 /**
- * @brief print the error message about the contents of the specified file to stderr.
- *
- * @param[in]  file_name  file name of NULL to indicate that the source is standard input
- * @param[in]  lineno  the line number
- * @param[in]  msg  the error message
- *
- * @note line number starts from 1.
- */
-void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg){
-    assert(lineno > 0);
-    assert(msg);
-
-    if (! file_name)
-        file_name = "stdin";
-
-    fprintf(stderr, "%s: %s: line %d: %s\n", program_name, file_name, lineno, msg);
-}
-
-
-/**
  * @brief print a suggenstion message to stderr.
  *
  * @param[in]  cmd_flag  whether to suggest displaying the manual of each dit command
@@ -393,8 +373,48 @@ void xperror_suggestion(bool cmd_flag){
 
 
 
+/**
+ * @brief print the error message about the error encountered during file handling.
+ *
+ * @param[in]  file_name  file name
+ * @param[in]  errid  error number of an error encountered during file handling
+ * @return int  -1 (error exit)
+ *
+ * @note can be passed as 'errfunc' in glibc 'glob' function.
+ */
+int xperror_file_handling(const char *file_name, int errid){
+    assert(file_name);
+    assert(errid == errno);
+
+    xperror_message(strerror(errid), file_name);
+    return ERROR_EXIT;
+}
+
+
+/**
+ * @brief print the error message about the contents of the specified file to stderr.
+ *
+ * @param[in]  file_name  file name of NULL to indicate that the source is standard input
+ * @param[in]  lineno  the line number
+ * @param[in]  msg  the error message
+ *
+ * @note line number starts from 1.
+ */
+void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg){
+    assert(lineno > 0);
+    assert(msg);
+
+    if (! file_name)
+        file_name = "stdin";
+
+    fprintf(stderr, "%s: %s: line %d: %s\n", program_name, file_name, lineno, msg);
+}
+
+
+
+
 /******************************************************************************
-    * Extensions of Standard Library Functions
+    * Extensions of Library Functions
 ******************************************************************************/
 
 

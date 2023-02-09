@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the dit command 'erase', that delete some lines from Dockerfile or history-file.
+ * @brief Described the dit command 'erase', that deletes some lines from Dockerfile or history-file.
  * @author Tsukasa Inada
  * @date 2022/09/09
  *
@@ -582,7 +582,7 @@ static int construct_erase_data(erase_data *data, int target_c, int provlogs[2],
             exit_status = manage_erase_logs(log_file, mode_c, data->logs, no_delete);
     }
     else {
-        xperror_standards(exit_status, target_file);
+        xperror_file_handling(target_file, exit_status);
         exit_status = POSSIBLE_ERROR;
     }
 
