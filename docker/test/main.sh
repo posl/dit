@@ -1,4 +1,4 @@
-#!/bin/bash -eux
+#!/bin/bash -ex
 
 
 #
@@ -12,7 +12,7 @@ if dit test; then
     for script in _*.sh
     do
         echo
-        sh -eux "${script}"
+        sh -ex "${script}"
     done
 else
     exit 1

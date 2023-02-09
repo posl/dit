@@ -91,4 +91,4 @@ RUN set -eux; \
 WORKDIR /dit/test
 COPY ./test ./
 
-CMD [ "/bin/bash", "-eux", "main.sh" ]
+CMD [ "/bin/bash", "-ex", "main.sh" ]
