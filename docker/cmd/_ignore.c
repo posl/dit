@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2022 Tsukasa Inada
  *
- * @brief Described the dit command 'ignore', that edits the ignore-file used from the dit command 'convert'.
+ * @brief Described the dit command 'ignore', that edits the ignore-file used by the dit command 'convert'.
  * @author Tsukasa Inada
  * @date 2022/11/26
  *
@@ -135,7 +135,7 @@ static const char * const conds_keys[IG_CONDITIONS_NUM] = {
 
 
 /**
- * @brief edit the ignore-file used from the dit command 'convert'.
+ * @brief edit the ignore-file used by the dit command 'convert'.
  *
  * @param[in]  argc  the number of command line arguments
  * @param[out] argv  array of strings that are command line arguments

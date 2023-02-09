@@ -319,7 +319,7 @@ static bool display_help(help_conts code, const char *target){
             help_func = cmd_helps[code][i];
         }
         else {
-            xperror_invalid_arg('C', i, "dit command", target);
+            xperror_invalid_arg('C', i, "command", target);
             xperror_suggestion(false);
             return false;
         }
@@ -367,8 +367,8 @@ static void dit_manual(void){
         "  ignore         edit set of commands that are ignored "WHEN_REFLECTING"\n"
         "\n"
         "editing Dockerfile:\n"
-        "  package        install packages in an optimized manner and reflect this as a RUN instruction\n"
-        "  copy           copy files from the host environment and reflect this as COPY/ADD instructions\n"
+        "  package        install packages in an optimized manner and reflect this as a RUN instructions\n"
+        "  copy           copy files from the host environment and reflect this as COPY/ADD instruction\n"
         "  label          edit list of LABEL/EXPOSE instructions\n"
         "  cmd            set a CMD/ENTRYPOINT instruction\n"
         "  healthcheck    set a HEALTHCHECK instruction\n"
