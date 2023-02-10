@@ -141,6 +141,31 @@ bool check_if_alphabetical_order(const char * const *reprs, size_t size){
 }
 
 
+/**
+ * @brief check if there are no problems as a result of visual inspection.
+ *
+ * @return bool  the resulting boolean
+ */
+bool check_if_visually_no_problem(void){
+    bool no_problem = false;
+
+    fputs("If everything is fine, press enter to proceed: ", stderr);
+
+    switch (fgetc(stdin)){
+        case '\n':
+            no_problem = true;
+            fputs("Done!\n", stderr);
+            break;
+        case EOF:
+            clearerr(stdin);
+            break;
+        default:
+            fscanf(stdin, "%*[^\n]%*c");
+            break;
+    }
+
+    return no_problem;
+}
 
 
 /**
@@ -150,7 +175,7 @@ bool check_if_alphabetical_order(const char * const *reprs, size_t size){
  * @param[in]  result  comparison result
  * @return bool  the resulting boolean
  */
-bool comptest_result_check(int type, int result){
+bool check_if_correct_cmp_result(int type, int result){
     assert((type >= 0) && (type < COMPTESTS_NUM));
 
     bool correct;

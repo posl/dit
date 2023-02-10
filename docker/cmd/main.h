@@ -4,7 +4,7 @@
 
 // if you want to test each command, comment out the line immediately after
 #ifndef NDEBUG
-#define NDEBUG
+// #define NDEBUG
 #endif
 
 
@@ -23,12 +23,14 @@
 #include <sys/types.h>
 
 #include <dirent.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <grp.h>
 #include <pthread.h>
 #include <pwd.h>
 #include <regex.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "test.h"
@@ -214,7 +216,8 @@ void xperror_too_many_args(int limit);
 void xperror_message(const char * restrict msg, const char * restrict addition);
 void xperror_suggestion(bool cmd_flag);
 
-int xperror_file_handling(const char *file_name, int errid);
+int xperror_standards(const char *entity, int errid);
+void xperror_child_process(const char *cmd_name, int status);
 void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg);
 
 
@@ -223,8 +226,11 @@ void xperror_file_contents(const char * restrict file_name, int lineno, const ch
 ******************************************************************************/
 
 char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid);
+
 int xstrcmp_upper_case(const char * restrict target, const char * restrict expected);
 int qstrcmp(const void *a, const void *b);
+
+int execute_command(const char *cmd_path, char * const argv[], int null_redirs);
 
 
 /******************************************************************************

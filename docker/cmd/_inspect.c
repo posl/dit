@@ -1122,14 +1122,16 @@ static void fcmp_name_test(void){
         { { .name =  0              }, { .name =  0             },    -1            }
     };
 
+    int i;
     file_node *file1, *file2, node1, node2;
+
     file1 = &node1;
     file2 = &node2;
 
-    for (int i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type >= 0; i++){
         node1.name = table[i].elem1.name;
         node2.name = table[i].elem2.name;
-        assert(comptest_result_check(table[i].type, fcmp_name(&file1, &file2, NULL)));
+        assert(check_if_correct_cmp_result(table[i].type, fcmp_name(&file1, &file2, NULL)));
 
         print_progress_test_loop('C', table[i].type, i);
         fprintf(stderr, "%-13s  %s\n", node1.name, node2.name);
@@ -1154,12 +1156,13 @@ static void fcmp_size_test(void){
         { { .size =    0 }, { .size =    0 },    -1            }
     };
 
+    int i;
     file_node node1, node2;
 
-    for (int i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type >= 0; i++){
         node1.size = table[i].elem1.size;
         node2.size = table[i].elem2.size;
-        assert(comptest_result_check(table[i].type, fcmp_size(&node1, &node2)));
+        assert(check_if_correct_cmp_result(table[i].type, fcmp_size(&node1, &node2)));
 
         print_progress_test_loop('C', table[i].type, i);
         fprintf(stderr, "%4d  %4d\n", ((int) node1.size), ((int) node2.size));
@@ -1184,12 +1187,13 @@ static void fcmp_ext_test(void){
         { { .name =  0                 }, { .name =  0                         },    -1            }
     };
 
+    int i;
     file_node node1, node2;
 
-    for (int i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type >= 0; i++){
         node1.name = table[i].elem1.name;
         node2.name = table[i].elem2.name;
-        assert(comptest_result_check(table[i].type, fcmp_ext(&node1, &node2)));
+        assert(check_if_correct_cmp_result(table[i].type, fcmp_ext(&node1, &node2)));
 
         print_progress_test_loop('C', table[i].type, i);
         fprintf(stderr, "%-16s  %s\n", node1.name, node2.name);

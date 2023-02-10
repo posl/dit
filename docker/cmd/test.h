@@ -88,8 +88,8 @@ void reflect_test(void);
 ******************************************************************************/
 
 bool check_if_alphabetical_order(const char * const *reprs, size_t size);
-
-bool comptest_result_check(int type, int result);
+bool check_if_visually_no_problem(void);
+bool check_if_correct_cmp_result(int type, int result);
 
 void print_progress_test_loop(int code_c, int type, int count);
 

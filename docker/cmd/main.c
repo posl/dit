@@ -15,6 +15,13 @@
 #define XFGETS_NESTINGS_MAX 2
 #define XFGETS_INITIAL_SIZE 1023
 
+#define sigreset(sigdfl_int, sigdfl_quit, old_mask) \
+    do { \
+        sigaction(SIGINT, &sigdfl_int, NULL); \
+        sigaction(SIGQUIT, &sigdfl_quit, NULL); \
+        sigprocmask(SIG_SETMASK, &old_mask, NULL); \
+    } while (false)
+
 
 /** Data type for storing the information for one loop for 'xfgets_for_loop' */
 typedef struct {
@@ -374,20 +381,48 @@ void xperror_suggestion(bool cmd_flag){
 
 
 /**
- * @brief print the error message about the error encountered during file handling.
+ * @brief print the standard error message represented by 'errno' to stderr.
  *
- * @param[in]  file_name  file name
- * @param[in]  errid  error number of an error encountered during file handling
+ * @param[in]  entity  the entity that caused the error
+ * @param[in]  errid  error number
  * @return int  -1 (error exit)
  *
  * @note can be passed as 'errfunc' in glibc 'glob' function.
  */
-int xperror_file_handling(const char *file_name, int errid){
-    assert(file_name);
+int xperror_standards(const char *entity, int errid){
+    assert(entity);
     assert(errid == errno);
 
-    xperror_message(strerror(errid), file_name);
+    xperror_message(strerror(errid), entity);
     return ERROR_EXIT;
+}
+
+
+/**
+ * @brief print the error message related to child process to stderr.
+ *
+ * @param[in]  cmd_name  command name
+ * @param[in]  status  command's exit status, 0 or less integer
+ *
+ * @note reports an error caused by system call, or that the command in child process ended with an error.
+ */
+void xperror_child_process(const char *cmd_name, int status){
+    assert(cmd_name);
+    assert(status < 256);
+
+    size_t size;
+    size = strlen(cmd_name);
+
+    char entity[size + 9];
+    memcpy(entity, cmd_name, (sizeof(char) * size));
+    memcpy((entity + size), " (child)", (sizeof(char) * 9));
+
+    if (status <= 0){
+        assert(errno);
+        xperror_standards(entity, errno);
+    }
+    else
+        fprintf(stderr, "%s: %s: exited with exit status %d\n", program_name, entity, status);
 }
 
 
@@ -608,12 +643,75 @@ int qstrcmp(const void *a, const void *b){
 
 
 
-
-int xexecv(const char *cmd_path, char * const argv[]){
+/**
+ * @brief execute the specified command in a child process.
+ *
+ * @param[in]  cmd_path  command path
+ * @param[in]  argv  NULL-terminated array of strings that are command line arguments
+ * @param[in]  null_redirs  the number of file descriptors to discard output
+ * @return int  0 (success), -1 (syscall error) or positive integer (command error)
+ *
+ * @note this function is to avoid the inefficiency and the inconvenience when using 'system' function.
+ * @note signal handling conforms to the specifications of 'system' function.
+ * @note 'pthread_sigmask' function is not used because it is not any of async-signal-safe functions.
+ * @note discarding output is attempted on 1 (stdout) and 2 (stderr), in that order.
+ * @note the exit status that can be returned as a return value is based on the shell's.
+ *
+ * @attention the subsequent processing should not be continued if this function returns a non-zero value.
+ * @attention calling this function in a multithreaded process is not recommended.
+ */
+int execute_command(const char *cmd_path, char * const argv[], int null_redirs){
     assert(cmd_path);
-    assert(argv);
+    assert(argv && argv[0]);
+    assert((null_redirs >= 0) && (null_redirs <= 2));
 
-    
+    struct sigaction sigign = {0}, sigdfl_int, sigdfl_quit;
+    sigset_t new_mask, old_mask;
+    pid_t pid, err = 0;
+    int fd, wstatus = 0, exit_status = -1;
+
+    sigign.sa_handler = SIG_IGN;
+    sigemptyset(&sigign.sa_mask);
+    sigaction(SIGINT, &sigign, &sigdfl_int);
+    sigaction(SIGQUIT, &sigign, &sigdfl_quit);
+
+    sigemptyset(&new_mask);
+    sigaddset(&new_mask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &new_mask, &old_mask);
+
+    switch ((pid = fork())){
+        case -1:  // error
+            err = -1;
+            break;
+        case 0:   // child
+            if (null_redirs && ((fd = open("/dev/null", (O_WRONLY | O_CLOEXEC))) != -1)){
+                do
+                    dup2(fd, null_redirs);
+                while (--null_redirs);
+            }
+            sigreset(sigdfl_int, sigdfl_quit, old_mask);
+            execv(cmd_path, argv);
+            _exit(127);
+        default:  // parent
+            while (((err = waitpid(pid, &wstatus, 0)) == -1) && (errno == EINTR));
+            break;
+    }
+
+    sigreset(sigdfl_int, sigdfl_quit, old_mask);
+
+    if (err != -1){
+        if (WIFEXITED(wstatus))
+            exit_status = WEXITSTATUS(wstatus);
+        else {
+            exit_status = 128;
+            if (WIFSIGNALED(wstatus))
+                exit_status += WTERMSIG(wstatus);
+        }
+    }
+    if (exit_status)
+        xperror_child_process(argv[0], exit_status);
+
+    return exit_status;
 }
 
 
@@ -923,6 +1021,7 @@ char *get_suffix(char *target, int delimiter, bool retain){
 
 static void xfgets_for_loop_test(void);
 static void xstrcmp_upper_case_test(void);
+static void execute_command_test(void);
 
 static void receive_positive_integer_test(void);
 static void receive_expected_string_test(void);
@@ -938,6 +1037,7 @@ static void get_suffix_test(void);
 void dit_test(void){
     do_test(xfgets_for_loop_test);
     do_test(xstrcmp_upper_case_test);
+    do_test(execute_command_test);
 
     do_test(receive_positive_integer_test);
     do_test(receive_expected_string_test);
@@ -1094,19 +1194,8 @@ static void xfgets_for_loop_test(void){
         assert(fprintf(stdout, "%s\n", line) >= 0);
 
     do {
-        fputs("If everything is fine, press enter to proceed: ", stderr);
-
-        switch (fgetc(stdin)){
-            case '\n':
-                fputs("Done!\n", stderr);
-                break;
-            case EOF:
-                clearerr(stdin);
-                assert(false);
-            default:
-                fscanf(stdin, "%*[^\n]%*c");
-                assert(false);
-        }
+        if (! check_if_visually_no_problem())
+            assert(false);
 
         if (start_for_stdin){
             assert(remain > 0);
@@ -1178,15 +1267,53 @@ static void xstrcmp_upper_case_test(void){
         { { .name =  0                       }, { .name =  0                          },    -1            }
     };
 
+    int i;
     const char *target, *expected;
 
-    for (int i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type >= 0; i++){
         target = table[i].elem1.name;
         expected = table[i].elem2.name;
-        assert(comptest_result_check(table[i].type, xstrcmp_upper_case(target, expected)));
+        assert(check_if_correct_cmp_result(table[i].type, xstrcmp_upper_case(target, expected)));
 
         print_progress_test_loop('C', table[i].type, i);
         fprintf(stderr, "%-22s  %s\n", target, expected);
+    }
+}
+
+
+
+
+static void execute_command_test(void){
+    char * const argv[] = { "cat", NULL };
+
+    int i, key, exit_status;
+    const char *addition;
+    char cmdline[32];
+
+    for (i = 0; i < 2; i++){
+        if (! i){
+            key = 'D';
+            addition = "-";
+            exit_status = 0;
+        }
+        else {
+            key = 'C';
+            addition = "> /dev/null";
+            exit_status = 128 + SIGINT;
+        }
+
+        fprintf(stderr, "\nChecking if child process can be exited by 'Ctrl + %c' ...\n", key);
+
+        snprintf(cmdline, sizeof(cmdline), "+ cat %s\n", addition);
+        fputs(cmdline, stdout);
+
+        assert(execute_command("/bin/cat", argv, i) == exit_status);
+
+        *cmdline = '-';
+        fputs(cmdline, stdout);
+
+        if (! check_if_visually_no_problem())
+            assert(false);
     }
 }
 
@@ -1403,10 +1530,18 @@ static void get_file_size_test(void){
 
     // when specifying a file that is too large
 
-    if (system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K > /dev/null"))){
-        assert(get_file_size(TMP_FILE1) == -2);
-        assert(errno == EFBIG);
-    }
+    char * const argv[] = {
+        "dd",
+        "if=/dev/zero",
+        "of="TMP_FILE1,
+        "bs=1M",
+        "count=2K",
+        NULL
+    };
+
+    assert(! execute_command("/bin/dd", argv, 2));
+    assert(get_file_size(TMP_FILE1) == -2);
+    assert(errno == EFBIG);
 
 
     // when specifying a non-existing file
@@ -1486,9 +1621,10 @@ static void get_suffix_test(void){
         {  0,                    0,     0,   0          }
     };
 
+    int i;
     char target[32];
 
-    for (int i = 0; table[i].target; i++){
+    for (i = 0; table[i].target; i++){
         memcpy(target, table[i].target, (sizeof(char) * (strlen(table[i].target) + 1)));
         assert(! strcmp(get_suffix(target, table[i].delimiter, table[i].retain), table[i].suffix));
 

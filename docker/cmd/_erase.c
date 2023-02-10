@@ -582,7 +582,7 @@ static int construct_erase_data(erase_data *data, int target_c, int provlogs[2],
             exit_status = manage_erase_logs(log_file, mode_c, data->logs, no_delete);
     }
     else {
-        xperror_file_handling(target_file, exit_status);
+        xperror_standards(target_file, exit_status);
         exit_status = POSSIBLE_ERROR;
     }
 
@@ -1862,12 +1862,12 @@ static void receive_range_specification_test(void){
     };
 
 
-    int type, stop;
+    int i, type, stop;
     unsigned int check_list[2];
     size_t size;
     char range[64];
 
-    for (int i = 0; table[i].range; i++){
+    for (i = 0; table[i].range; i++){
         type = SUCCESS;
         check_list[0] = 0;
         check_list[1] = 0;
