@@ -10,7 +10,6 @@
 
 #include "main.h"
 
-#define INSP_INITIAL_PATH_MAX 256
 #define INSP_INITIAL_DIRS_MAX 32
 
 #define INSP_EXCESS_STR " #EXCESS"
@@ -50,13 +49,6 @@ typedef struct file_node{
 } file_node;
 
 
-/** Data type for achieving the virtually infinite length of file path */
-typedef struct {
-    char *ptr;     /** file path */
-    size_t max;    /** the current maximum length of file path */
-} inf_path;
-
-
 /** Data type for storing comparison function used when qsort */
 typedef int (* fcmp)(const file_node *, const file_node *);
 
@@ -64,8 +56,7 @@ typedef int (* fcmp)(const file_node *, const file_node *);
 static int parse_opts(int argc, char **argv, insp_opts *opt);
 
 static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt);
-static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, qcmp comp);
-static bool concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len);
+static file_node *construct_recursive(inf_str *ipath, size_t ipath_len, const char *name, qcmp comp);
 static file_node *new_file(const char * restrict path, char * restrict name);
 static bool append_file(file_node *tree, file_node *file);
 
@@ -228,7 +219,7 @@ static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt
     file_node *tree = NULL;
 
     if (base_path){
-        inf_path ipath = { .ptr = NULL, .max = 0};
+        inf_str ipath = {0};
         tree = construct_recursive(&ipath, 0, base_path, opt->comp);
 
         if (ipath.ptr)
@@ -249,14 +240,14 @@ static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt
  *
  * @note at the same time, sorts files in directory.
  */
-static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const char *name, qcmp comp){
+static file_node *construct_recursive(inf_str *ipath, size_t ipath_len, const char *name, qcmp comp){
     assert(ipath);
     assert(name);
 
     file_node *file = NULL;
     size_t name_len;
 
-    if (((name_len = strlen(name) + 1) > 0) && concat_inf_path(ipath, ipath_len, name, name_len)){
+    if (((name_len = strlen(name) + 1) > 0) && xstrcat_inf_len(ipath, ipath_len, name, name_len)){
         char *dest;
         if ((dest = (char *) malloc(sizeof(char) * name_len))){
             memcpy(dest, name, (sizeof(char) * name_len));
@@ -267,7 +258,7 @@ static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const c
                     if ((dir = opendir(ipath->ptr))){
                         ipath_len += name_len;
 
-                        if (concat_inf_path(ipath, (ipath_len - 1), "/", 2)){
+                        if (xstrcat_inf_len(ipath, (ipath_len - 1), "/", 2)){
                             struct dirent *entry;
                             file_node *tmp;
 
@@ -303,59 +294,6 @@ static file_node *construct_recursive(inf_path *ipath, size_t ipath_len, const c
 }
 
 
-
-
-/**
- * @brief concatenate any string to the end of base path string.
- *
- * @param[out] ipath  base path string
- * @param[in]  ipath_len  the length of base path string
- * @param[in]  suf  string to concatenate to the end of base path string
- * @param[in]  suf_len  the length of the string including the terminating null character
- * @return bool  successful or not
- *
- * @note path string of arbitrary length can be achieved.
- */
-static bool concat_inf_path(inf_path *ipath, size_t ipath_len, const char *suf, size_t suf_len){
-    assert(ipath);
-    assert(ipath->max >= ipath_len);
-    assert(suf);
-    assert(suf_len == (strlen(suf) + 1));
-
-    size_t curr_max;
-    bool allocate_flag = false;
-    void *ptr;
-
-    if (! (curr_max = ipath->max)){
-        curr_max = INSP_INITIAL_PATH_MAX;
-        allocate_flag = true;
-    }
-
-    do {
-        if ((curr_max - ipath_len) < suf_len){
-            if ((curr_max <<= 1)){
-                allocate_flag = true;
-                continue;
-            }
-        }
-        else if (! allocate_flag)
-            break;
-        else if ((ptr = realloc(ipath->ptr, (sizeof(char) * curr_max)))){
-            ipath->ptr = (char *) ptr;
-            ipath->max = curr_max;
-            break;
-        }
-        return false;
-    } while (true);
-
-    assert(ipath->ptr);
-
-    char *dest;
-    dest = ipath->ptr + ipath_len;
-    memcpy(dest, suf, (sizeof(char) * suf_len));
-
-    return true;
-}
 
 
 /**
@@ -865,7 +803,6 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
 ******************************************************************************/
 
 
-static void concat_inf_path_test(void);
 static void new_file_test(void);
 static void append_file_test(void);
 
@@ -877,78 +814,12 @@ static void fcmp_ext_test(void);
 
 
 void inspect_test(void){
-    do_test(concat_inf_path_test);
     do_test(new_file_test);
     do_test(append_file_test);
 
     do_test(fcmp_name_test);
     do_test(fcmp_size_test);
     do_test(fcmp_ext_test);
-}
-
-
-
-
-static void concat_inf_path_test(void){
-    const struct {
-        const char * const path;
-        const size_t inherit;
-        const char * const result;
-    }
-    // changeable part for updating test cases
-    table[] = {
-        { "dit/",                 0, "dit/"                        },
-        { "tmp/",                 4, "dit/tmp/"                    },
-        { "last-history-number",  8, "dit/tmp/last-history-number" },
-        { "reflect-report.prov",  8, "dit/tmp/reflect-report.prov" },
-        { "etc/config.stat",      4, "dit/etc/config.stat"         },
-        { "./",                   0, "./"                          },
-        { "../etc/passwd",        2, "./../etc/passwd"             },
-        { "../etc/passwd",        5, "./../../etc/passwd"          },
-        { "../etc/passwd",        8, "./../../../etc/passwd"       },
-        { "malware.sh",          15, "./../../../etc/malware.sh"   },
-        {  0,                     0,  0                            }
-    };
-
-    int i;
-    inf_path ipath = { .ptr = NULL, .max = 0};
-
-    for (i = 0; table[i].path; i++){
-        assert(concat_inf_path(&ipath, table[i].inherit, table[i].path, (strlen(table[i].path) + 1)));
-        assert(ipath.ptr);
-        assert(! strcmp(ipath.ptr, table[i].result));
-
-        print_progress_test_loop('\0', -1, i);
-        fprintf(stderr, "%s\n", table[i].result);
-    }
-
-
-    // changeable part for updating test cases
-    const char *repeat = "Infinitely-Deep-Directory/";
-
-    size_t size, ipath_len = 0;
-    int iter = 0;
-
-    size = strlen(repeat);
-    assert(size > 0);
-
-    while ((size * (++iter) + 1) <= INSP_INITIAL_PATH_MAX);
-    assert((size * iter + 1) < (INSP_INITIAL_PATH_MAX * 2));
-
-    for (i = 0; i < iter;){
-        assert(ipath.max == INSP_INITIAL_PATH_MAX);
-        assert(concat_inf_path(&ipath, ipath_len, repeat, (size + 1)));
-        assert(ipath.ptr);
-
-        ipath_len += size;
-        print_progress_test_loop('\0', -1, i);
-        fprintf(stderr, "%s * %d\n", repeat, ++i);
-    }
-
-    assert(ipath.max == (INSP_INITIAL_PATH_MAX * 2));
-
-
-    free(ipath.ptr);
 }
 
 

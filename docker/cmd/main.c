@@ -15,6 +15,8 @@
 #define XFGETS_NESTINGS_MAX 2
 #define XFGETS_INITIAL_SIZE 1023
 
+#define XSTRCAT_INITIAL_MAX 256
+
 #define sigreset(sigdfl_int, sigdfl_quit, old_mask) \
     do { \
         sigaction(SIGINT, &sigdfl_int, NULL); \
@@ -644,9 +646,67 @@ int qstrcmp(const void *a, const void *b){
 
 
 /**
+ * @brief concatenate any string to the end of base string.
+ *
+ * @param[out] base  base string
+ * @param[in]  base_len  the length of base string
+ * @param[in]  suf  string to concatenate to the end of base string
+ * @param[in]  suf_len  the length of the string including the terminating null character
+ * @return bool  successful or not
+ *
+ * @note this function allows for strings of virtually infinite length.
+ *
+ * @attention each element of 'base' must be initialized with 0 before the first call.
+ * @attention if 'base->ptr' is non-NULL, it should be released by the caller.
+ */
+bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf_len){
+    assert(base);
+    assert(base->max >= base_len);
+    assert(suf);
+    assert(suf_len == (strlen(suf) + 1));
+
+    size_t curr_max;
+    bool allocate_flag = false;
+    void *ptr;
+
+    if (! (curr_max = base->max)){
+        curr_max = XSTRCAT_INITIAL_MAX;
+        allocate_flag = true;
+    }
+
+    do {
+        if ((curr_max - base_len) < suf_len){
+            if ((curr_max <<= 1)){
+                allocate_flag = true;
+                continue;
+            }
+        }
+        else if (! allocate_flag)
+            break;
+        else if ((ptr = realloc(base->ptr, (sizeof(char) * curr_max)))){
+            base->ptr = (char *) ptr;
+            base->max = curr_max;
+            break;
+        }
+        return false;
+    } while (true);
+
+    assert(base->ptr);
+
+    char *dest;
+    dest = base->ptr + base_len;
+    memcpy(dest, suf, (sizeof(char) * suf_len));
+
+    return true;
+}
+
+
+
+
+/**
  * @brief execute the specified command in a child process.
  *
- * @param[in]  cmd_path  command path
+ * @param[in]  cmd_file  command path
  * @param[in]  argv  NULL-terminated array of strings that are command line arguments
  * @param[in]  null_redirs  the number of file descriptors to discard output
  * @return int  0 (success), -1 (syscall error) or positive integer (command error)
@@ -660,8 +720,8 @@ int qstrcmp(const void *a, const void *b){
  * @attention the subsequent processing should not be continued if this function returns a non-zero value.
  * @attention calling this function in a multithreaded process is not recommended.
  */
-int execute_command(const char *cmd_path, char * const argv[], int null_redirs){
-    assert(cmd_path);
+int execute_command(const char *cmd_file, char * const argv[], int null_redirs){
+    assert(cmd_file);
     assert(argv && argv[0]);
     assert((null_redirs >= 0) && (null_redirs <= 2));
 
@@ -690,7 +750,7 @@ int execute_command(const char *cmd_path, char * const argv[], int null_redirs){
                 while (--null_redirs);
             }
             sigreset(sigdfl_int, sigdfl_quit, old_mask);
-            execv(cmd_path, argv);
+            execv(cmd_file, argv);
             _exit(127);
         default:  // parent
             while (((err = waitpid(pid, &wstatus, 0)) == -1) && (errno == EINTR));
@@ -1021,6 +1081,7 @@ char *get_suffix(char *target, int delimiter, bool retain){
 
 static void xfgets_for_loop_test(void);
 static void xstrcmp_upper_case_test(void);
+static void xstrcat_inf_len_test(void);
 static void execute_command_test(void);
 
 static void receive_positive_integer_test(void);
@@ -1037,6 +1098,7 @@ static void get_suffix_test(void);
 void dit_test(void){
     do_test(xfgets_for_loop_test);
     do_test(xstrcmp_upper_case_test);
+    do_test(xstrcat_inf_len_test);
     do_test(execute_command_test);
 
     do_test(receive_positive_integer_test);
@@ -1278,6 +1340,71 @@ static void xstrcmp_upper_case_test(void){
         print_progress_test_loop('C', table[i].type, i);
         fprintf(stderr, "%-22s  %s\n", target, expected);
     }
+}
+
+
+
+
+static void xstrcat_inf_len_test(void){
+    const struct {
+        const char * const path;
+        const size_t inherit;
+        const char * const result;
+    }
+    // changeable part for updating test cases
+    table[] = {
+        { "dit/",                 0, "dit/"                        },
+        { "tmp/",                 4, "dit/tmp/"                    },
+        { "last-history-number",  8, "dit/tmp/last-history-number" },
+        { "reflect-report.prov",  8, "dit/tmp/reflect-report.prov" },
+        { "etc/config.stat",      4, "dit/etc/config.stat"         },
+        { "./",                   0, "./"                          },
+        { "../etc/passwd",        2, "./../etc/passwd"             },
+        { "../etc/passwd",        5, "./../../etc/passwd"          },
+        { "../etc/passwd",        8, "./../../../etc/passwd"       },
+        { "malware.sh",          15, "./../../../etc/malware.sh"   },
+        {  0,                     0,  0                            }
+    };
+
+    int i;
+    inf_str istr = {0};
+
+    for (i = 0; table[i].path; i++){
+        assert(xstrcat_inf_len(&istr, table[i].inherit, table[i].path, (strlen(table[i].path) + 1)));
+        assert(istr.ptr);
+        assert(! strcmp(istr.ptr, table[i].result));
+
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "%s\n", table[i].result);
+    }
+
+
+    // changeable part for updating test cases
+    const char *repeat = "\'a string of arbitrary length\'";
+
+    size_t size, istr_len = 0;
+    int iter = 0;
+
+    size = strlen(repeat);
+    assert(size > 0);
+
+    while ((size * (++iter) + 1) <= XSTRCAT_INITIAL_MAX);
+    assert((size * iter + 1) < (XSTRCAT_INITIAL_MAX * 2));
+
+    for (i = 0; i < iter;){
+        assert(istr.max == XSTRCAT_INITIAL_MAX);
+        assert(xstrcat_inf_len(&istr, istr_len, repeat, (size + 1)));
+        assert(istr.ptr);
+
+        istr_len += size;
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "%s * %d\n", repeat, ++i);
+    }
+
+    assert(istr.max == (XSTRCAT_INITIAL_MAX * 2));
+
+
+    free(istr.ptr);
 }
 
 

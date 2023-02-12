@@ -146,6 +146,19 @@
 
 
 /******************************************************************************
+    * commonly used Data Types
+******************************************************************************/
+
+/** Data type for achieving strings of virtually infinite length */
+typedef struct {
+    char *ptr;     /** a string of arbitrary length */
+    size_t max;    /** the current maximum length of the string */
+} inf_str;
+
+
+
+
+/******************************************************************************
     * Tool-specific Functions
 ******************************************************************************/
 
@@ -230,7 +243,9 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid);
 int xstrcmp_upper_case(const char * restrict target, const char * restrict expected);
 int qstrcmp(const void *a, const void *b);
 
-int execute_command(const char *cmd_path, char * const argv[], int null_redirs);
+bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf_len);
+
+int execute_command(const char *cmd_file, char * const argv[], int null_redirs);
 
 
 /******************************************************************************
