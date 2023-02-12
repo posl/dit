@@ -56,8 +56,8 @@ typedef int (* fcmp)(const file_node *, const file_node *);
 static int parse_opts(int argc, char **argv, insp_opts *opt);
 
 static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt);
-static file_node *construct_recursive(inf_str *ipath, size_t ipath_len, const char *name, qcmp comp);
-static file_node *new_file(const char * restrict path, char * restrict name);
+static file_node *construct_recursive(const char *name, qcmp comp);
+static file_node *new_file(char *name);
 static bool append_file(file_node *tree, file_node *file);
 
 static int qcmp_name(const void *a, const void *b);
@@ -73,6 +73,10 @@ static void print_file_mode(mode_t mode);
 static void print_file_owner(const file_node *file, bool numeric_id);
 static void print_file_size(off_t size);
 static void print_file_name(const file_node *file, const insp_opts *opt, bool link_flag);
+
+
+/** global variable for interrupting the recursive processing */
+static bool fatal_error = false;
 
 
 
@@ -115,7 +119,7 @@ int inspect(int argc, char **argv){
             i = FAILURE;
 
         assert(argc > 0);
-        if (--argc){
+        if (--argc && (! fatal_error)){
             path = *(++argv);
             fputc('\n', stdout);
         }
@@ -219,11 +223,12 @@ static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt
     file_node *tree = NULL;
 
     if (base_path){
-        inf_str ipath = {0};
-        tree = construct_recursive(&ipath, 0, base_path, opt->comp);
+        tree = construct_recursive(base_path, opt->comp);
 
-        if (ipath.ptr)
-            free(ipath.ptr);
+        if (tree && fatal_error){
+            destruct_recursive(tree, NULL, 0);
+            tree = NULL;
+        }
     }
     return tree;
 }
@@ -232,64 +237,70 @@ static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt
 /**
  * @brief construct the directory tree, recursively.
  *
- * @param[out] ipath  file path to the file we are currently looking at
- * @param[in]  ipath_len  the length of path string
  * @param[in]  name  name of the file we are currently looking at
  * @param[in]  comp  comparison function used when qsort
  * @return file_node*  the result of sub-constructing
  *
  * @note at the same time, sorts files in directory.
  */
-static file_node *construct_recursive(inf_str *ipath, size_t ipath_len, const char *name, qcmp comp){
-    assert(ipath);
+static file_node *construct_recursive(const char *name, qcmp comp){
     assert(name);
 
     file_node *file = NULL;
     size_t name_len;
 
-    if (((name_len = strlen(name) + 1) > 0) && xstrcat_inf_len(ipath, ipath_len, name, name_len)){
+    if ((name_len = strlen(name) + 1) > 0){
         char *dest;
         if ((dest = (char *) malloc(sizeof(char) * name_len))){
             memcpy(dest, name, (sizeof(char) * name_len));
 
-            if ((file = new_file(ipath->ptr, dest))){
+            if ((file = new_file(dest))){
                 if (S_ISDIR(file->mode)){
+                    int status;
                     DIR *dir;
-                    if ((dir = opendir(ipath->ptr))){
-                        ipath_len += name_len;
 
-                        if (xstrcat_inf_len(ipath, (ipath_len - 1), "/", 2)){
-                            struct dirent *entry;
-                            file_node *tmp;
+                    if ((! (status = chdir(name))) && (dir = opendir("."))){
+                        struct dirent *entry;
+                        file_node *tmp;
 
-                            while ((entry = readdir(dir))){
-                                name = entry->d_name;
-                                assert(name);
+                        while ((entry = readdir(dir))){
+                            name = entry->d_name;
+                            assert(name);
 
-                                if ((name[0] == '.') && (! name[(name[1] != '.') ? 1 : 2]))
-                                    continue;
+                            if ((name[0] == '.') && (! name[(name[1] != '.') ? 1 : 2]))
+                                continue;
 
-                                if (! (tmp = construct_recursive(ipath, ipath_len, name, comp)))
-                                    break;
-                                if (! append_file(file, tmp)){
-                                    destruct_recursive(tmp, NULL, 0);
-                                    break;
-                                }
+                            if ((! (tmp = construct_recursive(name, comp))) || fatal_error)
+                                break;
+                            if (! append_file(file, tmp)){
+                                destruct_recursive(tmp, NULL, 0);
+                                break;
                             }
-
-                            if (file->children)
-                                qsort(file->children, file->children_num, sizeof(file_node *), comp);
                         }
+
                         closedir(dir);
+
+                        if (fatal_error)
+                            goto exit;
+
+                        if (file->children)
+                            qsort(file->children, file->children_num, sizeof(file_node *), comp);
                     }
                     else
                         file->errid = errno;
+
+                    if ((! status) && chdir("..")){
+                        fatal_error = true;
+                        xperror_standards("chdir (fatal error)", errno);
+                    }
                 }
             }
             else
                 free(dest);
         }
     }
+
+exit:
     return file;
 }
 
@@ -299,12 +310,10 @@ static file_node *construct_recursive(inf_str *ipath, size_t ipath_len, const ch
 /**
  * @brief create new element that makes up the directory tree.
  *
- * @param[in]  path  file path to the file we are currently looking at
  * @param[in]  name  name of the file we are currently looking at
  * @return file_node*  new element that makes up the directory tree
  */
-static file_node *new_file(const char * restrict path, char * restrict name){
-    assert(path);
+static file_node *new_file(char *name){
     assert(name);
 
     file_node *file;
@@ -327,7 +336,7 @@ static file_node *new_file(const char * restrict path, char * restrict name){
         file->noinfo = false;
 
         struct stat file_stat;
-        if (! lstat(path, &file_stat)){
+        if (! lstat(name, &file_stat)){
             file->mode = file_stat.st_mode;
             file->uid = file_stat.st_uid;
             file->gid = file_stat.st_gid;
@@ -337,10 +346,10 @@ static file_node *new_file(const char * restrict path, char * restrict name){
                 char *link_path;
                 if ((link_path = (char *) malloc(sizeof(char) * (file->size + 1)))){
                     ssize_t link_len;
-                    link_len = readlink(path, link_path, file->size);
+                    link_len = readlink(name, link_path, file->size);
 
                     if (link_len > 0){
-                        if (! stat(path, &file_stat)){
+                        if (! stat(name, &file_stat)){
                             file->link_mode = file_stat.st_mode;
                             file->link_invalid = false;
                         }
@@ -842,8 +851,8 @@ static void new_file_test(void){
     assert((fp = fopen(TMP_FILE1, "w")));
     assert(! fclose(fp));
 
-    assert((file = new_file(TMP_FILE1, TMP_NAME1)));
-    assert(! strcmp(file->name, TMP_NAME1));
+    assert((file = new_file(TMP_FILE1)));
+    assert(! strcmp(file->name, TMP_FILE1));
 
     mode = file->mode;
     assert(S_ISREG(mode));
@@ -863,8 +872,8 @@ static void new_file_test(void){
 
     assert(! symlink(TMP_FILE1, TMP_FILE2));
 
-    assert((file = new_file(TMP_FILE2, TMP_NAME2)));
-    assert(! strcmp(file->name, TMP_NAME2));
+    assert((file = new_file(TMP_FILE2)));
+    assert(! strcmp(file->name, TMP_FILE2));
 
     assert(S_ISLNK(file->mode));
     assert(file->uid == uid);
@@ -886,8 +895,8 @@ static void new_file_test(void){
 
     assert(! remove(TMP_FILE1));
 
-    assert((file = new_file(TMP_FILE1, TMP_NAME1)));
-    assert(! strcmp(file->name, TMP_NAME1));
+    assert((file = new_file(TMP_FILE1)));
+    assert(! strcmp(file->name, TMP_FILE1));
 
     assert(! (file->mode || file->uid || file->gid || file->size));
 
@@ -905,8 +914,8 @@ static void new_file_test(void){
 
     // when specifying an invalid symbolic link
 
-    assert((file = new_file(TMP_FILE2, TMP_NAME2)));
-    assert(! strcmp(file->name, TMP_NAME2));
+    assert((file = new_file(TMP_FILE2)));
+    assert(! strcmp(file->name, TMP_FILE2));
 
     assert(S_ISLNK(file->mode));
     assert(file->uid == uid);
