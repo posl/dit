@@ -22,7 +22,7 @@ end_processing(){
         mv -f "${DIR}"/erase.log.* /dit/var
     fi
 
-    rm -fR _erase[1-4].tmp
+    rm -fr _erase[1-4].tmp
     echo
 }
 

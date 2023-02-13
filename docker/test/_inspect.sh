@@ -15,7 +15,7 @@ dit inspect --unit-tests
 
 set +x
 
-trap 'rm -fR _inspect[1-3].tmp; echo' EXIT
+trap 'rm -fr _inspect[1-3].tmp; echo' EXIT
 trap 'exit 1' HUP INT QUIT TERM
 
 

@@ -15,13 +15,13 @@ elif type apt-get > /dev/null 2>&1; then
 
     apt-get update
     apt-get install -y --no-install-recommends "$@"
-    rm -rf /var/lib/apt/lists/*
+    rm -fr /var/lib/apt/lists/*
 
 elif type yum > /dev/null 2>&1; then
     readonly PACKAGE_MANAGER='yum'
 
     yum install -y "$@"
-    rm -rf /var/cache/yum
+    rm -fr /var/cache/yum
 
 else
     echo "dit: no package manager is available" 1>&2
