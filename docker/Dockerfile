@@ -40,6 +40,7 @@ RUN set -eux; \
     cd src; \
     make; \
     mv -f dit /usr/local/bin/; \
+    mv -f srcglob ..; \
     cd ..; \
     rm -fr src;
 
