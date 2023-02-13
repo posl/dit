@@ -32,7 +32,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "srcglob.h"
 #include "test.h"
 #include "yyjson.h"
 

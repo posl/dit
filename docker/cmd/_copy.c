@@ -1,7 +1,7 @@
 /**
  * @file _copy.c
  *
- * Copyright (c) 2022 Tsukasa Inada
+ * Copyright (c) 2023 Tsukasa Inada
  *
  * @brief Described the dit command 'copy', that imitates COPY/ADD instruction.
  * @author Tsukasa Inada
@@ -9,6 +9,7 @@
  */
 
 #include "main.h"
+#include "srcglob.h"
 
 #define COPY_TMP_DIR "/dit/tmp/copy.d"
 
@@ -26,6 +27,12 @@ typedef struct {
 static int parse_opts(int argc, char **argv, copy_opts *opt);
 static int do_copy(int argc, char **argv, copy_opts *opt);
 
+/*
+static int copy_to_tmp_dir();
+static int move_from_tmp_dir();
+
+static int reflect_copy_instr();
+*/
 
 
 
@@ -70,7 +77,7 @@ int copy(int argc, char **argv){
             xperror_missing_args(errdesc, first_arg);
         xperror_suggestion(true);
     }
-    return 0;
+    return i;
 }
 
 
@@ -188,8 +195,23 @@ static int do_copy(int argc, char **argv, copy_opts *opt){
 
 
 /******************************************************************************
-    * Functions in charge of each phase of COPY/ADD instruction
+    * Copy Part
 ******************************************************************************/
+
+
+
+//
+
+
+
+
+/******************************************************************************
+    * Reflect Part
+******************************************************************************/
+
+
+
+//
 
 
 
@@ -200,6 +222,7 @@ static int do_copy(int argc, char **argv, copy_opts *opt){
 /******************************************************************************
     * Unit Test Functions
 ******************************************************************************/
+
 
 void copy_test(void){
     fputs("copy test\n", stdout);

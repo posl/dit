@@ -37,8 +37,10 @@
 #define FAILURE 1
 
 
-void xperror_message(const char *msg, const char *addition);
-int xperror_standards(const char *entity, int errid);
+static void xperror_message(const char *msg, const char *addition);
+
+static void report_srcglob_err(int type, int code, const char *entity);
+static int report_standard_err(const char *entity, int errid);
 
 
 /** string representing a invoked command name */
@@ -56,38 +58,58 @@ static FILE *srcglob_fp = NULL;
 
 
 /**
- * @brief interface for the extra command 'srcglob'
+ * @brief the extra command 'srcglob'
  *
  * @param[in]  argc  the length of the argument vector below
  * @param[out] argv  array of strings that are wildcard patterns of COPY/ADD instruction
  * @return int  command's exit status
  */
 int main(int argc, char **argv){
-    const char *errmsg = NULL;
-    int exit_status = FAILURE;
+    int errtype = '\0', errcode = -1, exit_status = FAILURE;
+    const char *errinfo = NULL;
 
-    if ((argc <= 0) || (! (program_name = *argv)))
+    if ((argc <= 0) || (! (argv && (program_name = *argv))))
         goto exit;
 
     if (argc == 1){
-        errmsg = "requires one or more arguments";
-        goto exit;
-    }
-    if (geteuid()){
-        errmsg = "not a privileged user";
+        errtype = 'M';
+        errinfo = "requires one or more arguments";
         goto exit;
     }
     if (! (srcglob_fp = fopen(SRCGLOB_FILE, "wb"))){
-        errmsg = "cannot record the results";
+        errtype = 'M';
+        errinfo = "cannot record the results";
         goto exit;
     }
 
+    if (geteuid()){
+        errtype = 'O';
+        errcode = SRCGLOB_ERRCODE_NO_PRIVILEGE;
+        goto exit;
+    }
+    if (chdir(DIT_MOUNT_DIR) || chroot(DIT_MOUNT_DIR)){
+        errtype = 'S';
+        errcode = errno;
+        errinfo = DIT_MOUNT_DIR;
+        goto exit;
+    }
+
+    
 
     exit_status = SUCCESS;
 
 exit:
-    if (errmsg)
-        xperror_message(errmsg, NULL);
+    if (errtype){
+        if (errcode < 0){
+            assert(errinfo);
+            xperror_message(errinfo, NULL);
+        }
+        else
+            report_srcglob_err(errtype, errcode, errinfo);
+    }
+    if (srcglob_fp)
+        fclose(srcglob_fp);
+
     return exit_status;
 }
 
@@ -105,7 +127,7 @@ exit:
  * @param[in]  msg  the error message
  * @param[in]  addition  additional information, if any
  */
-void xperror_message(const char *msg, const char *addition){
+static void xperror_message(const char *msg, const char *addition){
     assert(msg);
 
     int offset = 0;
@@ -115,27 +137,33 @@ void xperror_message(const char *msg, const char *addition){
         addition = msg;
     }
 
+    assert(program_name);
     fprintf(stderr, ("%s: %s: %s\n" + offset), program_name, addition, msg);
 }
 
 
+
+
 /**
- * @brief print the standard error message represented by 'errno' to stderr.
+ * @brief report any errors that occur while running this command.
  *
+ * @param[in]  type  error type
+ * @param[in]  code  error code
  * @param[in]  entity  the entity that caused the error or NULL
- * @param[in]  errid  error number
- * @return int  -1 (error exit)
  *
- * @note can be passed as 'errfunc' in glibc 'glob' function.
+ * @note see the data type 'srcglob_err' for details on the arguments of this function.
  */
-int xperror_standards(const char *entity, int errid){
-    assert(errid);
+static void report_srcglob_err(int type, int code, const char *entity){
+    assert((type == 'S') || (type == 'O'));
+    assert(code >= 0);
 
     srcglob_err errinfo = {
-        .type = 'S',
-        .code = errid,
+        .type = type,
+        .code = code,
         .written_size = 0
     };
+
+    const char *errmsg;
 
     if (entity)
         errinfo.written_size = strlen(entity) + 1;
@@ -147,6 +175,23 @@ int xperror_standards(const char *entity, int errid){
         fwrite(entity, sizeof(const char), errinfo.written_size, srcglob_fp);
     }
 
-    xperror_message(strerror(errid), entity);
+    errmsg = (type == 'S') ? strerror(code) : srcglob_errmsgs[code];
+    xperror_message(errmsg, entity);
+}
+
+
+/**
+ * @brief report the standard error represented by 'errno'.
+ *
+ * @param[in]  entity  the entity that caused the error or NULL
+ * @param[in]  errid  error number
+ * @return int  -1 (error exit)
+ *
+ * @note can be passed as 'errfunc' in glibc 'glob' function.
+ */
+static int report_standard_err(const char *entity, int errid){
+    assert(errid);
+
+    report_srcglob_err('S', errid, entity);
     return -1;
 }
