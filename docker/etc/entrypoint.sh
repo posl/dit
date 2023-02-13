@@ -44,6 +44,7 @@ touch \
 chown root /usr/local/bin/dit
 chmod a=x,u+s /usr/local/bin/dit
 
+find /dit/bin -type f -exec chmod a=x {} +
 find /dit/etc -type f -exec chmod a=r {} +
 
 chmod a=rw \
@@ -88,6 +89,7 @@ umask "${DEFAULT_UMASK_VALUE}"
 
 chmod a=rx \
     /dit \
+    /dit/bin \
     /dit/etc \
     /dit/srv \
     /dit/var
@@ -189,4 +191,4 @@ chown "${DEFAULT_USER}" /dit/tmp/.profile
 export ENV=/dit/tmp/.profile
 
 
-exec su-exec "${DEFAULT_USER}" "$@"
+exec /dit/bin/su-exec "${DEFAULT_USER}" "$@"

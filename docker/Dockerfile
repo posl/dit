@@ -2,7 +2,7 @@ ARG BASE_NAME
 ARG BASE_VERSION
 
 FROM "${BASE_NAME}:${BASE_VERSION}" AS builder
-WORKDIR /dit/src
+WORKDIR /dit/bin
 
 
 # install essential packages
@@ -28,24 +28,28 @@ RUN set -eux; \
     curl -L "https://github.com/ncopa/su-exec/archive/${COMMIT_ID}.tar.gz" | tar -xvz; \
     cd "su-exec-${COMMIT_ID}"; \
     make CC='gcc'; \
-    mv su-exec /usr/local/bin/; \
+    mv -f su-exec ..; \
     cd ..; \
-    rm -rf "su-exec-${COMMIT_ID}";
+    rm -fr "su-exec-${COMMIT_ID}";
 
 
 # generate the dit command
-COPY ./cmd ./
+COPY ./cmd ./src
 
 RUN set -eux; \
+    cd src; \
     make; \
-    make clean;
+    mv -f dit /usr/local/bin/; \
+    cd ..; \
+    rm -fr src;
 
 
 
 FROM "${BASE_NAME}:${BASE_VERSION}" AS product
 
 
-COPY --from=builder /usr/local/bin /usr/local/bin/
+COPY --from=builder /usr/local/bin/dit /usr/local/bin/
+COPY --from=builder /dit/bin /dit/bin
 COPY --from=builder /dit/etc/package_manager /dit/etc/
 COPY ./etc /dit/etc/
 
@@ -89,6 +93,6 @@ RUN set -eux; \
 
 # verify all dit commands work properly
 WORKDIR /dit/test
-COPY ./test ./
+COPY ./test .
 
 CMD [ "/bin/bash", "-ex", "main.sh" ]
