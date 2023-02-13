@@ -291,7 +291,7 @@ static file_node *construct_recursive(const char *name, qcmp comp){
 
                     if ((! status) && chdir("..")){
                         fatal_error = true;
-                        xperror_standards("chdir (fatal error)", errno);
+                        xperror_standards(NULL, errno);
                     }
                 }
             }

@@ -1,7 +1,7 @@
 /**
  * @file _package.c
  *
- * Copyright (c) 2022 Tsukasa Inada
+ * Copyright (c) 2023 Tsukasa Inada
  *
  * @brief Described the dit command 'package', that 
  * @author Tsukasa Inada

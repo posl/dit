@@ -26,7 +26,6 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <grp.h>
-#include <pthread.h>
 #include <pwd.h>
 #include <regex.h>
 #include <sys/stat.h>
@@ -220,18 +219,18 @@ int write_provisional_report(int reflecteds[2]);
     * Error Message Functions
 ******************************************************************************/
 
-void xperror_invalid_arg(int code_c, int state, const char * restrict desc, const char * restrict arg);
+void xperror_invalid_arg(int code_c, int state, const char *desc, const char *arg);
 void xperror_valid_args(const char * const *expected, size_t size);
 
-void xperror_missing_args(const char * restrict desc, const char * restrict before_arg);
+void xperror_missing_args(const char *desc, const char *before_arg);
 void xperror_too_many_args(int limit);
 
-void xperror_message(const char * restrict msg, const char * restrict addition);
+void xperror_message(const char *msg, const char *addition);
 void xperror_suggestion(bool cmd_flag);
 
-int xperror_standards(const char *entity, int errid);
+void xperror_standards(const char *entity, int errid);
 void xperror_child_process(const char *cmd_name, int status);
-void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg);
+void xperror_file_contents(const char *file_name, int lineno, const char *msg);
 
 
 /******************************************************************************

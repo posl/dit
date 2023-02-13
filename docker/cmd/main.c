@@ -235,7 +235,7 @@ static int call_dit_command(int argc, char **argv, int cmd_id){
  *
  * @note the return value of 'receive_expected_string' can be used as it is for 'state'.
  */
-void xperror_invalid_arg(int code_c, int state, const char * restrict desc, const char * restrict arg){
+void xperror_invalid_arg(int code_c, int state, const char *desc, const char *arg){
     assert(desc);
 
     const char *format, *addition = "", *adjective;
@@ -286,7 +286,7 @@ void xperror_valid_args(const char * const *reprs, size_t size){
  *
  * @note if 'desc' is NULL, prints an error message about specifying the target file.
  */
-void xperror_missing_args(const char * restrict desc, const char * restrict before_arg){
+void xperror_missing_args(const char *desc, const char *before_arg){
     assert(desc || (! before_arg));
 
     char format[] = "%s: missing %s operand after '%s'\n";
@@ -345,7 +345,7 @@ void xperror_too_many_args(int limit){
  * @note if 'msg' is NULL, prints an error message about manipulating an internal file.
  * @attention if 'msg' is NULL, 'addition' must also be NULL.
  */
-void xperror_message(const char * restrict msg, const char * restrict addition){
+void xperror_message(const char *msg, const char *addition){
     assert(msg || (! addition));
 
     int offset = 0;
@@ -385,18 +385,13 @@ void xperror_suggestion(bool cmd_flag){
 /**
  * @brief print the standard error message represented by 'errno' to stderr.
  *
- * @param[in]  entity  the entity that caused the error
+ * @param[in]  entity  the entity that caused the error or NULL
  * @param[in]  errid  error number
- * @return int  -1 (error exit)
- *
- * @note can be passed as 'errfunc' in glibc 'glob' function.
  */
-int xperror_standards(const char *entity, int errid){
-    assert(entity);
-    assert(errid == errno);
+void xperror_standards(const char *entity, int errid){
+    assert(errid);
 
     xperror_message(strerror(errid), entity);
-    return ERROR_EXIT;
 }
 
 
@@ -437,7 +432,7 @@ void xperror_child_process(const char *cmd_name, int status){
  *
  * @note line number starts from 1.
  */
-void xperror_file_contents(const char * restrict file_name, int lineno, const char * restrict msg){
+void xperror_file_contents(const char *file_name, int lineno, const char *msg){
     assert(lineno > 0);
     assert(msg);
 
@@ -714,7 +709,7 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
  * @note this function is to avoid the inefficiency and the inconvenience when using 'system' function.
  * @note signal handling conforms to the specifications of 'system' function.
  * @note 'pthread_sigmask' function is not used because it is not any of async-signal-safe functions.
- * @note discarding output is attempted on 1 (stdout) and 2 (stderr), in that order.
+ * @note discarding output is attempted on stdout and stderr, in that order.
  * @note the exit status that can be returned as a return value is based on the shell's.
  *
  * @attention the subsequent processing should not be continued if this function returns a non-zero value.
@@ -725,50 +720,49 @@ int execute_command(const char *cmd_file, char * const argv[], int null_redirs){
     assert(argv && argv[0]);
     assert((null_redirs >= 0) && (null_redirs <= 2));
 
-    struct sigaction sigign = {0}, sigdfl_int, sigdfl_quit;
-    sigset_t new_mask, old_mask;
+    struct sigaction new_act = {0}, sigdfl_int, sigdfl_quit;
+    sigset_t old_mask;
     pid_t pid, err = 0;
-    int fd, wstatus = 0, exit_status = -1;
+    int tmp = 0, exit_status = -1;
 
-    sigign.sa_handler = SIG_IGN;
-    sigemptyset(&sigign.sa_mask);
-    sigaction(SIGINT, &sigign, &sigdfl_int);
-    sigaction(SIGQUIT, &sigign, &sigdfl_quit);
+    new_act.sa_handler = SIG_IGN;
+    sigemptyset(&new_act.sa_mask);
+    sigaction(SIGINT, &new_act, &sigdfl_int);
+    sigaction(SIGQUIT, &new_act, &sigdfl_quit);
 
-    sigemptyset(&new_mask);
-    sigaddset(&new_mask, SIGCHLD);
-    sigprocmask(SIG_BLOCK, &new_mask, &old_mask);
+    sigaddset(&new_act.sa_mask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &new_act.sa_mask, &old_mask);
 
     switch ((pid = fork())){
         case -1:  // error
             err = -1;
             break;
         case 0:   // child
-            if (null_redirs && ((fd = open("/dev/null", (O_WRONLY | O_CLOEXEC))) != -1)){
+            if (null_redirs && ((tmp = open("/dev/null", (O_WRONLY | O_CLOEXEC))) != -1)){
                 do
-                    dup2(fd, null_redirs);
-                while (--null_redirs);
+                    dup2(tmp, ((! --null_redirs) ? STDOUT_FILENO : STDERR_FILENO));
+                while (null_redirs);
             }
             sigreset(sigdfl_int, sigdfl_quit, old_mask);
             execv(cmd_file, argv);
             _exit(127);
         default:  // parent
-            while (((err = waitpid(pid, &wstatus, 0)) == -1) && (errno == EINTR));
+            while (((err = waitpid(pid, &tmp, 0)) == -1) && (errno == EINTR));
             break;
     }
 
     sigreset(sigdfl_int, sigdfl_quit, old_mask);
 
     if (err != -1){
-        if (WIFEXITED(wstatus))
-            exit_status = WEXITSTATUS(wstatus);
+        if (WIFEXITED(tmp))
+            exit_status = WEXITSTATUS(tmp);
         else {
             exit_status = 128;
-            if (WIFSIGNALED(wstatus))
-                exit_status += WTERMSIG(wstatus);
+            if (WIFSIGNALED(tmp))
+                exit_status += WTERMSIG(tmp);
         }
     }
-    if (exit_status)
+    if (exit_status && (null_redirs != 2))
         xperror_child_process(argv[0], exit_status);
 
     return exit_status;
