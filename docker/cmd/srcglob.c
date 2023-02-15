@@ -7,7 +7,8 @@
  * @author Tsukasa Inada
  * @date 2023/02/14
  *
- * @note 
+ * @note source file paths must be resolved only within the build context.
+ * @note implemented this command because 'chroot' syscall and some async-signal-unsafe functions are needed.
  */
 
 
@@ -87,10 +88,15 @@ int main(int argc, char **argv){
         errcode = SRCGLOB_ERRCODE_NO_PRIVILEGE;
         goto exit;
     }
-    if (chdir(DIT_MOUNT_DIR) || chroot(DIT_MOUNT_DIR)){
+    if (chdir(DIT_MOUNT_DIR)){
         errtype = 'S';
         errcode = errno;
         errinfo = DIT_MOUNT_DIR;
+        goto exit;
+    }
+    if (chroot(".")){
+        errtype = 'S';
+        errcode = errno;
         goto exit;
     }
 
@@ -168,6 +174,7 @@ static void report_srcglob_err(int type, int code, const char *entity){
     if (entity)
         errinfo.written_size = strlen(entity) + 1;
 
+    assert(srcglob_fp);
     fwrite(&errinfo, sizeof(errinfo), 1, srcglob_fp);
 
     if (errinfo.written_size){
