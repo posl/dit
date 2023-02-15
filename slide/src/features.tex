@@ -120,7 +120,7 @@ PROMPT_COMMAND='mylog > "/tmp/$(date -Ins)"'
     \end{description}
 
     \vskip1.0zh
-    \textcolor{red!75}{strictとnormalの違い}（例：条件実行の``left \&\& right''）
+    strictとnormalの違い（例：条件実行の``left \&\& right''）
     \begin{description}
         \item[strict] 左のコマンドだけを反映する可能性がある
         \item[normal] ひとまとめに反映するか，全く反映しないか
@@ -128,49 +128,20 @@ PROMPT_COMMAND='mylog > "/tmp/$(date -Ins)"'
 \end{frame}
 
 
-\begin{frame}{機能１　変換処理の流れ}
-    \begin{tikzpicture}[remember picture]
-        \useasboundingbox (0.0, 0.0);
-        \begin{scope}[shift={(current page.south west)}]
-            \node[progress20] (p1) at (6.8, 7.6) {直前の終了ステータスを判定};
-            \node[progress20] (p2) at (6.8, 6.4) {現在の反映モードを判定};
-            \node[progress20] (p3) at (6.8, 5.2) {コマンドラインを解析・展開};
-            \node[progress10] (p4) at (2.2, 4.0) {変換規則の適用};
-            \node[progress20] (p5) at (6.8, 2.8) {ignoreファイル・反映ルールの適用};
+\newcommand{\MyConvertExample}[2]{
+    \begin{frame}{機能１　#2}
+        \begin{figure}
+            \centering
+            \includegraphics[width=\linewidth]{img/convert#1.pdf}
+        \end{figure}
+    \end{frame}
+}
 
-            \node[success] (g1) at (2.2, 1.0) {対応する命令を追加};
-            \node[success] (g2) at (6.8, 1.0) {RUN命令を追加};
-            \node[failure] (g3) at (11.4, 1.0) {失敗で終了};
+\MyConvertExample{1}{変換処理の流れ}
 
-            \coordinate (c1) at (2.2, 2.8);
-            \coordinate (c2) at (6.8, 4.0);
-            \coordinate (c3) at (11.4, 2.8);
-            \coordinate (c4) at (11.4, 6.4);
-            \coordinate (c5) at (11.4, 7.6);
-
-            \foreach \u / \v in {p1/p2,p2/p3,p3/p5,p4/g1,p5/g2,c1/p5,c2/p4}
-                \draw[arrows = {-Stealth}] (\u) -- (\v);
-
-            \foreach \u / \v in {p1/c5,p2/c4,p5/c3,c5/g3}
-                \draw[red, arrows = {-Stealth}] (\u) -- (\v);
-
-            \begin{tikzpicture}[remember picture, overlay]
-                \only<2>{\node[callout, callout absolute pointer={(p2.north)}] at (1.2, 3.0) {成功ならば};}
-                \only<3>{\node[callout, callout absolute pointer={(p3.north)}] at (1.2, 1.8) {no-reflect以外};}
-                \only<4>{\node[callout, callout absolute pointer={(p4.east)}] at (1.2, 1.0) {候補にだけ};}
-                \only<5>{\node[callout, callout absolute pointer={(c3)}] at (7.2, 0.0) {反映するものがなければ};}
-            \end{tikzpicture}
-        \end{scope}
-    \end{tikzpicture}
-\end{frame}
-
-
-\begin{frame}[fragile]{機能１　変換処理の具体例}
-    \begin{figure}
-        \centering
-        \includegraphics[width=\linewidth]{img/convert.pdf}
-    \end{figure}
-\end{frame}
+\MyConvertExample{2}{変換処理の実行例 １/３}
+\MyConvertExample{3}{変換処理の実行例 ２/３}
+\MyConvertExample{4}{変換処理の実行例 ３/３}
 
 
 
@@ -179,7 +150,7 @@ PROMPT_COMMAND='mylog > "/tmp/$(date -Ins)"'
 
 
 \begin{frame}{機能２\\「ホスト環境からファイルをコピーする」}
-    \textcolor{blue!75}{dit copy}
+    \textcolor{blue!75}{\large dit copy}
 
     \hskip1.0zw
     ホスト環境からコンテナ内へのファイルのコピーを行い，その内容をCOPY・ADD命令としてDockerfileに反映する．
@@ -194,7 +165,7 @@ PROMPT_COMMAND='mylog > "/tmp/$(date -Ins)"'
 
 
 \begin{frame}{機能２\\「パッケージをインストールする」}
-    \textcolor{blue!75}{dit package}
+    \textcolor{blue!75}{\large dit package}
 
     \hskip1.0zw
     最適化された形式で，パッケージのインストールを行い，その内容をRUN命令としてDockerfileに反映する．
@@ -209,7 +180,7 @@ PROMPT_COMMAND='mylog > "/tmp/$(date -Ins)"'
 
 
 \begin{frame}[fragile]{機能２\\「Dockerfileに命令を追加する」}
-    \textcolor{blue!75}{dit reflect}
+    \textcolor{blue!75}{\large dit reflect}
 
     \hskip1.0zw
     各種ログを取りながら，Dockerfileに命令を追加する．
@@ -230,7 +201,7 @@ dit reflect -dp -
 
 
 \begin{frame}[fragile]{機能２\\「Dockerfileから指定した行を削除する」}
-    \textcolor{blue!75}{dit erase}
+    \textcolor{blue!75}{\large dit erase}
 
     \hskip1.0zw
     条件にマッチする行を，Dockerfileから削除する．
@@ -256,20 +227,34 @@ dit erase -diy -E '^LABEL[[:space:]]'
 
 
 \begin{frame}{機能３\\「Dockerfileのリファクタリング・最適化を行う」}
-    \textcolor{blue!75}{dit optimize}
+    \textcolor{blue!75}{\large dit optimize}
 
     \hskip1.0zw
     下書きのDockerfileから，完成版のDockerfileを生成する．
     \vskip1.0zh
 
-    処理内容の例
+    処理内容
     \begin{itemize}
-        \item WORKDIR命令のオペランドを絶対パスにする．
-        \item 重複した命令など，無意味な命令を取り除く．
-        \item 連続するRUN命令をまとめる．
-        \item 可読性を向上させるための整形を行う．
+        \item 各命令に特有のリファクタリング
+        \item 連続する同系統の命令列に対する最適化
+        \item 環境の整合性を保つために必須の集約処理
+        \item 順序に依存しない命令の並べ替え
     \end{itemize}
 \end{frame}
+
+
+\newcommand{\MyOptimizeExample}[2]{
+    \begin{frame}{機能３　リファクタリング・最適化の実行例 #1/３}
+        \begin{figure}
+            \centering
+            \includegraphics[width=\linewidth]{img/optimize#2.pdf}
+        \end{figure}
+    \end{frame}
+}
+
+\MyOptimizeExample{１}{3}
+\MyOptimizeExample{２}{4}
+\MyOptimizeExample{３}{5}
 
 
 
@@ -278,7 +263,7 @@ dit erase -diy -E '^LABEL[[:space:]]'
 
 
 \begin{frame}{機能４\\「Dockerfileの開発を中断・再開できるようにする」}
-    コマンドラインの実行履歴を保持する，\textcolor{red!75}{履歴ファイル}\\を導入することで実現する．
+    コマンドラインの実行履歴を保持する，\textcolor{orange}{履歴ファイル}\\を導入することで実現する．
 
     \vskip1.0zh
     \begin{description}

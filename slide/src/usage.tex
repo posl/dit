@@ -1,7 +1,7 @@
 \section{簡単な使い方}
 
 \begin{frame}[fragile]{手順 １/４\\「提案ツールのソースコードを取得する」}
-    提案ツールの\href{https://github.com/posl/dit}{リポジトリ}をクローンする．
+    提案ツールの\href{https://github.com/posl/dit}{\textcolor{teal!60}{リポジトリ}}をクローンする．
     \vskip2.0zh
 
     実行例
@@ -14,8 +14,8 @@ git clone --depth 1 "${URL}"
 
 
 \begin{frame}[fragile]{手順 ２/４\\「開発用のコンテナを起動し，開発を開始する」}
-    開発用のディレクトリを設定しながら，\textcolor{red!75}{exec.sh}を実行する．\\
-    実行後は，指定したベースイメージに\textcolor{red!75}{bash}で入った状態．
+    開発用のディレクトリを設定しながら，\textcolor{orange}{exec.sh}を実行する．\\
+    実行後は，指定したベースイメージに\textcolor{orange}{bash}で入った状態．
 
     \begin{figure}
         \centering
@@ -26,7 +26,7 @@ git clone --depth 1 "${URL}"
 
 \begin{frame}{手順 ３/４\\「動作確認しながら，目的の環境構築を行う」}
     コンテナ内で動作確認しながら，環境構築することで，\\
-    それと同時に，\textcolor{red!75}{自動的に}Dockerfileが作られていく．
+    それと同時に，\textcolor{orange}{自動的に}Dockerfileが作られていく．
 
     \begin{figure}
         \centering

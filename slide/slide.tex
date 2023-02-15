@@ -14,30 +14,22 @@
 
 \renewcommand{\kanjifamilydefault}{\gtdefault}
 
+\colorlet{mygreen}{green!60!black}
+\colorlet{myblue}{blue!60!black}
+
 \hypersetup{
     setpagesize=false,
     bookmarksnumbered=true,
-    bookmarksopen=true,
-    colorlinks=true,
-    linkcolor=blue!75,
-    urlcolor=teal!60
+    bookmarksopen=true
 }
 
-\usetikzlibrary{arrows.meta, shapes.callouts}
-
-\tikzset{callout/.style={rectangle callout, rounded corners, white, fill=red!75, minimum height=30pt}}
-\tikzset{probrem/.style={rectangle, white, fill=red!75, text centered, font=\huge, minimum width=24zw}}
-
-\tikzset{block/.style={rectangle, rounded corners, draw, text centered, minimum height=20pt}}
-\tikzset{progress/.style={block, fill=cyan!12}}
-\tikzset{progress10/.style={progress, minimum width=10zw}}
-\tikzset{progress20/.style={progress, minimum width=20zw}}
-\tikzset{success/.style={block, fill=magenta!12, minimum width=10zw}}
-\tikzset{failure/.style={block, red, fill=red!12}}
+\usetikzlibrary{shapes.callouts}
+\tikzset{callout/.style={rectangle callout, rounded corners, white, fill=orange, minimum height=30pt}}
+\tikzset{probrem/.style={rectangle, white, fill=orange, text centered, font=\huge, minimum width=24zw}}
 
 \lstset{
     basicstyle=\ttfamily\footnotesize,
-    commentstyle=\color[rgb]{0.0,0.6,0.0},
+    commentstyle=\color{mygreen},
     backgroundcolor=\color[rgb]{0.95,0.95,0.92},
     columns=[l]{fullflexible},
     frame=tlBR,
@@ -51,27 +43,24 @@
     showtabs=false
 }
 
-\colorlet{number}{green!60!black}
-\definecolor{bracket}{RGB}{20,100,175}
-
 \lstdefinelanguage{json}{
     keywords={null, true, false},
-    keywordstyle=\color{blue!60!black},
+    keywordstyle=\color{myblue},
     literate=
-       *{0}{{{\color{number}0}}}{1}
-        {1}{{{\color{number}1}}}{1}
-        {2}{{{\color{number}2}}}{1}
-        {3}{{{\color{number}3}}}{1}
-        {4}{{{\color{number}4}}}{1}
-        {5}{{{\color{number}5}}}{1}
-        {6}{{{\color{number}6}}}{1}
-        {7}{{{\color{number}7}}}{1}
-        {8}{{{\color{number}8}}}{1}
-        {9}{{{\color{number}9}}}{1}
-        {\{}{{{\color{bracket}{\{}}}}{1}
-        {\}}{{{\color{bracket}{\}}}}}{1}
-        {[}{{{\color{bracket}{[}}}}{1}
-        {]}{{{\color{bracket}{]}}}}{1},
+       *{0}{{{\color{mygreen}0}}}{1}
+        {1}{{{\color{mygreen}1}}}{1}
+        {2}{{{\color{mygreen}2}}}{1}
+        {3}{{{\color{mygreen}3}}}{1}
+        {4}{{{\color{mygreen}4}}}{1}
+        {5}{{{\color{mygreen}5}}}{1}
+        {6}{{{\color{mygreen}6}}}{1}
+        {7}{{{\color{mygreen}7}}}{1}
+        {8}{{{\color{mygreen}8}}}{1}
+        {9}{{{\color{mygreen}9}}}{1}
+        {\{}{{{\color{cyan}{\{}}}}{1}
+        {\}}{{{\color{cyan}{\}}}}}{1}
+        {[}{{{\color{cyan}{[}}}}{1}
+        {]}{{{\color{cyan}{]}}}}{1},
     numbers=left,
     numberstyle=\scriptsize,
     firstnumber=1,
@@ -85,13 +74,11 @@
 \usefonttheme{professionalfonts}
 
 \setbeamercolor{normal text}{bg=white}
-\setbeamercolor{enumerate item}{fg=blue!75}
 \setbeamercolor{description item}{fg=blue!75}
 
 \setbeamertemplate{caption}{\raggedright\insertcaption\par}
 \setbeamertemplate{navigation symbols}{}
 
-\setbeamercolor{footline}{fg=red!75}
 \setbeamertemplate{footline}[frame number]
 \setbeamerfont{footline}{series=\bfseries}
 
@@ -119,7 +106,6 @@
 %--------- スライド ---------%
 \begin{document}
 
-
 \frame{\maketitle}
 
 \begin{frame}{目次}
@@ -128,17 +114,16 @@
 
 
 %1 導入
-\input{sec/intro}
+\input{src/intro}
 %2 背景と目的
-\input{sec/motivation}
+\input{src/motivation}
 %3 提案ツールの特長
-\input{sec/advantages}
+\input{src/advantages}
 %4 簡単な使い方
-\input{sec/usage}
+\input{src/usage}
 %5 主な機能
-\input{sec/features}
+\input{src/features}
 %6 まとめ
-\input{sec/conclusion}
-
+\input{src/conclusion}
 
 \end{document}
