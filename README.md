@@ -1,12 +1,9 @@
 <!-- omit in toc -->
 # dit
 
-1. [How to use](#how-to-use)
-
-
+An interactive tool for assisting Dockerfile development
 
 <br>
-
 
 ## Please wait for the first release.
 
