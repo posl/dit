@@ -14,8 +14,9 @@ git clone --depth 1 "${URL}"
 
 
 \begin{frame}{手順 ２/４\\「開発用のコンテナを起動し，開発を開始する」}
-    開発用のディレクトリを設定しながら，\textcolor{orange}{exec.sh}を実行する．\\
-    実行後は，指定したベースイメージに\textcolor{orange}{bash}で入った状態．
+    \vskip0.5zh
+    ルートにある，\textcolor{orange}{exec.sh}というシェルスクリプトを実行する．
+    \vskip0.5zh
 
     \begin{figure}
         \centering
@@ -25,12 +26,13 @@ git clone --depth 1 "${URL}"
 
 
 \begin{frame}{手順 ３/４\\「動作確認しながら，目的の環境構築を行う」}
-    コンテナ内で動作確認しながら，環境構築することで，\\
-    それと同時に，\textcolor{orange}{自動的に}Dockerfileが作られていく．
+    \vskip1.0zh
+    動作確認に専念しながら，\textcolor{orange}{対話的に}Dockerfileを開発する．
+    \vskip1.0zh
 
     \begin{figure}
         \centering
-        \includegraphics[width=0.8\linewidth]{img/usage2.pdf}
+        \includegraphics[width=\linewidth]{img/usage2.pdf}
     \end{figure}
 \end{frame}
 
@@ -45,6 +47,4 @@ git clone --depth 1 "${URL}"
 
     \vskip2.0zh
     最後に，Dockerfileのリファクタリング・最適化を行う．
-
-    これで，目的のDockerfileが完成する．
 \end{frame}

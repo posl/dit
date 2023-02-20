@@ -1,46 +1,50 @@
 \section{提案ツールの特長}
 
-\begin{frame}{なぜ，イメージ開発の効率化が必要なのか？}
-    下のギャップが，開発を非効率にしている．
-    \begin{description}[labelwidth=6.0zw]
-        \item[イメージ開発] Dockerfileを作成する．
-        \item[動作確認] コンテナ内で行う．
-    \end{description}
-
-    \vskip1.0zh
-    現状の動作確認の手段
-    \begin{enumerate}
-        \item 開発中のDockerfileから逐一起動するコンテナを使う．
-        \item 同じベースイメージから起動したコンテナを使う．
-    \end{enumerate}
-
-    \vskip0.5zh
-    どちらも，\textcolor{orange}{問題あり}．
-\end{frame}
-
-
-\begin{frame}{開発中のDockerfileから逐一起動するコンテナで\\動作確認しながら，Dockerfileを開発する}
-    Dockerfileを修正する度に，一時的なイメージを構築する．
-
-    →　\textcolor{orange}{待ち時間が発生する}
+\begin{frame}{現状のイメージ開発の問題点}
+    \vskip1.5zh
+    開発時と動作確認時で，作業対象が異なる．
     \vskip1.5zh
 
     \begin{figure}
         \centering
         \includegraphics[width=\linewidth]{img/method1.pdf}
     \end{figure}
+
+    \begin{onlyenv}<2>
+        \begin{tikzpicture}[remember picture]
+            \useasboundingbox (0.0, 0.0);
+            \begin{scope}[shift={(current page.south west)}]
+                \node[probrem] at (6.4, 4.6) {２つの問題が発生};
+            \end{scope}
+        \end{tikzpicture}
+    \end{onlyenv}
 \end{frame}
 
 
-\begin{frame}{同じベースイメージから起動したコンテナで\\動作確認しながら，Dockerfileを開発する}
-    目的の環境構築とDockerfileの編集作業を同時進行させる．
+\begin{frame}{問題 １/２\\「Dockerfileの動作確認のオーバヘッド」}
+    \vskip1.0zh
+    Dockerfileを修正する度に，何度もイメージを構築する．
 
-    →　\textcolor{orange}{開発者の負担が大きい}
-    \vskip1.5zh
+    →　\textcolor{orange}{待ち時間が発生する}
+    \vskip0.5zh
 
     \begin{figure}
         \centering
         \includegraphics[width=\linewidth]{img/method2.pdf}
+    \end{figure}
+\end{frame}
+
+
+\begin{frame}{問題 ２/２\\「Dockerfile開発時の開発者の負担」}
+    \vskip1.0zh
+    目的の環境構築とDockerfileの編集作業を同時進行させる．
+
+    →　\textcolor{orange}{開発者の負担が大きい}
+    \vskip0.5zh
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{img/method3.pdf}
     \end{figure}
 \end{frame}
 
@@ -53,18 +57,10 @@
 \end{frame}
 
 
-\begin{frame}{提案ツールの特長}
-    Dockerfileの効率的な開発手法が必要．
-    \vskip0.5zh
+\begin{frame}{提案ツールの特長 １/２}
+    \textcolor{blue!75}{\large インタラクティブツールとしての側面}
 
-    \hskip3.0zw
-    {\huge $\Downarrow$}
-    \vskip0.5zh
-
-    \textcolor{blue!75}{インタラクティブツールとしての側面}
-
-    ユーザがコンテナ内で動作確認しながら環境構築することで，
-    \textcolor{orange}{自動的に}Dockerfileを生成してくれる．
+    ユーザがコンテナ内で動作確認しながら環境構築することで，自動的にDockerfileを生成してくれる．
 \end{frame}
 
 
@@ -97,14 +93,13 @@
 \end{frame}
 
 
-\begin{frame}{提案ツールの特長}
-    \textcolor{blue!75}{インタラクティブツールとしての側面}
+\begin{frame}{提案ツールの特長 ２/２}
+    \textcolor{blue!75}{\large インタラクティブツールとしての側面}
 
-    ユーザがコンテナ内で動作確認しながら環境構築することで，
-    \textcolor{orange}{自動的に}Dockerfileを生成してくれる．
+    ユーザがコンテナ内で動作確認しながら環境構築することで，自動的にDockerfileを生成してくれる．
 
-    \vskip1.0zh
-    \textcolor{blue!75}{リファクタリング・最適化の機能}
+    \vskip2.0zh
+    \textcolor{blue!75}{\large リファクタリング・最適化の機能}
 
     上のようにして生成したDockerfileに，ベストプラクティスに基づいたリファクタリング・最適化を行うことができる．
 \end{frame}

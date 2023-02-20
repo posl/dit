@@ -33,8 +33,21 @@ PROMPT_COMMAND='mylog > "/tmp/$(date -Ins)"'
 \begin{frame}{機能１\\「変換仕様により，コマンドの反映の要否を判断する」}
     \begin{figure}
         \centering
-        \includegraphics[width=\linewidth]{img/terms.pdf}
+        \includegraphics[width=0.92\linewidth]{img/terms.pdf}
     \end{figure}
+
+    \small
+    \begin{table}[h]
+        \centering
+        \begin{tabular}{c|l}
+            変換仕様 & \multicolumn{1}{c}{概要} \\
+            \hline\hline
+            変換規則 & コマンドとDockerfileの命令を対応づける \\
+            反映ルール & 構文情報からコマンドの反映の要否を決定 \\
+            ignoreファイル & 反映しないコマンドとその条件を記述 \\
+            反映モード & 反映ルール・ignoreファイルの使い方を変更 \\
+        \end{tabular}
+    \end{table}
 \end{frame}
 
 
@@ -235,9 +248,9 @@ dit erase -diy -E '^LABEL[[:space:]]'
     処理内容
     \begin{itemize}
         \item 各命令に特有のリファクタリング
+        \item 順序に依存しない命令の並べ替え
         \item 連続する同系統の命令列に対する最適化
         \item 環境の整合性を保つために必須の集約処理
-        \item 順序に依存しない命令の並べ替え
     \end{itemize}
 \end{frame}
 
