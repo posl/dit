@@ -16,10 +16,10 @@
                 <mxCell id="33" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;起動&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;labelBackgroundColor=#FFFFFF;fontSize=18;fontColor=#000000;fontFamily=Noto Sans JP;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DNoto%2BSans%2BJP;" parent="1" vertex="1">
                     <mxGeometry x="155" y="64" width="40" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="43" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;コンテナ&lt;/font&gt;" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Noto Sans JP;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DNoto%2BSans%2BJP;" parent="1" vertex="1">
+                <mxCell id="43" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;開発用のコンテナ&lt;/font&gt;" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Noto Sans JP;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DNoto%2BSans%2BJP;" parent="1" vertex="1">
                     <mxGeometry x="212.63" y="40" width="140" height="110" as="geometry"/>
                 </mxCell>
-                <mxCell id="44" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;シェル環境&lt;/font&gt;" style="swimlane;whiteSpace=wrap;html=1;fontSize=16;startSize=24;fillColor=#ffe6cc;strokeColor=#d79b00;fontFamily=Noto Sans JP;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DNoto%2BSans%2BJP;" parent="43" vertex="1">
+                <mxCell id="44" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Bash 環境&lt;/font&gt;" style="swimlane;whiteSpace=wrap;html=1;fontSize=16;startSize=24;fillColor=#ffe6cc;strokeColor=#d79b00;fontFamily=Noto Sans JP;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DNoto%2BSans%2BJP;" parent="43" vertex="1">
                     <mxGeometry x="15" y="41.25" width="110" height="57.5" as="geometry"/>
                 </mxCell>
                 <mxCell id="62" value="" style="shape=flexArrow;endArrow=classic;html=1;fontSize=18;fontColor=#000000;fillColor=#d5e8d4;strokeColor=#82b366;endWidth=18.75;endSize=4.6125;fontFamily=Noto Sans JP;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DNoto%2BSans%2BJP;" parent="1" edge="1">

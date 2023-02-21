@@ -10,14 +10,12 @@
         \includegraphics[width=\linewidth]{img/method1.pdf}
     \end{figure}
 
-    \begin{onlyenv}<2>
-        \begin{tikzpicture}[remember picture]
-            \useasboundingbox (0.0, 0.0);
-            \begin{scope}[shift={(current page.south west)}]
-                \node[probrem] at (6.4, 4.6) {２つの問題が発生};
-            \end{scope}
-        \end{tikzpicture}
-    \end{onlyenv}
+    \begin{tikzpicture}[remember picture]
+        \useasboundingbox (0.0, 0.0);
+        \begin{scope}[shift={(current page.south west)}]
+            \only<2>{\node[probrem] at (6.4, 4.6) {２つの問題が発生};}
+        \end{scope}
+    \end{tikzpicture}
 \end{frame}
 
 
