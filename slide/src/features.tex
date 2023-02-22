@@ -255,19 +255,64 @@ dit erase -diy -E '^LABEL[[:space:]]'
 \end{frame}
 
 
-\newcommand{\MyOptimizeExample}[2]{
-    \begin{frame}{機能３　リファクタリング・最適化の実行例 #1/３}
-        \begin{figure}
-            \centering
-            \includegraphics[width=\linewidth]{img/optimize#2.pdf}
-        \end{figure}
-    \end{frame}
-}
+\begin{frame}{機能３　リファクタリング・最適化の実行例 １/３}
+    \vskip2.0zh
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{img/optimize3.pdf}
+    \end{figure}
 
-\MyOptimizeExample{１}{3}
-\MyOptimizeExample{２}{4}
-\MyOptimizeExample{３}{5}
+    \begin{tikzpicture}[remember picture]
+        \useasboundingbox (0.0, 0.0);
+        \begin{scope}[shift={(current page.south west)}]
+            \begin{onlyenv}<2>
+                \node[callout, callout absolute pointer={(5.6, 6.4)}] at (8.8, 6.4) {起点となる絶対パスが必要};
+            \end{onlyenv}
+        \end{scope}
+    \end{tikzpicture}
+\end{frame}
 
+
+\begin{frame}{機能３　リファクタリング・最適化の実行例 ２/３}
+    \vskip2.0zh
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{img/optimize4.pdf}
+    \end{figure}
+
+    \begin{tikzpicture}[remember picture]
+        \useasboundingbox (0.0, 0.0);
+        \begin{scope}[shift={(current page.south west)}]
+            \begin{onlyenv}<2>
+                \node[callout, callout absolute pointer={(6.4, 4.3)}] at (9.2, 4.3) {連続する命令列にのみ};
+            \end{onlyenv}
+        \end{scope}
+    \end{tikzpicture}
+\end{frame}
+
+
+\begin{frame}{機能３　リファクタリング・最適化の実行例 ３/３}
+    \vskip0.7zh
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{img/optimize5.pdf}
+    \end{figure}
+
+    \begin{tikzpicture}[remember picture]
+        \useasboundingbox (0.0, 0.0);
+        \begin{scope}[shift={(current page.south west)}]
+            \begin{onlyenv}<2>
+                \node[wordbox] at (10.2, 3.6) {環境の整合性を保つ};
+                \node[wordbox] at (10.2, 2.4) {意味のまとまりとなる};
+                \node[wordbox] at (10.2, 1.6) {イメージサイズ削減};
+
+                \draw[white, line width=1.5pt]
+                    (10.20, 2.85) -- (10.20, 3.15)
+                    (10.05, 3.00) -- (10.35, 3.00);
+            \end{onlyenv}
+        \end{scope}
+    \end{tikzpicture}
+\end{frame}
 
 
 
