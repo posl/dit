@@ -19,8 +19,6 @@ typedef struct {
     bool verbose;         /** whether to display an added instruction on screen */
     bool extract_flag;    /** whether to expand the tar archive like the ADD instruction */
     char *chown_arg;      /** the argument to set in the chown flag of the COPY instruction */
-    uid_t chown_uid;      /** uid of the new file or directory */
-    gid_t chown_gid;      /** gid of the new file or directory */
 } copy_opts;
 
 
@@ -33,6 +31,12 @@ static int move_from_tmp_dir();
 
 static int reflect_copy_instr();
 */
+
+
+/** owner information of the files to be newly created */
+static uid_t new_uid = 0;
+static gid_t new_gid = 0;
+
 
 
 
@@ -108,8 +112,6 @@ static int parse_opts(int argc, char **argv, copy_opts *opt){
     opt->verbose = false;
     opt->extract_flag = false;
     opt->chown_arg = NULL;
-    opt->chown_uid = 0;
-    opt->chown_gid = 0;
 
     int c, i;
     char *tmp, *p_colon;
@@ -140,7 +142,7 @@ static int parse_opts(int argc, char **argv, copy_opts *opt){
                     }
                 }
                 if (optarg == p_colon)
-                    opt->chown_uid = 0;
+                    new_uid = 0;
                 else {
                     if (p_colon)
                         *p_colon = '\0';
@@ -150,16 +152,17 @@ static int parse_opts(int argc, char **argv, copy_opts *opt){
                         *p_colon = ':';
                     if (c < 0)
                         goto errexit;
-                    opt->chown_uid = c;
+                    new_uid = c;
                 }
                 if (! ((tmp = p_colon) && *(++tmp)))
-                    opt->chown_gid = opt->chown_uid;
+                    new_gid = new_uid;
                 else {
-                    if ((c = receive_positive_integer(tmp, NULL)) < 0)
-                        c = (group = getgrnam(tmp)) ? group->gr_gid : -1;
-                    if (c < 0)
-                        goto errexit;
-                    opt->chown_gid = c;
+                    if ((c = receive_positive_integer(tmp, NULL)) < 0){
+                        if (! (group = getgrnam(tmp)))
+                            goto errexit;
+                        c = group->gr_gid;
+                    }
+                    new_gid = c;
                 }
                 opt->chown_arg = optarg;
                 break;
