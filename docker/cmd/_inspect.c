@@ -15,16 +15,11 @@
 #define INSP_EXCESS_STR " #EXCESS"
 
 
-/** Data type for storing comparison function used when qsort */
-typedef int (* qcmp)(const void *, const void *);
-
-
 /** Data type for storing the results of option parse */
 typedef struct {
-    bool color;         /** whether to colorize file name based on file mode */
-    bool classify;      /** whether to append i to file name based on file mode */
-    bool numeric_id;    /** whether to represent users and groups numerically */
-    qcmp comp;          /** comparison function used when qsort */
+    unsigned int color;    /** whether to colorize file name based on file mode */
+    bool classify;         /** whether to append i to file name based on file mode */
+    bool numeric_id;       /** whether to represent users and groups numerically */
 } insp_opts;
 
 
@@ -49,21 +44,17 @@ typedef struct file_node{
 } file_node;
 
 
-/** Data type for storing comparison function used when qsort */
-typedef int (* fcmp)(const file_node *, const file_node *);
-
-
 static int parse_opts(int argc, char **argv, insp_opts *opt);
 
-static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt);
-static file_node *construct_recursive(const char *name, qcmp comp);
+static file_node *construct_dir_tree(const char *root);
+static file_node *construct_recursive(const char *name);
 static file_node *new_file(char *name);
 static bool append_file(file_node *tree, file_node *file);
 
 static int qcmp_name(const void *a, const void *b);
 static int qcmp_size(const void *a, const void *b);
 static int qcmp_ext(const void *a, const void *b);
-static int fcmp_name(const void *a, const void *b, fcmp addition);
+static int fcmp_name(const void *a, const void *b, int (* fcmp)(const file_node *, const file_node *));
 static int fcmp_size(const file_node *file1, const file_node *file2);
 static int fcmp_ext(const file_node *file1, const file_node *file2);
 
@@ -74,6 +65,9 @@ static void print_file_owner(const file_node *file, bool numeric_id);
 static void print_file_size(off_t size);
 static void print_file_name(const file_node *file, const insp_opts *opt, bool link_flag);
 
+
+/** comparison function used when qsort */
+static int (* qcmp)(const void *, const void *) = qcmp_name;
 
 /** global variable for interrupting the recursive processing */
 static bool fatal_error = false;
@@ -113,7 +107,7 @@ int inspect(int argc, char **argv){
         argc = 1;
 
     do {
-        if ((tree = construct_dir_tree(path, &opt)))
+        if ((tree = construct_dir_tree(path)))
             destruct_dir_tree(tree, &opt);
         else
             i = FAILURE;
@@ -162,7 +156,6 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
     opt->color = false;
     opt->classify = false;
     opt->numeric_id = false;
-    opt->comp = qcmp_name;
 
     int c, i;
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0)
@@ -177,17 +170,17 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
                 opt->numeric_id = true;
                 break;
             case 'S':
-                opt->comp = qcmp_size;
+                qcmp = qcmp_size;
                 break;
             case 'X':
-                opt->comp = qcmp_ext;
+                qcmp = qcmp_ext;
                 break;
             case 1:
                 inspect_manual();
                 return NORMALLY_EXIT;
             case 0:
                 if ((c = receive_expected_string(optarg, sort_args, ARGS_NUM, 2)) >= 0){
-                    opt->comp = c ? ((c == 1) ? qcmp_name : qcmp_size) : qcmp_ext;
+                    qcmp = c ? ((c == 1) ? qcmp_name : qcmp_size) : qcmp_ext;
                     break;
                 }
                 xperror_invalid_arg('O', c, long_opts[i].name, optarg);
@@ -197,7 +190,9 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
                 return ERROR_EXIT;
         }
 
-    opt->color &= isatty(fileno(stdout));
+    opt->color &= (unsigned int) isatty(fileno(stdout));
+    assert(opt->color == ((bool) opt->color));
+
     return SUCCESS;
 }
 
@@ -212,18 +207,14 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
 /**
  * @brief construct the directory tree with details about each file also collected together.
  *
- * @param[in]  base_path  file path to the root of the directory tree
- * @param[in]  opt  variable to store the results of option parse
+ * @param[in]  root  file path to the root of the directory tree
  * @return file_node*  the result of constructing
  */
-static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt){
-    assert(opt);
-    assert(opt->comp);
-
+static file_node *construct_dir_tree(const char *root){
     file_node *tree = NULL;
 
-    if (base_path){
-        tree = construct_recursive(base_path, opt->comp);
+    if (root){
+        tree = construct_recursive(root);
 
         if (tree && fatal_error){
             destruct_recursive(tree, NULL, 0);
@@ -238,12 +229,11 @@ static file_node *construct_dir_tree(const char *base_path, const insp_opts *opt
  * @brief construct the directory tree, recursively.
  *
  * @param[in]  name  name of the file we are currently looking at
- * @param[in]  comp  comparison function used when qsort
  * @return file_node*  the result of sub-constructing
  *
  * @note at the same time, sorts files in directory.
  */
-static file_node *construct_recursive(const char *name, qcmp comp){
+static file_node *construct_recursive(const char *name){
     assert(name);
 
     file_node *file = NULL;
@@ -267,14 +257,13 @@ static file_node *construct_recursive(const char *name, qcmp comp){
                             name = entry->d_name;
                             assert(name);
 
-                            if ((name[0] == '.') && (! name[(name[1] != '.') ? 1 : 2]))
-                                continue;
-
-                            if ((! (tmp = construct_recursive(name, comp))) || fatal_error)
-                                break;
-                            if (! append_file(file, tmp)){
-                                destruct_recursive(tmp, NULL, 0);
-                                break;
+                            if (check_if_valid_dirent(name)){
+                                if ((! (tmp = construct_recursive(name))) || fatal_error)
+                                    break;
+                                if (! append_file(file, tmp)){
+                                    destruct_recursive(tmp, NULL, 0);
+                                    break;
+                                }
                             }
                         }
 
@@ -284,7 +273,7 @@ static file_node *construct_recursive(const char *name, qcmp comp){
                             goto exit;
 
                         if (file->children)
-                            qsort(file->children, file->children_num, sizeof(file_node *), comp);
+                            qsort(file->children, file->children_num, sizeof(file_node *), qcmp);
                     }
                     else
                         file->errid = errno;
@@ -461,10 +450,10 @@ static int qcmp_ext(const void *a, const void *b){
  *
  * @param[in]  a  pointer to file1
  * @param[in]  b  pointer to file2
- * @param[in]  addition  additional comparison function used before comparison by file name
+ * @param[in]  fcmp  additional comparison function used before comparison by file name
  * @return int  comparison result
  */
-static int fcmp_name(const void *a, const void *b, fcmp addition){
+static int fcmp_name(const void *a, const void *b, int (* fcmp)(const file_node *, const file_node *)){
     assert(a);
     assert(b);
 
@@ -476,7 +465,7 @@ static int fcmp_name(const void *a, const void *b, fcmp addition){
     assert(file1);
     assert(file2);
 
-    return (addition && (i = addition(file1, file2))) ? i : strcmp(file1->name, file2->name);
+    return (fcmp && (i = fcmp(file1, file2))) ? i : strcmp(file1->name, file2->name);
 }
 
 
