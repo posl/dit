@@ -771,6 +771,82 @@ int execute_command(const char *cmd_file, char * const argv[], int null_redirs){
 
 
 
+/**
+ * @brief the function that recursively scans the specified directory
+ *
+ * @param[in]  name  name of the directory we are currently looking at
+ * @param[in]  callback  a callback function that takes a file name as an argument and returns 0 on success
+ * @return bool  successful or not
+ *
+ * @note for example, you can specify 'remove' function as the callback function.
+ */
+bool xscandir_recursive(const char *name, int (* callback)(const char *)){
+    assert(name);
+    assert(callback);
+
+    bool success = false;
+
+    if (! chdir(name)){
+        DIR *dir;
+
+        if ((dir = opendir("."))){
+            struct dirent *entry;
+            struct stat file_stat;
+            bool isdir;
+
+            while ((entry = readdir(dir))){
+                name = entry->d_name;
+                assert(name);
+
+                if (check_if_valid_dirent(name)){
+#ifdef _DIRENT_HAVE_D_TYPE
+                    if (entry->d_type != DT_UNKNOWN)
+                        isdir = (entry->d_type == DT_DIR);
+                    else
+#endif
+                    if (! lstat(name, &file_stat))
+                        isdir = S_ISDIR(file_stat.st_mode);
+                    else
+                        goto exit;
+
+                    if ((isdir && (! xscandir_recursive(name, callback))) || callback(name))
+                        goto exit;
+                }
+            }
+
+            success = true;
+exit:
+            closedir(dir);
+        }
+
+        if (chdir(".."))
+            success = false;
+    }
+
+    return success;
+}
+
+
+/**
+ * @brief the callback function to be passed as 'filter' in glibc 'scandir' function.
+ *
+ * @param[in]  entry  a directory entry
+ * @return int  whether it is a valid directory entry
+ */
+int filter_dirent(const struct dirent *entry){
+    assert(entry);
+
+    const char *name;
+
+    name = entry->d_name;
+    assert(name);
+
+    return check_if_valid_dirent(name);
+}
+
+
+
+
 /******************************************************************************
     * String Recognizers
 ******************************************************************************/

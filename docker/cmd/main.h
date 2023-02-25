@@ -82,7 +82,9 @@
 #define assign_both_or_either(target, a, b, c)  (target = (target == (a)) ? (b) : (c))
 
 #define strchrcmp(str, c)  (((str)[0] == (c)) && (! (str)[1]))
-#define check_if_stdin(file_name)  strchrcmp(file_name, '-')
+#define check_if_stdin(name)  strchrcmp(name, '-')
+
+#define check_if_valid_dirent(name)  (((name)[0] != '.') || (name)[((name)[1] != '.') ? 1 : 2])
 
 
 /******************************************************************************
@@ -245,6 +247,9 @@ int qstrcmp(const void *a, const void *b);
 bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf_len);
 
 int execute_command(const char *cmd_file, char * const argv[], int null_redirs);
+
+bool xscandir_recursive(const char *name, int (* callback)(const char *));
+int filter_dirent(const struct dirent *entry);
 
 
 /******************************************************************************
