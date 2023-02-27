@@ -8,12 +8,13 @@
 
 #define SRCGLOB_FILE "/dit/tmp/srcglob.bin"
 
-#define DIT_MOUNT_DIR "/dit/mnt/"
 
+#define SRCGLOB_ERRMSGS_NUM 4
 
-#define SRCGLOB_ERRMSGS_NUM 1
-
-#define SRCGLOB_ERRCODE_NO_PRIVILEGE  0
+#define SRCGLOB_NO_PRIVILEGE     0
+#define SRCGLOB_NOTHING_MATCHED  1
+#define SRCGLOB_NOT_IN_CONTEXT   2
+#define SRCGLOB_IS_SPECIAL_FILE  3
 
 
 
@@ -46,7 +47,10 @@ typedef struct {
 
 /** array of error messages represented by 'errcode' */
 static const char * const srcglob_errmsgs[SRCGLOB_ERRMSGS_NUM] = {
-    "not a privileged user"
+    "had no privilege",
+    "matched nothing",
+    "not in build context",
+    "is a special file"
 };
 
 

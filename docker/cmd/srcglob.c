@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +37,23 @@
 
 #define SUCCESS 0
 #define FAILURE 1
+
+#ifndef GLOB_PERIOD
+#define GLOB_PERIOD 0
+#endif
+
+#define DIT_MOUNT_DIR "/dit/mnt"
+
+#define OUTPUT_FORMAT_REG  (DIT_MOUNT_DIR "%s\n")
+#define OUTPUT_FORMAT_DIR  (DIT_MOUNT_DIR "%s/\n")
+
+
+/** Data type that is applied to the smallest element that makes up the results of this command */
+typedef struct {
+    char *path;    /** real path */
+    bool isdir;    /** whether this is a directory */
+    size_t len;    /** the size of real path */
+} src_data;
 
 
 static void xperror_message(const char *msg, const char *addition);
@@ -66,13 +84,16 @@ static FILE *srcglob_fp = NULL;
  * @return int  command's exit status
  */
 int main(int argc, char **argv){
-    int errtype = '\0', errcode = -1, exit_status = FAILURE;
+    int errtype = '\0', code = -1, exit_status = FAILURE;
     const char *errinfo = NULL;
+
+    bool glob_done = false;
+    glob_t pglob;
 
     if ((argc <= 0) || (! (argv && (program_name = *argv))))
         goto exit;
 
-    if (argc == 1){
+    if (! --argc){
         errtype = 'M';
         errinfo = "requires one or more arguments";
         goto exit;
@@ -85,36 +106,144 @@ int main(int argc, char **argv){
 
     if (geteuid()){
         errtype = 'O';
-        errcode = SRCGLOB_ERRCODE_NO_PRIVILEGE;
-        goto exit;
+        code = SRCGLOB_NO_PRIVILEGE;
+        goto report;
     }
     if (chdir(DIT_MOUNT_DIR)){
         errtype = 'S';
-        errcode = errno;
+        code = errno;
         errinfo = DIT_MOUNT_DIR;
-        goto exit;
+        goto report;
     }
     if (chroot(".")){
         errtype = 'S';
-        errcode = errno;
-        goto exit;
+        code = errno;
+        goto report;
     }
 
-    
 
-    exit_status = SUCCESS;
+    // inconsistent with COPY instruction if GNU extension to 'glob' function is not available
+    code = GLOB_PERIOD;
+    assert(code);
+
+    do {
+        if (! *(++argv))
+            goto free;
+
+        glob_done = true;
+
+        switch (glob(*argv, code, report_standard_err, &pglob)){
+            case 0:
+                break;
+            case GLOB_NOMATCH:
+                errtype = 'O';
+                code = SRCGLOB_NOTHING_MATCHED;
+                errinfo = *argv;
+            default:
+                goto report;
+        }
+        code = GLOB_PERIOD | GLOB_APPEND;
+    } while (--argc);
+
+    assert(pglob.gl_pathc > 0);
+    assert(pglob.gl_pathv && *(pglob.gl_pathv));
+
+
+    src_data *src_array = NULL, *p_src, *p_dest;
+    char * const *p_path;
+    srcglob_info result = {0};
+    struct stat file_stat;
+    const char *format = OUTPUT_FORMAT_REG;
+
+    if ((src_array = (src_data *) malloc(sizeof(src_data) * pglob.gl_pathc))){
+        for (p_src = src_array, p_path = pglob.gl_pathv; *p_path; p_src++, p_path++){
+            if ((p_src->path = realpath(*p_path, NULL))){
+                errno = 0;
+                result.total_num++;
+
+                if (! lstat(p_src->path, &file_stat)){
+                    if ((p_src->isdir = S_ISDIR(file_stat.st_mode)))
+                        result.dirs_num++;
+
+                    if (p_src->isdir || S_ISREG(file_stat.st_mode)){
+                        p_src->len = strlen(p_src->path) + 1;
+                        result.written_size += p_src->len + 8;  // add the length of "/dit/mnt"
+                        continue;
+                    }
+                }
+            }
+
+            errtype = 'O';
+            code = errno;
+            errinfo = *p_path;
+
+            switch (code){
+                case ENOENT:
+                    code = SRCGLOB_NOT_IN_CONTEXT;
+                    break;
+                case 0:
+                    code = SRCGLOB_IS_SPECIAL_FILE;
+                    break;
+                default:
+                    errtype = 'S';
+            }
+            break;
+        }
+
+        if (! errtype){
+            exit_status = SUCCESS;
+            assert(result.total_num == pglob.gl_pathc);
+            fwrite(&result, sizeof(result), 1, srcglob_fp);
+        }
+
+        assert(result.total_num || (! result.dirs_num));
+
+        do {
+            if (! result.total_num){
+                if (! result.dirs_num)
+                    break;
+                result.total_num = result.dirs_num;
+                result.dirs_num = 0;
+                format = OUTPUT_FORMAT_DIR;
+            }
+            for (p_src = (p_dest = src_array); result.total_num; p_src++, result.total_num--){
+                if (! errtype){
+                    if (result.dirs_num && p_src->isdir){
+                        if (p_src != p_dest)
+                            memcpy(p_dest, p_src, sizeof(src_data));
+                        p_dest++;
+                        continue;
+                    }
+                    fputs(DIT_MOUNT_DIR, srcglob_fp);
+                    fwrite(p_src->path, sizeof(char), p_src->len, srcglob_fp);
+                    fprintf(stdout, format, p_src->path);
+                }
+                free(p_src->path);
+            }
+        } while (! errtype);
+
+        free(src_array);
+    }
+
+
+report:
+    if (errtype){
+        report_srcglob_err(errtype, code, errinfo);
+        errtype = '\0';
+    }
+
+free:
+    if (glob_done)
+        globfree(&pglob);
+
+    assert(srcglob_fp);
+    fclose(srcglob_fp);
 
 exit:
     if (errtype){
-        if (errcode < 0){
-            assert(errinfo);
-            xperror_message(errinfo, NULL);
-        }
-        else
-            report_srcglob_err(errtype, errcode, errinfo);
+        assert(errtype == 'M');
+        xperror_message(errinfo, NULL);
     }
-    if (srcglob_fp)
-        fclose(srcglob_fp);
 
     return exit_status;
 }
