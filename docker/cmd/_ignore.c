@@ -19,9 +19,9 @@
 #define IGNORE_FILE_H "/dit/var/ignore.json.hist"
 
 #ifdef NDEBUG
-#define IG_WRITER_FLAG  YYJSON_WRITE_NOFLAG
+    #define IG_WRITER_FLAG  YYJSON_WRITE_NOFLAG
 #else
-#define IG_WRITER_FLAG  YYJSON_WRITE_PRETTY
+    #define IG_WRITER_FLAG  YYJSON_WRITE_PRETTY
 #endif
 
 #define IG_INITIAL_LONG_OPTS_MAX 16

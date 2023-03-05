@@ -375,8 +375,10 @@ static void display_prev_verbose(int target_c){
             print_target_repr(offset);
         }
 
-        while ((line = xfgets_for_loop(src_file, NULL, NULL)))
-            fprintf(stdout, "%s\n", line);
+        while ((line = xfgets_for_loop(src_file, NULL, NULL))){
+            fputs(line, stdout);
+            fputc('\n', stdout);
+        }
     } while ((target_c = next_target_c));
 
     assert(! offset);
@@ -971,8 +973,11 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
                             fps[0] = target_fp;
                         }
 
-                        while (offset)
-                            fprintf(fps[--offset], "%s\n", line);
+                        while (offset){
+                            offset--;
+                            fputs(line, fps[offset]);
+                            fputc('\n', fps[offset]);
+                        }
 
                         while (*(line++));
                     } while (++i < data->lines_num);

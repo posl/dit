@@ -220,7 +220,8 @@ static void display_cmd_list(void){
 
     for (const int *p_id = cmd_rearange; *p_id >= 0; p_id++){
         assert(*p_id < CMDS_NUM);
-        fprintf(stdout, "%s\n", cmd_reprs[*p_id]);
+        fputs(cmd_reprs[*p_id], stdout);
+        fputc('\n', stdout);
     }
 }
 
@@ -234,8 +235,10 @@ static int display_version(void){
     const char *line;
     int errid = 0, exit_status = NORMALLY_EXIT;
 
-    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid)))
-        fprintf(stdout, "%s\n", line);
+    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid))){
+        fputs(line, stdout);
+        fputc('\n', stdout);
+    }
 
     if (errid){
         xperror_internal_file();

@@ -779,6 +779,7 @@ int execute_command(const char *cmd_file, char * const argv[], int null_redirs){
  * @return bool  successful or not
  *
  * @note for example, you can specify 'remove' function as the callback function.
+ * @attention the callback function is not called for the root directory specified at the first call.
  */
 bool xscandir_recursive(const char *name, int (* callback)(const char *)){
     assert(name);
