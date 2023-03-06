@@ -46,8 +46,8 @@ RUN set -eux; \
 
 
 
-FROM "${BASE_NAME}:${BASE_VERSION}" AS product
 
+FROM "${BASE_NAME}:${BASE_VERSION}" AS product
 
 COPY --from=builder /usr/local/bin/dit /usr/local/bin/
 COPY --from=builder /dit/bin /dit/bin

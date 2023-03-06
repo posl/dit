@@ -715,6 +715,7 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
  * @note signal handling conforms to the specifications of 'system' function.
  * @note 'pthread_sigmask' function is not used because it is not any of async-signal-safe functions.
  * @note discarding output is attempted on stdout and stderr, in that order.
+ * @note report the exit status of the abnormally terminated command only when 'null_redirs' is 1.
  * @note the exit status that can be returned as a return value is based on the shell's.
  *
  * @attention the subsequent processing should not be continued if this function returns a non-zero value.
@@ -767,7 +768,7 @@ int execute(const char *cmd_file, char * const argv[], int null_redirs){
                 exit_status += WTERMSIG(tmp);
         }
     }
-    if (exit_status && (null_redirs != 2))
+    if ((null_redirs == 1) ? exit_status : (exit_status < 0))
         xperror_child_process(argv[0], exit_status);
 
     return exit_status;
