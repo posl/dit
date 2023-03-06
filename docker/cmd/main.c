@@ -446,7 +446,7 @@ void xperror_file_contents(const char *file_name, int lineno, const char *msg){
 
 
 /******************************************************************************
-    * Extensions of Library Functions
+    * Extensions of Standard Library Functions
 ******************************************************************************/
 
 
@@ -698,6 +698,11 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
 
 
 
+/******************************************************************************
+    * Extensions of System Calls in Unix and C
+******************************************************************************/
+
+
 /**
  * @brief execute the specified command in a child process.
  *
@@ -715,7 +720,7 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
  * @attention the subsequent processing should not be continued if this function returns a non-zero value.
  * @attention calling this function in a multithreaded process is not recommended.
  */
-int execute_command(const char *cmd_file, char * const argv[], int null_redirs){
+int execute(const char *cmd_file, char * const argv[], int null_redirs){
     assert(cmd_file);
     assert(argv && argv[0]);
     assert((null_redirs >= 0) && (null_redirs <= 2));
@@ -781,7 +786,7 @@ int execute_command(const char *cmd_file, char * const argv[], int null_redirs){
  * @note for example, you can specify 'remove' function as the callback function.
  * @attention the callback function is not called for the root directory specified at the first call.
  */
-bool xscandir_recursive(const char *name, int (* callback)(const char *)){
+bool walk(const char *name, int (* callback)(const char *)){
     assert(name);
     assert(callback);
 
@@ -810,13 +815,13 @@ bool xscandir_recursive(const char *name, int (* callback)(const char *)){
                     else
                         goto exit;
 
-                    if ((isdir && (! xscandir_recursive(name, callback))) || callback(name))
+                    if ((isdir && (! walk(name, callback))) || callback(name))
                         goto exit;
                 }
             }
 
             success = true;
-exit:
+        exit:
             closedir(dir);
         }
 
@@ -826,6 +831,27 @@ exit:
 
     return success;
 }
+
+
+/**
+ * @brief remove all files under the specified file.
+ *
+ * @param[in]  name  file or directory name
+ * @param[in]  isdir  whether it is a directory, if known
+ * @return bool  successful or not
+ */
+bool remove_all(const char *name, bool isdir){
+    assert(name);
+
+    bool success = true;
+
+    if ((isdir || (unlink(name) && (success = (errno == EISDIR)))) && ((! walk(name, remove)) || rmdir(name)))
+        success = false;
+
+    return success;
+}
+
+
 
 
 /**
@@ -1153,7 +1179,8 @@ char *get_suffix(char *target, int delimiter, bool retain){
 static void xfgets_for_loop_test(void);
 static void xstrcmp_upper_case_test(void);
 static void xstrcat_inf_len_test(void);
-static void execute_command_test(void);
+
+static void execute_test(void);
 
 static void receive_positive_integer_test(void);
 static void receive_expected_string_test(void);
@@ -1170,7 +1197,7 @@ void dit_test(void){
     do_test(xfgets_for_loop_test);
     do_test(xstrcmp_upper_case_test);
     do_test(xstrcat_inf_len_test);
-    do_test(execute_command_test);
+    do_test(execute_test);
 
     do_test(receive_positive_integer_test);
     do_test(receive_expected_string_test);
@@ -1481,7 +1508,7 @@ static void xstrcat_inf_len_test(void){
 
 
 
-static void execute_command_test(void){
+static void execute_test(void){
     char * const argv[] = { "cat", NULL };
 
     int i, key, exit_status;
@@ -1505,7 +1532,7 @@ static void execute_command_test(void){
         snprintf(cmdline, sizeof(cmdline), "+ cat %s\n", addition);
         fputs(cmdline, stdout);
 
-        assert(execute_command("/bin/cat", argv, i) == exit_status);
+        assert(execute("/bin/cat", argv, i) == exit_status);
 
         *cmdline = '-';
         fputs(cmdline, stdout);
@@ -1737,7 +1764,7 @@ static void get_file_size_test(void){
         NULL
     };
 
-    assert(! execute_command("/bin/dd", argv, 2));
+    assert(! execute("/bin/dd", argv, 2));
     assert(get_file_size(TMP_FILE1) == -2);
     assert(errno == EFBIG);
 

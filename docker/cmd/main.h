@@ -100,6 +100,8 @@
 #define xperror_internal_file()  xperror_individually(NULL)
 
 
+
+
 /******************************************************************************
     * IDs for each dit command
 ******************************************************************************/
@@ -215,8 +217,6 @@ int read_provisional_report(int reflecteds[2]);
 int write_provisional_report(int reflecteds[2]);
 
 
-
-
 /******************************************************************************
     * Error Message Functions
 ******************************************************************************/
@@ -235,8 +235,10 @@ void xperror_child_process(const char *cmd_name, int status);
 void xperror_file_contents(const char *file_name, int lineno, const char *msg);
 
 
+
+
 /******************************************************************************
-    * Extensions of Library Functions
+    * Extensions of Standard Library Functions
 ******************************************************************************/
 
 char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid);
@@ -246,9 +248,16 @@ int qstrcmp(const void *a, const void *b);
 
 bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf_len);
 
-int execute_command(const char *cmd_file, char * const argv[], int null_redirs);
 
-bool xscandir_recursive(const char *name, int (* callback)(const char *));
+/******************************************************************************
+    * Extensions of System Calls in Unix and C
+******************************************************************************/
+
+int execute(const char *cmd_file, char * const argv[], int null_redirs);
+
+bool walk(const char *name, int (* callback)(const char *));
+bool remove_all(const char *name, bool isdir);
+
 int filter_dirent(const struct dirent *entry);
 
 
