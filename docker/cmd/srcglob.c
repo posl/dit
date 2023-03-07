@@ -12,11 +12,7 @@
  */
 
 
-// if you want to enable the assertion, comment out the line immediately after
-#ifndef NDEBUG
-#define NDEBUG
-#endif
-
+#include "debug.h"
 
 #include <assert.h>
 #include <errno.h>

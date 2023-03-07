@@ -101,7 +101,15 @@ else
 fi
 
 
-trap 'rm -f docker/.dockerignore' EXIT
+end_processing(){
+    if [ -e docker/cmd/~debug.h ]; then
+        mv -f docker/cmd/~debug.h docker/cmd/debug.h
+    fi
+
+    rm -f docker/.dockerignore
+}
+
+trap 'end_processing' EXIT
 trap 'exit 1' HUP INT QUIT TERM
 
 case "${BUILD_TARGET}" in
@@ -118,8 +126,10 @@ case "${BUILD_TARGET}" in
         } > docker/.dockerignore
         ;;
     test)
-        if [ "$#" -ge 1 ]; then
-            {
+        {
+            echo 'cmd/~debug.h'
+
+            if [ "$#" -ge 1 ]; then
                 echo 'test'
                 echo '!test/main.sh'
 
@@ -127,8 +137,11 @@ case "${BUILD_TARGET}" in
                 do
                     echo "!test/_${cmd}.sh"
                 done
-            } > docker/.dockerignore
-        fi
+            fi
+        } > docker/.dockerignore
+
+        mv -f docker/cmd/debug.h docker/cmd/~debug.h
+        : > docker/cmd/debug.h
 
         if [ -z "${IMAGE_TAG}" ]; then
             export IMAGE_TAG='test'

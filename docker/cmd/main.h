@@ -2,11 +2,7 @@
 #define DOCKER_INTERACTIVE_TOOL
 
 
-// if you want to test each command, comment out the line immediately after
-#ifndef NDEBUG
-#define NDEBUG
-#endif
-
+#include "debug.h"
 
 #include <assert.h>
 #include <ctype.h>

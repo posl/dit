@@ -3,3 +3,6 @@
 
 app
 out
+
+docker/.dockerignore
+docker/cmd/~debug.h
