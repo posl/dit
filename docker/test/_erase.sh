@@ -49,6 +49,9 @@ cp -fp \
 
 DIR="${TARGET}"
 
+
+FUNC_NESTED=on
+
 set -x
 
 
@@ -123,7 +126,9 @@ EOF
         } | tee -a "${TMP1}" | dit reflect -hp -
     fi
 
-    set -x
+    if [ "${FUNC_NESTED}" != on ]; then
+        set -x
+    fi
 }
 
 
@@ -274,7 +279,7 @@ do_test_other_options(){
             check_log_file hist 16 2 2
         fi
 
-        echo "Done!"
+        echo "Done -${target_c}!"
     done
 
     echo
@@ -291,6 +296,8 @@ do_test_regexp
 do_test_line_numbers
 do_test_undoes
 do_test_other_options d h
+
+unset FUNC_NESTED
 
 dit erase --help | head -n2 | grep -F '  dit erase [OPTION]...'
 echo

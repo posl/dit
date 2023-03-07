@@ -153,8 +153,8 @@ read -r REPLY
 dit help -m commit && exit 1
 read -r REPLY
 
-: 'error: the command must be uniquely interpretable.'
-dit help --exam he && exit 1
+: 'error: commands must be uniquely interpretable.'
+dit help --exam he con && exit 1
 read -r REPLY
 
 : 'error: the internal version-file must not be handled carelessly.'

@@ -112,7 +112,6 @@ int help(int argc, char **argv){
     }
 
     const char *target = NULL;
-    char newlines[] = "\n\n\n";
 
     if ((argc -= optind) > 0){
         argv += optind;
@@ -121,6 +120,10 @@ int help(int argc, char **argv){
     else
         argc = 1;
 
+    assert(! i);
+    if (code != manual)
+        i = 1;
+
     do {
         if (! display_help(code, target))
             exit_status = FAILURE;
@@ -128,8 +131,7 @@ int help(int argc, char **argv){
         assert(argc > 0);
         if (--argc){
             target = *(++argv);
-            newlines[1] = (code != manual) ? '\0' : '\n';
-            fputs(newlines, stdout);
+            fputs("\n\n" + i, stdout);
         }
         else
             return exit_status;
@@ -582,8 +584,8 @@ void ignore_manual(void){
         "  - The target "SPECIFIED_BY_TARGET".\n"
         "  - When '-i' is given, if '-A' is not given, it has the same meaning as '-n', otherwise it set\n"
         "    a flag indicating that the conditions for reflection are described as the additional settings.\n"
-        "  - When '-p' is given, '-r' toggles to show the default settings, and\n"
-        "    NAMEs narrow down the settings to be displayed to just those specified.\n"
+        "  - When '-p' is given, '-r' does not reset the ignore-file, it toggles to show the default\n"
+        "    settings, and NAMEs narrow down the settings to be displayed to just those specified.\n"
         "  - If either of '-np' or '--equivalent-to' is given, the additional settings make no sense.\n"
         "  - If given at the same time, '-p' takes precedence over '-n', '-n' over '--equivalent-to'.\n"
         "\n"
