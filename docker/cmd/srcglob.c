@@ -275,7 +275,7 @@ static int resolve_src_paths(srcglob_data *src_array, srcglob_info *result){
 
     next:
         p_src++;
-        while (*(path++));
+        path += strlen(path) + 1;
     } while (--srcs_num);
 
     if (exit_status)

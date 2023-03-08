@@ -150,6 +150,7 @@ bool check_if_visually_no_problem(void){
     bool no_problem = false;
 
     fputs("If everything is fine, press enter to proceed: ", stderr);
+    fflush(stderr);
 
     switch (fgetc(stdin)){
         case '\n':

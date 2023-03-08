@@ -318,11 +318,10 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, const ref
 
     char **p_ptr, *line;
     const char *src_file, *errdesc = NULL;
-    int exit_status = SUCCESS, lineno, instr_id;
+    int exit_status = SUCCESS, lineno, id;
     bool first_blank = true, first_cmd = true, first_entrypoint = true;
     size_t curr_size = 0, old_size = 0;
     void *ptr;
-    FILE *fp;
 
     data->lines_num = 0;
     data->lines = NULL;
@@ -365,12 +364,12 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, const ref
                 first_blank = true;
 
             if (argc && (opt->target_c == 'd')){
-                instr_id = -1;
+                id = -1;
 
-                if (receive_dockerfile_instr(line, &instr_id)){
-                    assert((instr_id >= -1) && (instr_id < DOCKER_INSTRS_NUM));
+                if (receive_dockerfile_instr(line, &id)){
+                    assert((id >= -1) && (id < DOCKER_INSTRS_NUM));
 
-                    switch (instr_id){
+                    switch (id){
                         case ID_CMD:
                             if (! first_cmd)
                                 errdesc = "duplicated CMD instruction";
@@ -427,8 +426,8 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, const ref
             assert(src_file);
             assert(! errdesc);
 
-            if ((fp = fopen(src_file, "w")))
-                fclose(fp);
+            if ((id = open(src_file, (O_RDWR | O_CREAT | O_TRUNC))) != -1)
+                close(id);
         }
     } while (--argc > 0);
 

@@ -19,12 +19,19 @@
 #define TMP_FILE2 "/dit/tmp/test2.tmp"
 
 
+#define xputs(str) \
+    do { \
+        fputs(str, stderr); \
+        fputc('\n', stderr); \
+    } while (false)
+
+
 #define do_test(func) \
     do { \
         fprintf(stderr, "Testing %s:%u: '"#func"' ...\n", __FILE__, __LINE__); \
         func(); \
         fputs("Passed all tests!\n\n", stderr); \
-    } while(false)
+    } while (false)
 
 #define no_test()  fputs("No unit tests.\n\n", stderr)
 

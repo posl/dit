@@ -605,31 +605,66 @@ static void destruct_recursive(file_node *file, const insp_opts *opt, size_t dep
  * @param[in]  mode  file mode
  */
 static void print_file_mode(mode_t mode){
-    char mode_str[11];
+    char output[] = "?rw-rw-rw-  ";
 
-    mode_str[0] =
-        S_ISREG(mode) ? '-' :
-        S_ISDIR(mode) ? 'd' :
-        S_ISCHR(mode) ? 'c' :
-        S_ISBLK(mode) ? 'b' :
-        S_ISFIFO(mode) ? 'p' :
-        S_ISLNK(mode) ? 'l' :
-        S_ISSOCK(mode) ? 's' :
-        '\?';
+    switch ((mode & S_IFMT)){
+        case S_IFREG:
+            *output = '-';
+            break;
+        case S_IFDIR:
+            *output = 'd';
+            break;
+        case S_IFCHR:
+            *output = 'c';
+            break;
+        case S_IFBLK:
+            *output = 'b';
+            break;
+        case S_IFIFO:
+            *output = 'p';
+            break;
+        case S_IFLNK:
+            *output = 'l';
+            break;
+        case S_IFSOCK:
+            *output = 's';
+    }
 
-    mode_str[1] = (mode & S_IRUSR) ? 'r' : '-';
-    mode_str[2] = (mode & S_IWUSR) ? 'w' : '-';
-    mode_str[3] = (mode & S_ISUID) ? ((mode & S_IXUSR) ? 's' : 'S') : ((mode & S_IXUSR) ? 'x' : '-');
-    mode_str[4] = (mode & S_IRGRP) ? 'r' : '-';
-    mode_str[5] = (mode & S_IWGRP) ? 'w' : '-';
-    mode_str[6] = (mode & S_ISGID) ? ((mode & S_IXGRP) ? 's' : 'S') : ((mode & S_IXGRP) ? 'x' : '-');
-    mode_str[7] = (mode & S_IROTH) ? 'r' : '-';
-    mode_str[8] = (mode & S_IWOTH) ? 'w' : '-';
-    mode_str[9] = (mode & S_ISVTX) ? ((mode & S_IXOTH) ? 't' : 'T') : ((mode & S_IXOTH) ? 'x' : '-');
-    mode_str[10] = '\0';
 
-    fprintf(stdout, "%s  ", mode_str);
+#define unset_rwprm(idx, mask) \
+    if (! (mode & (mask))) \
+        output[idx] = '-';
+
+#define update_xprm(idx, mask, st_mask, st_only, st_too) \
+    switch ((mode & ((mask) | (st_mask)))){ \
+        case (mask): \
+            output[idx] = 'x'; \
+            break; \
+        case (st_mask): \
+            output[idx] = (st_only); \
+            break; \
+        case ((mask) | (st_mask)): \
+            output[idx] = (st_too); \
+            break; \
+    }
+
+    unset_rwprm(1, S_IRUSR)
+    unset_rwprm(2, S_IWUSR)
+    update_xprm(3, S_IXUSR, S_ISUID, 'S', 's')
+
+    unset_rwprm(4, S_IRGRP)
+    unset_rwprm(5, S_IWGRP)
+    update_xprm(6, S_IXGRP, S_ISGID, 'S', 's')
+
+    unset_rwprm(7, S_IROTH)
+    unset_rwprm(8, S_IWOTH)
+    update_xprm(9, S_IXOTH, S_ISVTX, 'T', 't')
+
+
+    fputs(output, stdout);
 }
+
+
 
 
 /**
@@ -679,6 +714,8 @@ static void print_file_owner(const file_node *file, bool numeric_id){
 }
 
 
+
+
 /**
  * @brief display file size on screen.
  *
@@ -715,6 +752,8 @@ static void print_file_size(off_t size){
 }
 
 
+
+
 /**
  * @brief display file name on screen.
  *
@@ -747,27 +786,48 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
             *tmp = '\?';
 
     if (opt->color){
-        tmp =
-            file->link_invalid ? "31" :
-            S_ISREG(mode) ? (
-                (mode & S_ISUID) ? "37;41" :
-                (mode & S_ISGID) ? "30;43" :
-                (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) ? "1;32" :
-                    "0"
-            ) :
-            S_ISDIR(mode) ? (
-                (mode & S_IWOTH) ? (
-                    (mode & S_ISVTX) ? "30;42" :
-                        "34;42"
-                ) :
-                (mode & S_ISVTX) ? "37;44" :
-                    "1;34"
-            ) :
-            (S_ISCHR(mode) || S_ISBLK(mode)) ? "1;33" :
-            S_ISFIFO(mode) ? "33" :
-            S_ISLNK(mode) ? "1;36" :
-            S_ISSOCK(mode) ? "1;35" :
-                "0";
+        if (! file->link_invalid)
+            switch ((mode & S_IFMT)){
+                case S_IFREG:
+                    tmp =
+                        (mode & S_ISUID) ? "37;41" :
+                        (mode & S_ISGID) ? "30;43" :
+                        (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) ? "1;32" :
+                            "0";
+                    break;
+                case S_IFDIR:
+                    switch ((mode & (S_ISVTX | S_IWOTH))){
+                        case 0:
+                            tmp = "1;34";
+                            break;
+                        case S_ISVTX:
+                            tmp = "37;44";
+                            break;
+                        case S_IWOTH:
+                            tmp = "34;42";
+                            break;
+                        default:
+                            tmp = "30;42";
+                    }
+                    break;
+                case S_IFCHR:
+                case S_IFBLK:
+                    tmp = "1;33";
+                    break;
+                case S_IFIFO:
+                    tmp = "33";
+                    break;
+                case S_IFLNK:
+                    tmp = "1;36";
+                    break;
+                case S_IFSOCK:
+                    tmp = "1;35";
+                    break;
+                default:
+                    tmp = "0";
+            }
+        else
+            tmp = "31";
 
         format = " -> \033[%sm%s\033[0m";
     }
@@ -779,14 +839,26 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
     fprintf(stdout, (format + i), tmp, name);
 
     if (opt->classify){
-        i = (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) ? '*' :
-            S_ISDIR(mode) ? '/' :
-            S_ISFIFO(mode) ? '|' :
-            S_ISSOCK(mode) ? '=' :
-                '\0';
-
-        if (i)
-            fputc(i, stdout);
+        switch ((mode & S_IFMT)){
+            case S_IFREG:
+                if (! (mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
+                    return;
+                i = '*';
+                break;
+            case S_IFDIR:
+                i = '/';
+                break;
+            case S_IFIFO:
+                i = '|';
+                break;
+            case S_IFSOCK:
+                i = '=';
+                break;
+            default:
+                return;
+        }
+        assert(i);
+        fputc(i, stdout);
     }
 }
 
@@ -835,10 +907,10 @@ static void new_file_test(void){
 
     // when specifying a regular file
 
-    FILE *fp;
+    int fd;
 
-    assert((fp = fopen(TMP_FILE1, "w")));
-    assert(! fclose(fp));
+    assert((fd = open(TMP_FILE1, (O_RDWR | O_CREAT | O_TRUNC))) != -1);
+    assert(! close(fd));
 
     assert((file = new_file(TMP_FILE1)));
     assert(! strcmp(file->name, TMP_FILE1));
@@ -882,7 +954,7 @@ static void new_file_test(void){
 
     // when specifying a non-existing file
 
-    assert(! remove(TMP_FILE1));
+    assert(! unlink(TMP_FILE1));
 
     assert((file = new_file(TMP_FILE1)));
     assert(! strcmp(file->name, TMP_FILE1));
@@ -924,7 +996,7 @@ static void new_file_test(void){
     free(file);
 
 
-    assert(! remove(TMP_FILE2));
+    assert(! unlink(TMP_FILE2));
 }
 
 

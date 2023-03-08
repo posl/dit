@@ -36,9 +36,6 @@ typedef struct {
 } xfgets_info;
 
 
-static int call_dit_command(int argc, char **argv, int cmd_id);
-
-
 /** array of strings in alphabetical order representing each dit command */
 const char * const cmd_reprs[CMDS_NUM] = {
     "cmd",
@@ -114,6 +111,24 @@ const char * const docker_instr_reprs[DOCKER_INSTRS_NUM] = {
 static const char *program_name = "dit";
 
 
+/** array of the function pointers corresponding to one of the dit commands */
+static int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
+    cmd,
+    config,
+    convert,
+    copy,
+    erase,
+    healthcheck,
+    help,
+    ignore,
+    inspect,
+    label,
+    onbuild,
+    optimize,
+    package,
+    reflect
+};
+
 
 
 /******************************************************************************
@@ -133,6 +148,8 @@ static const char *program_name = "dit";
  * @note leave the command name in a global variable for error message output.
  */
 int main(int argc, char **argv){
+    setvbuf(stderr, NULL, _IOLBF, 0);
+
     if ((argc > 0) && argv && *argv){
         *argv = get_suffix(*argv, '/', true);
 
@@ -146,8 +163,9 @@ int main(int argc, char **argv){
             test(argc, argv, cmd_id);
 #endif
             if (cmd_id >= 0){
+                assert(cmd_id < CMDS_NUM);
                 program_name = *argv;
-                return call_dit_command(argc, argv, cmd_id);
+                return cmd_funcs[cmd_id](argc, argv);
             }
 
             xperror_invalid_arg('C', 1, "command", *argv);
@@ -158,63 +176,6 @@ int main(int argc, char **argv){
 
     xperror_suggestion(false);
     return FAILURE;
-}
-
-
-/**
- * @brief set buffering for standard output, and run the specified dit command.
- *
- * @param[in]  argc  the number of command line arguments
- * @param[out] argv  array of strings that are command line arguments
- * @param[in]  cmd_id  index number corresponding to one of the dit commands
- * @return int  command's exit status
- *
- * @note set full buffering if a large amount of output is expected for the specified command.
- */
-static int call_dit_command(int argc, char **argv, int cmd_id){
-    assert(argc > 0);
-    assert(argv);
-    assert((cmd_id >= 0) && (cmd_id < CMDS_NUM));
-
-    int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
-        cmd,
-        config,
-        convert,
-        copy,
-        erase,
-        healthcheck,
-        help,
-        ignore,
-        inspect,
-        label,
-        onbuild,
-        optimize,
-        package,
-        reflect
-    };
-
-    int i = 1, mode;
-    FILE *fp;
-
-    do {
-        if (i){
-            fp = stdout;
-            mode = _IOLBF;
-#ifdef NDEBUG
-            if (cmd_id == DIT_INSPECT)
-                mode = _IOFBF;
-#endif
-        }
-        else {
-            fp = stderr;
-            mode = _IONBF;
-        }
-
-        setvbuf(fp, NULL, mode, 0);
-    } while (i--);
-
-    assert(i == -1);
-    return cmd_funcs[cmd_id](argc, argv);
 }
 
 
@@ -1317,7 +1278,8 @@ static void xfgets_for_loop_test(void){
     assert((fp = fopen(TMP_FILE1, "w")));
     for (p_line = lines_with_trailing_newline; *p_line; p_line++){
         count++;
-        assert(fprintf(fp, "%s\n", *p_line) >= 0);
+        assert(fputs(*p_line, fp) != EOF);
+        assert(fputc('\n', fp) != EOF);
     }
     assert(! fclose(fp));
 
@@ -1352,7 +1314,7 @@ static void xfgets_for_loop_test(void){
     fputs("\nChecking if it works the same as 'cat -' ...\n", stderr);
 
     for (remain = 0; (line = xfgets_for_loop(NULL, &start_for_stdin, NULL)); remain++)
-        assert(fprintf(stdout, "%s\n", line) >= 0);
+        assert(puts(line) != EOF);
 
     do {
         if (! check_if_visually_no_problem())
@@ -1366,8 +1328,8 @@ static void xfgets_for_loop_test(void){
             line = start_for_stdin;
 
             do {
-                assert(fprintf(stdout, "%s\n", line) >= 0);
-                while (*(line++));
+                assert(puts(line) != EOF);
+                line += strlen(line) + 1;
             } while (--remain);
 
             free(start_for_stdin);
@@ -1394,7 +1356,7 @@ static void xfgets_for_loop_test(void){
 
         do {
             assert(! strcmp(line, *(p_line++)));
-            while (*(line++));
+            line += strlen(line) + 1;
         } while (--count);
 
         free(start_for_file);
@@ -1405,7 +1367,7 @@ static void xfgets_for_loop_test(void){
 
     // when specifying a non-existing file
 
-    assert(! remove(TMP_FILE1));
+    assert(! unlink(TMP_FILE1));
     assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
     assert(errid == ENOENT);
 }
@@ -1530,13 +1492,13 @@ static void execute_test(void){
 
         fprintf(stderr, "\nChecking if child process can be exited by 'Ctrl + %c' ...\n", key);
 
-        snprintf(cmdline, sizeof(cmdline), "+ cat %s\n", addition);
-        fputs(cmdline, stdout);
+        snprintf(cmdline, sizeof(cmdline), "+ cat %s", addition);
+        puts(cmdline);
 
         assert(execute("/bin/cat", argv, i) == exit_status);
 
         *cmdline = '-';
-        fputs(cmdline, stdout);
+        puts(cmdline);
 
         if (! check_if_visually_no_problem())
             assert(false);
@@ -1732,21 +1694,20 @@ static void get_file_size_test(void){
     const unsigned int digit = 6;
     assert(digit <= 10);
 
-    int i, divisor = 1;
+    int i, divisor = 1, fd;
     size_t size;
-    FILE *fp;
     char *tmp;
 
     for (i = -1; ++i < digit; divisor *= 10) {
         size = rand() % divisor;
 
-        assert((fp = fopen(TMP_FILE1, "wb")));
+        assert((fd = open(TMP_FILE1, (O_WRONLY | O_CREAT | O_TRUNC))) != -1);
         if (size){
             assert((tmp = calloc(size, sizeof(char))));
-            assert(fwrite(tmp, sizeof(char), size, fp) == size);
+            assert(write(fd, tmp, size) == size);
             free(tmp);
         }
-        assert(! fclose(fp));
+        assert(! close(fd));
 
         assert(get_file_size(TMP_FILE1) == size);
 
@@ -1772,7 +1733,7 @@ static void get_file_size_test(void){
 
     // when specifying a non-existing file
 
-    assert(! remove(TMP_FILE1));
+    assert(! unlink(TMP_FILE1));
     assert(get_file_size(TMP_FILE1) == -1);
     assert(errno == ENOENT);
 }

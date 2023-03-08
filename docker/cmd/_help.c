@@ -131,7 +131,7 @@ int help(int argc, char **argv){
         assert(argc > 0);
         if (--argc){
             target = *(++argv);
-            fputs("\n\n" + i, stdout);
+            puts("\n" + i);
         }
         else
             return exit_status;
@@ -222,8 +222,7 @@ static void display_cmd_list(void){
 
     for (const int *p_id = cmd_rearange; *p_id >= 0; p_id++){
         assert(*p_id < CMDS_NUM);
-        fputs(cmd_reprs[*p_id], stdout);
-        fputc('\n', stdout);
+        puts(cmd_reprs[*p_id]);
     }
 }
 
@@ -237,10 +236,8 @@ static int display_version(void){
     const char *line;
     int errid = 0, exit_status = NORMALLY_EXIT;
 
-    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid))){
-        fputs(line, stdout);
-        fputc('\n', stdout);
-    }
+    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid)))
+        puts(line);
 
     if (errid){
         xperror_internal_file();
@@ -722,93 +719,63 @@ void reflect_manual(void){
 
 
 static void dit_description(void){
-    fputs(
-        "Use the tool-specific functions as the subcommand or the command linked to this command.\n"
-    , stdout);
+    puts("Use the tool-specific functions as the subcommand or the command linked to this command.");
 }
 
 static void cmd_description(void){
-    fputs(
-        "Set CMD/ENTRYPOINT instruction in Dockerfile.\n"
-    , stdout);
+    puts("Set CMD/ENTRYPOINT instruction in Dockerfile.");
 }
 
 static void config_description(void){
-    fputs(
-        "Set the level at which commands are reflected in "DOCKER_OR_HISTORY", individually.\n"
-    , stdout);
+    puts("Set the level at which commands are reflected in "DOCKER_OR_HISTORY", individually.");
 }
 
 static void convert_description(void){
-    fputs(
-        "Show how a command line is transformed for reflection in the "DOCKER_OR_HISTORY".\n"
-    , stdout);
+    puts("Show how a command line is transformed for reflection in the "DOCKER_OR_HISTORY".");
 }
 
 static void copy_description(void){
-    fputs(
-        "Perform the processing equivalent to COPY/ADD instructions and reflect this in Dockerfile.\n"
-    , stdout);
+    puts("Perform the processing equivalent to COPY/ADD instructions and reflect this in Dockerfile.");
 }
 
 static void erase_description(void){
-    fputs(
-        "Delete the lines that match some conditions from "DOCKER_OR_HISTORY".\n"
-    , stdout);
+    puts("Delete the lines that match some conditions from "DOCKER_OR_HISTORY".");
 }
 
 static void healthcheck_description(void){
-    fputs(
-        "Set HEALTHCHECK instruction in Dockerfile.\n"
-    , stdout);
+    puts("Set HEALTHCHECK instruction in Dockerfile.");
 }
 
 static void help_description(void){
-    fputs(
-        "Show requested information for some dit commands.\n"
-    , stdout);
+    puts("Show requested information for some dit commands.");
 }
 
 static void ignore_description(void){
-    fputs(
-        "Edit set of commands that should not be reflected in "DOCKER_OR_HISTORY", individually.\n"
-    , stdout);
+    puts("Edit set of commands that should not be reflected in "DOCKER_OR_HISTORY", individually.");
 }
 
 static void inspect_description(void){
-    fputs(
-        "List information about the files under some directories in a tree format.\n"
-    , stdout);
+    puts("List information about the files under some directories in a tree format.");
 }
 
 static void label_description(void){
-    fputs(
-        "Edit list of LABEL/EXPOSE instructions in Dockerfile.\n"
-    , stdout);
+    puts("Edit list of LABEL/EXPOSE instructions in Dockerfile.");
 }
 
 static void onbuild_description(void){
-    fputs(
-        "Append ONBUILD instructions in Dockerfile.\n"
-    , stdout);
+    puts("Append ONBUILD instructions in Dockerfile.");
 }
 
 static void optimize_description(void){
-    fputs(
-        "Generate Dockerfile as the result of refactoring and optimization based on its best practices.\n"
-    , stdout);
+    puts("Generate Dockerfile as the result of refactoring and optimization based on its best practices.");
 }
 
 static void package_description(void){
-    fputs(
-        "Perform the package installation in an optimized manner and reflect this in Dockerfile.\n"
-    , stdout);
+    puts("Perform the package installation in an optimized manner and reflect this in Dockerfile.");
 }
 
 static void reflect_description(void){
-    fputs(
-        "Append the contents of some files to "DOCKER_OR_HISTORY".\n"
-    , stdout);
+    puts("Append the contents of some files to "DOCKER_OR_HISTORY".");
 }
 
 
