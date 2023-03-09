@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-#define INSP_INITIAL_DIRS_MAX 32
+#define INSP_INITIAL_DIRS_MAX 16
 
 #define INSP_EXCESS_STR " #EXCESS"
 
@@ -246,10 +246,10 @@ static file_node *construct_recursive(const char *name){
 
             if ((file = new_file(dest))){
                 if (S_ISDIR(file->mode)){
-                    int status;
+                    int status = -1;
                     DIR *dir;
 
-                    if ((! (status = chdir(name))) && (dir = opendir("."))){
+                    if ((check_if_pwd(name) || (! (status = chdir(name)))) && (dir = opendir("."))){
                         struct dirent *entry;
                         file_node *tmp;
 
@@ -783,7 +783,7 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
     assert(name);
     for (tmp = name; *tmp; tmp++)
         if (iscntrl((unsigned char) *tmp))
-            *tmp = '\?';
+            *tmp = '?';
 
     if (opt->color){
         if (! file->link_invalid)

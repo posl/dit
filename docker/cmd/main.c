@@ -13,9 +13,9 @@
 #define EXIT_STATUS_FILE "/dit/srv/last-exit-status"
 
 #define XFGETS_NESTINGS_MAX 2
-#define XFGETS_INITIAL_SIZE 1023
+#define XFGETS_INITIAL_SIZE 1023  // 2^n - 1
 
-#define XSTRCAT_INITIAL_MAX 256
+#define XSTRCAT_INITIAL_MAX 120   // 2^n - 8
 
 #define sigreset(sigdfl_int, sigdfl_quit, old_mask) \
     do { \
@@ -621,27 +621,32 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
     assert(suf);
     assert(suf_len == (strlen(suf) + 1));
 
-    size_t curr_max;
+    size_t curr, old;
     bool allocate_flag = false;
     void *ptr;
+    char *dest;
 
-    if (! (curr_max = base->max)){
-        curr_max = XSTRCAT_INITIAL_MAX;
+    if (! (curr = base->max)){
+        curr = XSTRCAT_INITIAL_MAX;
         allocate_flag = true;
     }
 
     do {
-        if ((curr_max - base_len) < suf_len){
-            if ((curr_max <<= 1)){
+        if ((curr - base_len) < suf_len){
+            old = curr + 8;
+            assert(! (old & (old - 1)));
+
+            if ((old <<= 1)){
+                curr = old - 8;
                 allocate_flag = true;
                 continue;
             }
         }
         else if (! allocate_flag)
             break;
-        else if ((ptr = realloc(base->ptr, (sizeof(char) * curr_max)))){
+        else if ((ptr = realloc(base->ptr, (sizeof(char) * curr)))){
             base->ptr = (char *) ptr;
-            base->max = curr_max;
+            base->max = curr;
             break;
         }
         return false;
@@ -649,7 +654,6 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
 
     assert(base->ptr);
 
-    char *dest;
     dest = base->ptr + base_len;
     memcpy(dest, suf, (sizeof(char) * suf_len));
 
@@ -752,9 +756,9 @@ bool walk(const char *name, int (* callback)(const char *)){
     assert(name);
     assert(callback);
 
-    bool success = false;
+    bool no_chdir, success = false;
 
-    if (! chdir(name)){
+    if ((no_chdir = check_if_pwd(name)) || (! chdir(name))){
         DIR *dir;
 
         if ((dir = opendir("."))){
@@ -787,7 +791,7 @@ bool walk(const char *name, int (* callback)(const char *)){
             closedir(dir);
         }
 
-        if (chdir(".."))
+        if ((! no_chdir) && chdir(".."))
             success = false;
     }
 
@@ -1143,6 +1147,7 @@ static void xstrcmp_upper_case_test(void);
 static void xstrcat_inf_len_test(void);
 
 static void execute_test(void);
+static void walk_test(void);
 
 static void receive_positive_integer_test(void);
 static void receive_expected_string_test(void);
@@ -1159,7 +1164,6 @@ void dit_test(void){
     do_test(xfgets_for_loop_test);
     do_test(xstrcmp_upper_case_test);
     do_test(xstrcat_inf_len_test);
-    do_test(execute_test);
 
     do_test(receive_positive_integer_test);
     do_test(receive_expected_string_test);
@@ -1168,6 +1172,9 @@ void dit_test(void){
     do_test(get_file_size_test);
     do_test(get_last_exit_status_test);
     do_test(get_suffix_test);
+
+    do_test(execute_test);
+    do_test(walk_test);
 }
 
 
@@ -1433,6 +1440,7 @@ static void xstrcat_inf_len_test(void){
     for (i = 0; table[i].path; i++){
         assert(xstrcat_inf_len(&istr, table[i].inherit, table[i].path, (strlen(table[i].path) + 1)));
         assert(istr.ptr);
+        assert(istr.max == XSTRCAT_INITIAL_MAX);
         assert(! strcmp(istr.ptr, table[i].result));
 
         print_progress_test_loop('\0', -1, i);
@@ -1441,7 +1449,7 @@ static void xstrcat_inf_len_test(void){
 
 
     // changeable part for updating test cases
-    const char *repeat = "\'a string of arbitrary length\'";
+    const char *repeat = "'a string of arbitrary length'";
 
     size_t size, istr_len = 0;
     int iter = 0;
@@ -1450,7 +1458,6 @@ static void xstrcat_inf_len_test(void){
     assert(size > 0);
 
     while ((size * (++iter) + 1) <= XSTRCAT_INITIAL_MAX);
-    assert((size * iter + 1) < (XSTRCAT_INITIAL_MAX * 2));
 
     for (i = 0; i < iter;){
         assert(istr.max == XSTRCAT_INITIAL_MAX);
@@ -1462,47 +1469,9 @@ static void xstrcat_inf_len_test(void){
         fprintf(stderr, "%s * %d\n", repeat, ++i);
     }
 
-    assert(istr.max == (XSTRCAT_INITIAL_MAX * 2));
-
+    assert(istr.max > XSTRCAT_INITIAL_MAX);
 
     free(istr.ptr);
-}
-
-
-
-
-static void execute_test(void){
-    char * const argv[] = { "cat", NULL };
-
-    int i, key, exit_status;
-    const char *addition;
-    char cmdline[32];
-
-    for (i = 0; i < 2; i++){
-        if (! i){
-            key = 'D';
-            addition = "-";
-            exit_status = 0;
-        }
-        else {
-            key = 'C';
-            addition = "> /dev/null";
-            exit_status = 128 + SIGINT;
-        }
-
-        fprintf(stderr, "\nChecking if child process can be exited by 'Ctrl + %c' ...\n", key);
-
-        snprintf(cmdline, sizeof(cmdline), "+ cat %s", addition);
-        puts(cmdline);
-
-        assert(execute("/bin/cat", argv, i) == exit_status);
-
-        *cmdline = '-';
-        puts(cmdline);
-
-        if (! check_if_visually_no_problem())
-            assert(false);
-    }
 }
 
 
@@ -1613,7 +1582,7 @@ static void receive_expected_string_test(void){
             id = SUCCESS;
         }
         else {
-            instr_repr = " \?";
+            instr_repr = " ?";
             id = FAILURE;
         }
 
@@ -1674,7 +1643,7 @@ static void receive_dockerfile_instr_test(void){
 
         for (remain = 2; remain--;){
             id = remain ? table[i].expected_id : table[i].actual_id;
-            fprintf(stderr, "  %-11s", ((id >= 0) ? docker_instr_reprs[id] : " \?"));
+            fprintf(stderr, "  %-11s", ((id >= 0) ? docker_instr_reprs[id] : " ?"));
         }
 
         assert(remain == -1);
@@ -1717,16 +1686,7 @@ static void get_file_size_test(void){
 
     // when specifying a file that is too large
 
-    char * const argv[] = {
-        "dd",
-        "if=/dev/zero",
-        "of="TMP_FILE1,
-        "bs=1M",
-        "count=2K",
-        NULL
-    };
-
-    assert(! execute("/bin/dd", argv, 2));
+    assert(system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K > /dev/null")));
     assert(get_file_size(TMP_FILE1) == -2);
     assert(errno == EFBIG);
 
@@ -1818,6 +1778,122 @@ static void get_suffix_test(void){
         print_progress_test_loop('\0', -1, i);
         fprintf(stderr, "%-18s  '%s'\n", table[i].target, table[i].suffix);
     }
+}
+
+
+
+
+static void execute_test(void){
+    char * const argv[] = { "cat", NULL };
+
+    int i, c, exit_status;
+    const char *addition;
+    char cmdline[32];
+
+    for (i = 0; i < 2; i++){
+        if (! i){
+            c = 'D';
+            addition = "-";
+            exit_status = 0;
+        }
+        else {
+            c = 'C';
+            addition = "> /dev/null";
+            exit_status = 128 + SIGINT;
+        }
+
+        fprintf(stderr, "\nChecking if child process can be exited by 'Ctrl + %c' ...\n", c);
+
+        c = snprintf(cmdline, sizeof(cmdline), "+ cat %s", addition);
+        assert((c >= 0) && (c < sizeof(cmdline)));
+
+        puts(cmdline);
+
+        assert(execute("/bin/cat", argv, i) == exit_status);
+
+        *cmdline = '-';
+        puts(cmdline);
+
+        if (! check_if_visually_no_problem())
+            assert(false);
+    }
+}
+
+
+
+
+static inf_str walked_istr = {0};
+static size_t walked_len = 0;
+
+
+static int walk_test_stub(const char *name){
+    assert(name);
+
+    size_t size;
+    int exit_status = FAILURE;
+
+    size = strlen(name) + 1;
+
+    if (xstrcat_inf_len(&walked_istr, walked_len, name, size)){
+        exit_status = SUCCESS;
+        walked_len += size;
+    }
+
+    return exit_status;
+}
+
+
+static void walk_test(void){
+    // changeable part for updating test cases
+    const char * const root_dirs[] = {
+        ".",
+        "/dit/",
+        "/etc/./",
+        NULL
+    };
+
+    int i, c;
+    char cmdline[128];
+    struct stat file_stat;
+    void *addr, *found, *walked;
+    size_t name_len;
+
+    for (i = 0; root_dirs[i]; i++){
+        fprintf(stderr, "  Walking '%s' ...\n", root_dirs[i]);
+
+        assert(! walked_len);
+        assert(walk(root_dirs[i], walk_test_stub));
+
+        c = snprintf(cmdline, sizeof(cmdline), "find %s -depth -print0 > "TMP_FILE1, root_dirs[i]);
+        assert((c >= 0) && (c < sizeof(cmdline)));
+        assert(system(NULL) && (! system(cmdline)));
+
+        assert((c = open(TMP_FILE1, O_RDONLY)) != -1);
+        assert(! fstat(c, &file_stat));
+        assert(file_stat.st_size >= 0);
+        assert((addr = mmap(NULL, file_stat.st_size, PROT_READ, MAP_PRIVATE, c, 0)) != MAP_FAILED);
+
+        found = addr;
+        walked = walked_istr.ptr;
+
+        while (walked_len){
+            found = get_suffix(found, '/', true);
+            name_len = strlen(found) + 1;
+
+            fprintf(stderr, "    strcmp(W, F):  '%s'  '%s'\n", ((char *) walked), ((char *) found));
+            assert(! memcmp(walked, found, name_len));
+
+            found += name_len;
+            walked += name_len;
+            walked_len -= name_len;
+        }
+
+        assert(! munmap(addr, file_stat.st_size));
+        assert(! close(c));
+    }
+
+    assert(walked_istr.ptr);
+    free(walked_istr.ptr);
 }
 
 

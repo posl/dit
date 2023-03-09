@@ -24,6 +24,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <regex.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -78,6 +79,7 @@
 #define assign_both_or_either(target, a, b, c)  (target = (target == (a)) ? (b) : (c))
 
 #define strchrcmp(str, c)  (((str)[0] == (c)) && (! (str)[1]))
+#define check_if_pwd(name)  strchrcmp(name, '.')
 #define check_if_stdin(name)  strchrcmp(name, '-')
 
 #define check_if_valid_dirent(name)  (((name)[0] != '.') || (name)[((name)[1] != '.') ? 1 : 2])
