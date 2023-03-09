@@ -176,20 +176,21 @@ bool check_if_visually_no_problem(void){
  * @param[in]  result  comparison result
  * @return bool  the resulting boolean
  */
-bool check_if_correct_cmp_result(int type, int result){
-    assert((type >= 0) && (type < COMPTESTS_NUM));
-
+bool check_if_correct_cmp_result(comptest_type type, int result){
     bool correct;
 
     switch (type){
-        case COMPTEST_EQUAL:
+        case equal:
             correct = (! result);
             break;
-        case COMPTEST_LESSER:
+        case lesser:
             correct = (result < 0);
             break;
-        case COMPTEST_GREATER:
+        case greater:
             correct = (result > 0);
+            break;
+        default:
+            assert(false);
     }
 
     return correct;

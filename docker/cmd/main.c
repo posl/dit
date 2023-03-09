@@ -1378,22 +1378,22 @@ static void xfgets_for_loop_test(void){
 static void xstrcmp_upper_case_test(void){
     // changeable part for updating test cases
     comptest_table table[] = {
-        { { .name = "none"                   }, { .name = "NONE"                      }, COMPTEST_EQUAL   },
-        { { .name = "hoGe-PIyO"              }, { .name = "HOGE-PIYO"                 }, COMPTEST_EQUAL   },
-        { { .name = "f.lwhaeopyr;pfqwnel.FG" }, { .name = "F.LWHAEOPYR;PFQWNEL.FG"    }, COMPTEST_EQUAL   },
-        { { .name = "Quit"                   }, { .name = "YES"                       }, COMPTEST_LESSER  },
-        { { .name = "niPPon"                 }, { .name = "NIPPORI"                   }, COMPTEST_LESSER  },
-        { { .name = "fasldhfoNLASOL>NAZHO"   }, { .name = "FASLFN/L?EF=ONLAS|OLX{ZHO" }, COMPTEST_LESSER  },
-        { { .name = "SIGKILL"                }, { .name = "SIGINT"                    }, COMPTEST_GREATER },
-        { { .name = "Super Sento"            }, { .name = "SUPER MARKET"              }, COMPTEST_GREATER },
-        { { .name = "On your marks, Set, Go" }, { .name = "ON YOUR MARK!"             }, COMPTEST_GREATER },
-        { { .name =  0                       }, { .name =  0                          },    -1            }
+        { { .name = "none"                   }, { .name = "NONE"                      }, equal   },
+        { { .name = "hoGe-PIyO"              }, { .name = "HOGE-PIYO"                 }, equal   },
+        { { .name = "f.lwhaeopyr;pfqwnel.FG" }, { .name = "F.LWHAEOPYR;PFQWNEL.FG"    }, equal   },
+        { { .name = "Quit"                   }, { .name = "YES"                       }, lesser  },
+        { { .name = "niPPon"                 }, { .name = "NIPPORI"                   }, lesser  },
+        { { .name = "fasldhfoNLASOL>NAZHO"   }, { .name = "FASLFN/L?EF=ONLAS|OLX{ZHO" }, lesser  },
+        { { .name = "SIGKILL"                }, { .name = "SIGINT"                    }, greater },
+        { { .name = "Super Sento"            }, { .name = "SUPER MARKET"              }, greater },
+        { { .name = "On your marks, Set, Go" }, { .name = "ON YOUR MARK!"             }, greater },
+        { { .name =  0                       }, { .name =  0                          }, end     }
     };
 
     int i;
     const char *target, *expected;
 
-    for (i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type != end; i++){
         target = table[i].elem1.name;
         expected = table[i].elem2.name;
         assert(check_if_correct_cmp_result(table[i].type, xstrcmp_upper_case(target, expected)));

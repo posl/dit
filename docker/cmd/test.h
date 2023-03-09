@@ -10,10 +10,6 @@
 
 #define COMPTESTS_NUM 3
 
-#define COMPTEST_EQUAL    0
-#define COMPTEST_LESSER   1
-#define COMPTEST_GREATER  2
-
 
 #define TMP_FILE1 "/dit/tmp/test1.tmp"
 #define TMP_FILE2 "/dit/tmp/test2.tmp"
@@ -47,11 +43,18 @@ typedef const union {
     size_t size;
 } comptest_elem;
 
+typedef const enum {
+    equal,
+    lesser,
+    greater,
+    end
+} comptest_type;
+
 
 typedef const struct {
     comptest_elem elem1;
     comptest_elem elem2;
-    const int type;
+    comptest_type type;
 } comptest_table;
 
 
@@ -91,7 +94,7 @@ void reflect_test(void);
 
 bool check_if_alphabetical_order(const char * const *reprs, size_t size);
 bool check_if_visually_no_problem(void);
-bool check_if_correct_cmp_result(int type, int result);
+bool check_if_correct_cmp_result(comptest_type type, int result);
 
 void print_progress_test_loop(int code_c, int type, int count);
 

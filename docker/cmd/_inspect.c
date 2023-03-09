@@ -1051,16 +1051,16 @@ static void append_file_test(void){
 static void fcmp_name_test(void){
     // changeable part for updating test cases
     comptest_table table[] = {
-        { { .name = "dit_version"   }, { .name = "dit_version"  }, COMPTEST_EQUAL   },
-        { { .name = "su-exec"       }, { .name = "su-exec"      }, COMPTEST_EQUAL   },
-        { { .name = ".vscode"       }, { .name = ".vscode"      }, COMPTEST_EQUAL   },
-        { { .name = "etc"           }, { .name = "mnt"          }, COMPTEST_LESSER  },
-        { { .name = ".bashrc"       }, { .name = ".profile"     }, COMPTEST_LESSER  },
-        { { .name = "."             }, { .name = ".."           }, COMPTEST_LESSER  },
-        { { .name = ".dockerignore" }, { .name = ".dit_history" }, COMPTEST_GREATER },
-        { { .name = "abc.txt"       }, { .name = "abc.csv"      }, COMPTEST_GREATER },
-        { { .name = "123 456"       }, { .name = "123\t456"     }, COMPTEST_GREATER },
-        { { .name =  0              }, { .name =  0             },    -1            }
+        { { .name = "dit_version"   }, { .name = "dit_version"  }, equal   },
+        { { .name = "su-exec"       }, { .name = "su-exec"      }, equal   },
+        { { .name = ".vscode"       }, { .name = ".vscode"      }, equal   },
+        { { .name = "etc"           }, { .name = "mnt"          }, lesser  },
+        { { .name = ".bashrc"       }, { .name = ".profile"     }, lesser  },
+        { { .name = "."             }, { .name = ".."           }, lesser  },
+        { { .name = ".dockerignore" }, { .name = ".dit_history" }, greater },
+        { { .name = "abc.txt"       }, { .name = "abc.csv"      }, greater },
+        { { .name = "123 456"       }, { .name = "123\t456"     }, greater },
+        { { .name =  0              }, { .name =  0             }, end     }
     };
 
     int i;
@@ -1069,7 +1069,7 @@ static void fcmp_name_test(void){
     file1 = &node1;
     file2 = &node2;
 
-    for (i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type != end; i++){
         node1.name = table[i].elem1.name;
         node2.name = table[i].elem2.name;
         assert(check_if_correct_cmp_result(table[i].type, fcmp_name(&file1, &file2, NULL)));
@@ -1085,22 +1085,22 @@ static void fcmp_name_test(void){
 static void fcmp_size_test(void){
     // changeable part for updating test cases
     comptest_table table[] = {
-        { { .size =    0 }, { .size =    0 }, COMPTEST_EQUAL   },
-        { { .size =   32 }, { .size =   32 }, COMPTEST_EQUAL   },
-        { { .size =  195 }, { .size =  195 }, COMPTEST_EQUAL   },
-        { { .size =    8 }, { .size =    0 }, COMPTEST_LESSER  },
-        { { .size = 1270 }, { .size =   15 }, COMPTEST_LESSER  },
-        { { .size = 2048 }, { .size = 1024 }, COMPTEST_LESSER  },
-        { { .size =   60 }, { .size =  122 }, COMPTEST_GREATER },
-        { { .size =  672 }, { .size = 3572 }, COMPTEST_GREATER },
-        { { .size =    5 }, { .size =    6 }, COMPTEST_GREATER },
-        { { .size =    0 }, { .size =    0 },    -1            }
+        { { .size =    0 }, { .size =    0 }, equal   },
+        { { .size =   32 }, { .size =   32 }, equal   },
+        { { .size =  195 }, { .size =  195 }, equal   },
+        { { .size =    8 }, { .size =    0 }, lesser  },
+        { { .size = 1270 }, { .size =   15 }, lesser  },
+        { { .size = 2048 }, { .size = 1024 }, lesser  },
+        { { .size =   60 }, { .size =  122 }, greater },
+        { { .size =  672 }, { .size = 3572 }, greater },
+        { { .size =    5 }, { .size =    6 }, greater },
+        { { .size =    0 }, { .size =    0 }, end     }
     };
 
     int i;
     file_node node1, node2;
 
-    for (i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type != end; i++){
         node1.size = table[i].elem1.size;
         node2.size = table[i].elem2.size;
         assert(check_if_correct_cmp_result(table[i].type, fcmp_size(&node1, &node2)));
@@ -1116,22 +1116,22 @@ static void fcmp_size_test(void){
 static void fcmp_ext_test(void){
     // changeable part for updating test cases
     comptest_table table[] = {
-        { { .name = "config.stat"      }, { .name = "optimize.stat"            }, COMPTEST_EQUAL   },
-        { { .name = "properties.json"  }, { .name = "tasks.json"               }, COMPTEST_EQUAL   },
-        { { .name = "bin"              }, { .name = "sbin"                     }, COMPTEST_EQUAL   },
-        { { .name = "ignore.json.dock" }, { .name = "ignore.json.hist"         }, COMPTEST_LESSER  },
-        { { .name = "build"            }, { .name = "docker-compose.build.yml" }, COMPTEST_LESSER  },
-        { { .name = "main.c"           }, { .name = "main.o"                   }, COMPTEST_LESSER  },
-        { { .name = "Dockerfile.draft" }, { .name = ".dockerignore"            }, COMPTEST_GREATER },
-        { { .name = "exec.sh"          }, { .name = "exec.bash"                }, COMPTEST_GREATER },
-        { { .name = "index.html"       }, { .name = "html"                     }, COMPTEST_GREATER },
-        { { .name =  0                 }, { .name =  0                         },    -1            }
+        { { .name = "config.stat"      }, { .name = "optimize.stat"            }, equal   },
+        { { .name = "properties.json"  }, { .name = "tasks.json"               }, equal   },
+        { { .name = "bin"              }, { .name = "sbin"                     }, equal   },
+        { { .name = "ignore.json.dock" }, { .name = "ignore.json.hist"         }, lesser  },
+        { { .name = "build"            }, { .name = "docker-compose.build.yml" }, lesser  },
+        { { .name = "main.c"           }, { .name = "main.o"                   }, lesser  },
+        { { .name = "Dockerfile.draft" }, { .name = ".dockerignore"            }, greater },
+        { { .name = "exec.sh"          }, { .name = "exec.bash"                }, greater },
+        { { .name = "index.html"       }, { .name = "html"                     }, greater },
+        { { .name =  0                 }, { .name =  0                         }, end     }
     };
 
     int i;
     file_node node1, node2;
 
-    for (i = 0; table[i].type >= 0; i++){
+    for (i = 0; table[i].type != end; i++){
         node1.name = table[i].elem1.name;
         node2.name = table[i].elem2.name;
         assert(check_if_correct_cmp_result(table[i].type, fcmp_ext(&node1, &node2)));
