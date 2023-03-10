@@ -208,7 +208,9 @@ int get_config(const char *config_arg, int modes[2]);
 int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assume_c);
 int update_erase_logs(int reflecteds[2]);
 
-bool check_if_ignored(const yyjson_doc *idoc, int argc, char **argv);
+bool load_ignore_file(int offset, int original);
+void unload_ignore_file(void);
+bool check_if_ignored(int argc, char **argv);
 
 int reflect_to_dockerfile(char **lines, size_t size, bool verbose, int flag_c);
 int read_provisional_report(int reflecteds[2]);
