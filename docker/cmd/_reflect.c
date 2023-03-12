@@ -330,7 +330,7 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, const ref
 
     do {
         if (argc){
-            if (! (src_file = *(argv++)))
+            if (! ((src_file = *(argv++)) && *src_file))
                 continue;
             if (check_if_stdin(src_file))
                 src_file = NULL;

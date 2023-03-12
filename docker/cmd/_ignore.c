@@ -454,6 +454,7 @@ static bool parse_additional_settings(ig_conds *data, int argc, char **argv, ig_
                                 return false;
                         }
                     case 2:
+                        assert(*argv && **argv);
                         if (strchrcmp(*argv, '=')){
                             phase = 4;
                             continue;
@@ -1064,7 +1065,7 @@ bool load_ignore_file(int offset, int original){
     assert(original == ((bool) original));
 
     idoc = yyjson_read_file(ignore_files[original][offset], 0, NULL, NULL);
-    return ((bool) idoc);
+    return (bool) idoc;
 }
 
 

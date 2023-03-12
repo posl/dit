@@ -155,13 +155,12 @@ static int config_contents(unsigned int code, ...){
     assert(code < 8);
 
     bool reset_flag, write_flag, has_arg;
+    FILE *fp;
+    int exit_status = UNEXPECTED_ERROR;
 
     reset_flag = code & CONF_ISRSTFLG;
     write_flag = code & CONF_ISWRTFLG;
     has_arg = code & CONF_ISHASARG;
-
-    FILE *fp;
-    int exit_status = UNEXPECTED_ERROR;
 
     if ((fp = fopen(CONFIG_FILE, (reset_flag ? "wb" : "rb+")))){
         signed char c = CONF_INITIAL_STAT;
@@ -344,6 +343,7 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
  */
 static int receive_mode_integer(int c, int spare){
     int i;
+
     if ((i = c - '0') >= 0){
         if (i < CONF_MODES_NUM)
             return i;

@@ -67,9 +67,9 @@ int copy(int argc, char **argv){
         argv += optind;
 
         if (argc <= 0)
-            errdesc = "file";
+            errdesc = "source";
         else if (argc == 1)
-            errdesc = "destination file";
+            errdesc = "destination";
         else
             i = do_copy(argc, argv, &opt);
     }
