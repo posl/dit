@@ -109,8 +109,6 @@ done
 echo '0' > /dit/srv/last-exit-status
 echo '-1' > /dit/srv/last-history-number
 
-: > /dit/tmp/.profile
-
 config -r
 ignore -dhr
 optimize -r
@@ -134,7 +132,9 @@ PROMPT_REFLECT()
         fi
 
         : > /dit/srv/reflect-report.real
-        if dit reflect && unset PS1 2> /dev/null; then
+        dit reflect
+
+        if unset PS1 2> /dev/null && [ -f /dit/srv/reflect-report.real ]; then
             PS1="$( < /dit/srv/reflect-report.real )"
         fi
     fi

@@ -61,6 +61,7 @@ ARG BASE_VERSION
 
 RUN set -eux; \
     mkdir -m a=rwx,o+t /dit/tmp; \
+    : > /dit/tmp/.profile; \
     whoami > /dit/tmp/default_user; \
     { \
         echo "FROM ${BASE_NAME}:${BASE_VERSION}"; \
