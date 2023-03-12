@@ -516,7 +516,7 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
  *
  * @note each element of 'data' is non-NULL if subsequent deletion operations can be performed.
  * @note only in the above case, terminates normally without calling 'manage_erase_logs'.
- * @note if no changes to the log-file are necessary, just releases the log-data at 'manage_erase_logs'.
+ * @note if no changes to the log-file are necessary, just releases the log-data in 'manage_erase_logs'.
  *
  * @attention 'data->logs->reset_flag' must be appropriately initialized before calling this function.
  */
@@ -728,22 +728,30 @@ static int marklines_containing_pattern(erase_data *data, const char *pattern, b
             regfree(&preg);
         }
         else {
-            size_t errbuf_size = 0;
-            char *errbuf = NULL;
+            size_t size = 0;
+            char *errmsg = NULL;
 
             do {
-                errbuf_size = regerror(errcode, &preg, errbuf, errbuf_size);
+                size = regerror(errcode, &preg, errmsg, size);
 
-                if (errbuf){
-                    assert(errbuf_size == (strlen(errbuf) + 1));
-                    xperror_individually(errbuf);
-                    free(errbuf);
-                }
-                else if ((errbuf = (char *) malloc(sizeof(char) * errbuf_size)))
+                if ((! errmsg) && (errmsg = (char *) malloc(sizeof(char) * size)))
                     continue;
-
                 break;
             } while (true);
+
+            if (errmsg){
+                size = (strlen(pattern) * 4 + 1) + 2;
+
+                char buf[size];
+                size = get_sanitized_string((buf + 1), pattern, true);
+
+                buf[0] = '\'';
+                buf[++size] = '\'';
+                buf[++size] = '\0';
+
+                xperror_message(errmsg, buf);
+                free(errmsg);
+            }
         }
 
         data->first_mark = false;

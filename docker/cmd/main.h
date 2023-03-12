@@ -92,7 +92,7 @@
 #define print_target_repr(offset)  fprintf(stdout, ("\n < %s >\n" + (offset)), target_args[2 - (offset)])
 
 #define xperror_config_arg(target)  xperror_invalid_arg('C', 0, "mode", target)
-#define xperror_target_files()  xperror_missing_args(NULL, NULL)
+#define xperror_target_files()  xperror_missing_args(NULL)
 
 #define xperror_individually(msg)  xperror_message(msg, NULL)
 #define xperror_internal_file()  xperror_individually(NULL)
@@ -224,7 +224,7 @@ int write_provisional_report(int reflecteds[2]);
 void xperror_invalid_arg(int code_c, int state, const char *desc, const char *arg);
 void xperror_valid_args(const char * const *expected, size_t size);
 
-void xperror_missing_args(const char *desc, const char *before_arg);
+void xperror_missing_args(const char *desc);
 void xperror_too_many_args(int limit);
 
 void xperror_message(const char *msg, const char *addition);
@@ -277,6 +277,7 @@ char *receive_dockerfile_instr(char *line, int *p_id);
 int get_file_size(const char *file_name);
 int get_last_exit_status(void);
 char *get_suffix(char *target, int delimiter, bool retain);
+size_t get_sanitized_string(char *dest, const char *target, bool quoted);
 
 
 #endif // DOCKER_INTERACTIVE_TOOL

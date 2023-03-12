@@ -83,6 +83,87 @@ static void reflect_example(void);
 extern const char * const cmd_reprs[CMDS_NUM];
 
 
+/** array of index numbers to rearange the display order of the dit commands */
+static const int cmd_rearange[] = {
+    DIT_CONVERT,
+    DIT_OPTIMIZE,
+    DIT_CONFIG,
+    DIT_IGNORE,
+    DIT_PACKAGE,
+    DIT_COPY,
+    DIT_LABEL,
+    DIT_CMD,
+    DIT_HEALTHCHECK,
+    DIT_ONBUILD,
+    DIT_REFLECT,
+    DIT_ERASE,
+    DIT_INSPECT,
+    DIT_HELP,
+        -1
+};
+
+
+/** array of the help functions to display requested information for the corresponding dit command */
+static void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])(void) = {
+    {
+        cmd_manual,
+        config_manual,
+        convert_manual,
+        copy_manual,
+        erase_manual,
+        healthcheck_manual,
+        help_manual,
+        ignore_manual,
+        inspect_manual,
+        label_manual,
+        onbuild_manual,
+        optimize_manual,
+        package_manual,
+        reflect_manual
+    },
+    {
+        cmd_description,
+        config_description,
+        convert_description,
+        copy_description,
+        erase_description,
+        healthcheck_description,
+        help_description,
+        ignore_description,
+        inspect_description,
+        label_description,
+        onbuild_description,
+        optimize_description,
+        package_description,
+        reflect_description
+    },
+    {
+        cmd_example,
+        config_example,
+        convert_example,
+        copy_example,
+        erase_example,
+        healthcheck_example,
+        help_example,
+        ignore_example,
+        inspect_example,
+        label_example,
+        onbuild_example,
+        optimize_example,
+        package_example,
+        reflect_example
+    }
+};
+
+
+/** array of the help functions to display information about the main interface of the dit commands */
+static void (* const dit_helps[HELP_CONTENTS_NUM])(void) = {
+    dit_manual,
+    dit_description,
+    dit_example
+};
+
+
 
 
 /******************************************************************************
@@ -183,11 +264,13 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
             case 'm':
                 *opt = manual;
                 break;
-            case 'V':
-                return display_version();
             case 1:
                 help_manual();
                 return NORMALLY_EXIT;
+            case 'V':
+                if (! display_version())
+                    return NORMALLY_EXIT;
+                xperror_internal_file();
             default:
                 return ERROR_EXIT;
         }
@@ -202,24 +285,6 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
  * @note display the commands in the same order as 'dit help'.
  */
 static void display_cmd_list(void){
-    const int cmd_rearange[] = {
-        DIT_CONVERT,
-        DIT_OPTIMIZE,
-        DIT_CONFIG,
-        DIT_IGNORE,
-        DIT_PACKAGE,
-        DIT_COPY,
-        DIT_LABEL,
-        DIT_CMD,
-        DIT_HEALTHCHECK,
-        DIT_ONBUILD,
-        DIT_REFLECT,
-        DIT_ERASE,
-        DIT_INSPECT,
-        DIT_HELP,
-            -1
-    };
-
     for (const int *p_id = cmd_rearange; *p_id >= 0; p_id++){
         assert(*p_id < CMDS_NUM);
         puts(cmd_reprs[*p_id]);
@@ -230,20 +295,16 @@ static void display_cmd_list(void){
 /**
  * @brief display the version of this tool on screen.
  *
- * @return int  1 (normally exit) or -1 (error exit)
+ * @return int  0 (success) or -1 (unexpected error)
  */
 static int display_version(void){
     const char *line;
-    int errid = 0, exit_status = NORMALLY_EXIT;
+    int errid = 0;
 
     while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid)))
         puts(line);
 
-    if (errid){
-        xperror_internal_file();
-        exit_status = ERROR_EXIT;
-    }
-    return exit_status;
+    return errid;
 }
 
 
@@ -263,57 +324,6 @@ static bool display_help(help_conts code, const char *target){
     void (* help_func)(void);
 
     if (target){
-        void (* const cmd_helps[HELP_CONTENTS_NUM][CMDS_NUM])(void) = {
-            {
-                cmd_manual,
-                config_manual,
-                convert_manual,
-                copy_manual,
-                erase_manual,
-                healthcheck_manual,
-                help_manual,
-                ignore_manual,
-                inspect_manual,
-                label_manual,
-                onbuild_manual,
-                optimize_manual,
-                package_manual,
-                reflect_manual
-            },
-            {
-                cmd_description,
-                config_description,
-                convert_description,
-                copy_description,
-                erase_description,
-                healthcheck_description,
-                help_description,
-                ignore_description,
-                inspect_description,
-                label_description,
-                onbuild_description,
-                optimize_description,
-                package_description,
-                reflect_description
-            },
-            {
-                cmd_example,
-                config_example,
-                convert_example,
-                copy_example,
-                erase_example,
-                healthcheck_example,
-                help_example,
-                ignore_example,
-                inspect_example,
-                label_example,
-                onbuild_example,
-                optimize_example,
-                package_example,
-                reflect_example
-            }
-        };
-
         int i;
         if ((i = receive_expected_string(target, cmd_reprs, CMDS_NUM, 2)) >= 0){
             assert(i < CMDS_NUM);
@@ -327,12 +337,6 @@ static bool display_help(help_conts code, const char *target){
         }
     }
     else {
-        void (* const dit_helps[HELP_CONTENTS_NUM])(void) = {
-            dit_manual,
-            dit_description,
-            dit_example
-        };
-
         topic = "dit";
         help_func = dit_helps[code];
     }
@@ -636,7 +640,6 @@ void inspect_manual(void){
         "  - User or group name longer than 8 characters are converted to the corresponding ID, and\n"
         "    the ID longer than 8 digits are converted to '#EXCESS' that means it is undisplayable.\n"
         "  - The units of file size are 'k,M,G,T,P,E,Z', which are powers of 1000.\n"
-        "  - Undisplayable characters appearing in the file name are uniformly replaced with '?'.\n"
         "\n"
         "This command is based on the 'ls' command which is a GNU one.\n"
         "See that man page for details.\n"

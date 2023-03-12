@@ -107,11 +107,7 @@ const char * const docker_instr_reprs[DOCKER_INSTRS_NUM] = {
 };
 
 
-/** string representing a dit command invoked */
-static const char *program_name = "dit";
-
-
-/** array of the function pointers corresponding to one of the dit commands */
+/** array of the function pointers corresponding to each dit command */
 static int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
     cmd,
     config,
@@ -128,6 +124,39 @@ static int (* const cmd_funcs[CMDS_NUM])(int, char **) = {
     package,
     reflect
 };
+
+
+/** conversion table to use for string sanitization */
+static const char escape_char_table[128] = {
+    '?', '?', '?', '?', '?', '?', '?', 'a',
+    'b', 't', 'n', 'v', 'f', 'r', '?', '?',
+    '?', '?', '?', '?', '?', '?', '?', '?',
+    '?', '?', '?', 'e', '?', '?', '?', '?',
+    ' ', '_', '\"', '_', '_', '_', '_', '\'',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '\\', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '_',
+    '_', '_', '_', '_', '_', '_', '_', '?'
+};
+
+/** table for converting control characters to hexadecimal numbers */
+static const char escape_hex_table[32 * 2] = {
+    '0','0', '0','1', '0','2', '0','3', '0','4', '0','5', '0','6', '0','7',
+    '0','8', '0','9', '0','A', '0','B', '0','C', '0','D', '0','E', '0','F',
+    '1','0', '1','1', '1','2', '1','3', '1','4', '1','5', '1','6', '1','7',
+    '1','8', '1','9', '1','A', '1','B', '1','C', '1','D', '1','E', '1','F',
+};
+
+
+/** string representing a dit command invoked */
+static const char *program_name = "dit";
 
 
 
@@ -171,7 +200,7 @@ int main(int argc, char **argv){
             xperror_invalid_arg('C', 1, "command", *argv);
         }
         else
-            xperror_missing_args("command", NULL);
+            xperror_missing_args("command");
     }
 
     xperror_suggestion(false);
@@ -199,6 +228,18 @@ int main(int argc, char **argv){
 void xperror_invalid_arg(int code_c, int state, const char *desc, const char *arg){
     assert(desc);
 
+    size_t size = 1;
+
+    if (arg)
+        size = strlen(arg) * 4 + 1;
+
+    char buf[size];
+
+    if (arg)
+        get_sanitized_string(buf, arg, true);
+    else
+        *buf = '\0';
+
     const char *format, *addition = "", *adjective;
 
     switch (code_c){
@@ -210,12 +251,12 @@ void xperror_invalid_arg(int code_c, int state, const char *desc, const char *ar
         default:
             assert(code_c == 'O');
             format = "%s: %s argument '%s' for '--%s'\n";
-            addition = arg;
+            addition = buf;
     }
 
     adjective = state ? ((state == -1) ? "ambiguous" : "invalid") : "unrecognized";
 
-    fprintf(stderr, format, program_name, adjective, addition, desc, arg);
+    fprintf(stderr, format, program_name, adjective, addition, desc, buf);
 }
 
 
@@ -243,29 +284,19 @@ void xperror_valid_args(const char * const *reprs, size_t size){
  * @brief print an error message to stderr that some arguments are missing.
  *
  * @param[in]  desc  the description for the arguments or NULL
- * @param[in]  before_arg  the immediately preceding argument, if any
  *
  * @note if 'desc' is NULL, prints an error message about specifying the target file.
  */
-void xperror_missing_args(const char *desc, const char *before_arg){
-    assert(desc || (! before_arg));
-
-    char format[] = "%s: missing %s operand after '%s'\n";
-    int offset = 0;
+void xperror_missing_args(const char *desc){
+    char format[] = "%s: missing %s operand\n";
 
     if (! desc){
         desc = "'-d', '-h' or '--target' option";
-        offset = 14;
-    }
-    else if (! before_arg)
-        offset = 22;
-
-    if (offset){
-        format[offset++] = '\n';
-        format[offset] = '\0';
+        format[14] = '\n';
+        format[15] = '\0';
     }
 
-    fprintf(stderr, format, program_name, desc, before_arg);
+    fprintf(stderr, format, program_name, desc);
 }
 
 
@@ -328,14 +359,12 @@ void xperror_message(const char *msg, const char *addition){
  * @param[in]  cmd_flag  whether to suggest displaying the manual of each dit command
  */
 void xperror_suggestion(bool cmd_flag){
-    const char *str1, *str2;
+    const char *str1 = "", *str2 = "";
 
     if (cmd_flag){
         str1 = program_name;
         str2 = " --";
     }
-    else
-        str1 = (str2 = "");
 
     fprintf(stderr, "Try 'dit %s%shelp' for more information.\n", str1, str2);
 }
@@ -362,7 +391,7 @@ void xperror_standards(const char *entity, int errid){
  * @param[in]  cmd_name  command name
  * @param[in]  status  command's exit status, 0 or less integer
  *
- * @note reports an error caused by system call, or that the command in child process ended with an error.
+ * @note reports an error caused by syscall, or that the command in child process ended with an error.
  */
 void xperror_child_process(const char *cmd_name, int status){
     assert(cmd_name);
@@ -621,7 +650,7 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
     assert(suf);
     assert(suf_len == (strlen(suf) + 1));
 
-    size_t curr, old;
+    size_t curr;
     bool allocate_flag = false;
     void *ptr;
     char *dest;
@@ -633,11 +662,11 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
 
     do {
         if ((curr - base_len) < suf_len){
-            old = curr + 8;
-            assert(! (old & (old - 1)));
+            curr += 8;
+            assert(! (curr & (curr - 1)));
 
-            if ((old <<= 1)){
-                curr = old - 8;
+            if ((curr <<= 1)){
+                curr -= 8;
                 allocate_flag = true;
                 continue;
             }
@@ -756,9 +785,10 @@ bool walk(const char *name, int (* callback)(const char *)){
     assert(name);
     assert(callback);
 
-    bool no_chdir, success = false;
+    int fd = -1;
+    bool success = false;
 
-    if ((no_chdir = check_if_pwd(name)) || (! chdir(name))){
+    if (check_if_pwd(name) || (! chdir(name))){
         DIR *dir;
 
         if ((dir = opendir("."))){
@@ -791,7 +821,7 @@ bool walk(const char *name, int (* callback)(const char *)){
             closedir(dir);
         }
 
-        if ((! no_chdir) && chdir(".."))
+        if ((fd >= 0) && fchdir(fd))
             success = false;
     }
 
@@ -1126,6 +1156,63 @@ char *get_suffix(char *target, int delimiter, bool retain){
 }
 
 
+/**
+ * @brief get the sanitized string for display.
+ *
+ * @param[out] dest  where to store the sanitized string
+ * @param[in]  target  target string
+ * @param[in]  quoted  whether to use quotation
+ * @return size_t  the length of the stored string
+ *
+ * @attention the size of 'dest' must be greater than four times the length of the string before conversion.
+ */
+size_t get_sanitized_string(char *dest, const char *target, bool quoted){
+    assert(dest);
+    assert(target);
+
+    char *buf;
+    unsigned int i;
+    int c;
+
+    buf = dest;
+
+    while ((i = (unsigned char) *(target++))){
+        c = '?';
+
+        if (! (i & 0x80)){
+            assert(i < sizeof(escape_char_table));
+
+            switch ((c = escape_char_table[i])){
+                case '?':
+                    assert(iscntrl(i));
+                    memcpy(buf, "\\x", 2);
+                    buf += 2;
+                    memcpy(buf, ((i & 0x60) ? "7F" : &escape_hex_table[i * 2]), 2);
+                    buf += 2;
+                    continue;
+                case ' ':
+                    assert(i == ' ');
+                    if (! quoted)
+                        break;
+                case '_':
+                    assert(isprint(i));
+                    *(buf++) = i;
+                    continue;
+            }
+        }
+
+        assert(strchr("abefnrtv \"\'\\?", c));
+        *(buf++) = '\\';
+        *(buf++) = c;
+    }
+
+    *buf = '\0';
+
+    assert(buf >= dest);
+    return (size_t) (buf - dest);
+}
+
+
 
 
 #ifndef NDEBUG
@@ -1156,6 +1243,7 @@ static void receive_dockerfile_instr_test(void);
 static void get_file_size_test(void);
 static void get_last_exit_status_test(void);
 static void get_suffix_test(void);
+static void get_sanitized_string_test(void);
 
 
 
@@ -1172,6 +1260,7 @@ void dit_test(void){
     do_test(get_file_size_test);
     do_test(get_last_exit_status_test);
     do_test(get_suffix_test);
+    do_test(get_sanitized_string_test);
 
     do_test(execute_test);
     do_test(walk_test);
@@ -1477,6 +1566,122 @@ static void xstrcat_inf_len_test(void){
 
 
 
+static void execute_test(void){
+    char * const argv[] = { "cat", NULL };
+
+    int i, c, exit_status;
+    const char *addition;
+    char cmdline[32];
+
+    for (i = 0; i < 2; i++){
+        if (! i){
+            c = 'D';
+            addition = "-";
+            exit_status = 0;
+        }
+        else {
+            c = 'C';
+            addition = "> /dev/null";
+            exit_status = 128 + SIGINT;
+        }
+
+        fprintf(stderr, "\nChecking if child process can be exited by 'Ctrl + %c' ...\n", c);
+
+        c = snprintf(cmdline, sizeof(cmdline), "+ cat %s", addition);
+        assert((c >= 0) && (c < sizeof(cmdline)));
+
+        puts(cmdline);
+
+        assert(execute("/bin/cat", argv, i) == exit_status);
+
+        *cmdline = '-';
+        puts(cmdline);
+
+        if (! check_if_visually_no_problem())
+            assert(false);
+    }
+}
+
+
+
+
+static inf_str walked_istr = {0};
+static size_t walked_len = 0;
+
+
+static int walk_test_stub(const char *name){
+    assert(name);
+
+    size_t size;
+    int exit_status = FAILURE;
+
+    size = strlen(name) + 1;
+
+    if (xstrcat_inf_len(&walked_istr, walked_len, name, size)){
+        exit_status = SUCCESS;
+        walked_len += size;
+    }
+
+    return exit_status;
+}
+
+
+static void walk_test(void){
+    // changeable part for updating test cases
+    const char * const root_dirs[] = {
+        ".",
+        "/dit/",
+        "/etc/./",
+        NULL
+    };
+
+    int i, c;
+    char cmdline[128];
+    struct stat file_stat;
+    void *addr, *found, *walked;
+    size_t name_len;
+
+    for (i = 0; root_dirs[i]; i++){
+        fprintf(stderr, "  Walking '%s' ...\n", root_dirs[i]);
+
+        assert(! walked_len);
+        assert(walk(root_dirs[i], walk_test_stub));
+
+        c = snprintf(cmdline, sizeof(cmdline), "find %s -depth -print0 > "TMP_FILE1, root_dirs[i]);
+        assert((c >= 0) && (c < sizeof(cmdline)));
+        assert(system(NULL) && (! system(cmdline)));
+
+        assert((c = open(TMP_FILE1, O_RDONLY)) != -1);
+        assert(! fstat(c, &file_stat));
+        assert(file_stat.st_size >= 0);
+        assert((addr = mmap(NULL, file_stat.st_size, PROT_READ, MAP_PRIVATE, c, 0)) != MAP_FAILED);
+
+        found = addr;
+        walked = walked_istr.ptr;
+
+        while (walked_len){
+            found = get_suffix(found, '/', true);
+            name_len = strlen(found) + 1;
+
+            fprintf(stderr, "    strcmp(W, F):  '%s'  '%s'\n", ((char *) walked), ((char *) found));
+            assert(! memcmp(walked, found, name_len));
+
+            found += name_len;
+            walked += name_len;
+            walked_len -= name_len;
+        }
+
+        assert(! munmap(addr, file_stat.st_size));
+        assert(! close(c));
+    }
+
+    assert(walked_istr.ptr);
+    free(walked_istr.ptr);
+}
+
+
+
+
 static void receive_positive_integer_test(void){
     const struct {
         const char * const target;
@@ -1686,7 +1891,7 @@ static void get_file_size_test(void){
 
     // when specifying a file that is too large
 
-    assert(system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K > /dev/null")));
+    assert(system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K 2> /dev/null")));
     assert(get_file_size(TMP_FILE1) == -2);
     assert(errno == EFBIG);
 
@@ -1783,117 +1988,37 @@ static void get_suffix_test(void){
 
 
 
-static void execute_test(void){
-    char * const argv[] = { "cat", NULL };
-
-    int i, c, exit_status;
-    const char *addition;
-    char cmdline[32];
-
-    for (i = 0; i < 2; i++){
-        if (! i){
-            c = 'D';
-            addition = "-";
-            exit_status = 0;
-        }
-        else {
-            c = 'C';
-            addition = "> /dev/null";
-            exit_status = 128 + SIGINT;
-        }
-
-        fprintf(stderr, "\nChecking if child process can be exited by 'Ctrl + %c' ...\n", c);
-
-        c = snprintf(cmdline, sizeof(cmdline), "+ cat %s", addition);
-        assert((c >= 0) && (c < sizeof(cmdline)));
-
-        puts(cmdline);
-
-        assert(execute("/bin/cat", argv, i) == exit_status);
-
-        *cmdline = '-';
-        puts(cmdline);
-
-        if (! check_if_visually_no_problem())
-            assert(false);
+static void get_sanitized_string_test(void){
+    const struct {
+        const char *target;
+        const bool quoted;
+        const char *result;
     }
-}
-
-
-
-
-static inf_str walked_istr = {0};
-static size_t walked_len = 0;
-
-
-static int walk_test_stub(const char *name){
-    assert(name);
-
-    size_t size;
-    int exit_status = FAILURE;
-
-    size = strlen(name) + 1;
-
-    if (xstrcat_inf_len(&walked_istr, walked_len, name, size)){
-        exit_status = SUCCESS;
-        walked_len += size;
-    }
-
-    return exit_status;
-}
-
-
-static void walk_test(void){
     // changeable part for updating test cases
-    const char * const root_dirs[] = {
-        ".",
-        "/dit/",
-        "/etc/./",
-        NULL
+    table[] = {
+        { "",                     true, ""                         },
+        { "*.txt",                true, "*.txt"                    },
+        { "([\'\"])@you\\1",      true, "([\\\'\\\"])@you\\\\1"    },
+        { " \t",                  true, " \\t"                     },
+        { "extension",           false, "extension"                },
+        { "\002-\020",           false, "\\x02-\\x10"              },
+        { "\a\b \r\n \v\f",      false, "\\a\\b\\ \\r\\n\\ \\v\\f" },
+        { "\033[??;??m \033[0m", false, "\\e[??;??m\\ \\e[0m"      },
+        {  0,                      0,    0                         }
     };
 
-    int i, c;
-    char cmdline[128];
-    struct stat file_stat;
-    void *addr, *found, *walked;
-    size_t name_len;
+    int i;
+    char buf[64];
+    size_t size;
 
-    for (i = 0; root_dirs[i]; i++){
-        fprintf(stderr, "  Walking '%s' ...\n", root_dirs[i]);
+    for (i = 0; table[i].target; i++){
+        size = get_sanitized_string(buf, table[i].target, table[i].quoted);
+        assert(size == strlen(table[i].result));
+        assert(! strcmp(buf, table[i].result));
 
-        assert(! walked_len);
-        assert(walk(root_dirs[i], walk_test_stub));
-
-        c = snprintf(cmdline, sizeof(cmdline), "find %s -depth -print0 > "TMP_FILE1, root_dirs[i]);
-        assert((c >= 0) && (c < sizeof(cmdline)));
-        assert(system(NULL) && (! system(cmdline)));
-
-        assert((c = open(TMP_FILE1, O_RDONLY)) != -1);
-        assert(! fstat(c, &file_stat));
-        assert(file_stat.st_size >= 0);
-        assert((addr = mmap(NULL, file_stat.st_size, PROT_READ, MAP_PRIVATE, c, 0)) != MAP_FAILED);
-
-        found = addr;
-        walked = walked_istr.ptr;
-
-        while (walked_len){
-            found = get_suffix(found, '/', true);
-            name_len = strlen(found) + 1;
-
-            fprintf(stderr, "    strcmp(W, F):  '%s'  '%s'\n", ((char *) walked), ((char *) found));
-            assert(! memcmp(walked, found, name_len));
-
-            found += name_len;
-            walked += name_len;
-            walked_len -= name_len;
-        }
-
-        assert(! munmap(addr, file_stat.st_size));
-        assert(! close(c));
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "'%s'\n", table[i].result);
     }
-
-    assert(walked_istr.ptr);
-    free(walked_istr.ptr);
 }
 
 

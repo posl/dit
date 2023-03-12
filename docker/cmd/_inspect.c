@@ -10,9 +10,7 @@
 
 #include "main.h"
 
-#define INSP_INITIAL_DIRS_MAX 16
-
-#define INSP_EXCESS_STR " #EXCESS"
+#define INSP_INITIAL_DIRS_MAX 15  // 2^n - 1
 
 
 /** Data type for storing the results of option parse */
@@ -64,6 +62,14 @@ static void print_file_mode(mode_t mode);
 static void print_file_owner(const file_node *file, bool numeric_id);
 static void print_file_size(off_t size);
 static void print_file_name(const file_node *file, const insp_opts *opt, bool link_flag);
+
+
+/** array of strings in alphabetical order corresponding to each file sorting method */
+static const char * const sort_args[ARGS_NUM] = {
+    "extension",
+    "name",
+    "size"
+};
 
 
 /** comparison function used when qsort */
@@ -145,12 +151,6 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
         { "help",            no_argument,       NULL,  1  },
         { "sort",            required_argument, NULL,  0  },
         {  0,                 0,                 0,    0  }
-    };
-
-    const char * const sort_args[ARGS_NUM] = {
-        "extension",
-        "name",
-        "size"
     };
 
     opt->color = false;
@@ -239,7 +239,9 @@ static file_node *construct_recursive(const char *name){
     file_node *file = NULL;
     size_t name_len;
 
-    if ((name_len = strlen(name) + 1) > 0){
+    if ((name_len = strlen(name)) > 0){
+        name_len++;
+
         char *dest;
         if ((dest = (char *) malloc(sizeof(char) * name_len))){
             memcpy(dest, name, (sizeof(char) * name_len));
@@ -378,18 +380,25 @@ static bool append_file(file_node *tree, file_node *file){
     assert(file);
 
     if (tree->children_num == tree->children_max){
-        size_t old_size, new_size;
+        size_t curr;
         void *ptr;
 
-        old_size = tree->children_max;
-        new_size = old_size ? (old_size * 2) : INSP_INITIAL_DIRS_MAX;
+        if ((curr = tree->children_max)){
+            curr++;
+            assert(! (curr & (curr - 1)));
 
-        if ((old_size < new_size) && (ptr = realloc(tree->children, (sizeof(file_node *) * new_size)))){
-            tree->children = (file_node **) ptr;
-            tree->children_max = new_size;
+            if (! (curr <<= 1))
+                return false;
+            curr--;
         }
         else
+            curr = INSP_INITIAL_DIRS_MAX;
+
+        if (! (ptr = realloc(tree->children, (sizeof(file_node *) * curr))))
             return false;
+
+        tree->children = (file_node **) ptr;
+        tree->children_max = curr;
     }
 
     assert(tree->children);
@@ -408,7 +417,7 @@ static bool append_file(file_node *tree, file_node *file){
 
 
 /**
- * @brief comparison function used when sort style is unspecified or specified as name
+ * @brief comparison function used when sort style is unspecified or specified as 'name'
  *
  * @param[in]  a  pointer to file1
  * @param[in]  b  pointer to file2
@@ -420,7 +429,7 @@ static int qcmp_name(const void *a, const void *b){
 
 
 /**
- * @brief comparison function used when sort style is specified as size
+ * @brief comparison function used when sort style is specified as 'size'
  *
  * @param[in]  a  pointer to file1
  * @param[in]  b  pointer to file2
@@ -432,7 +441,7 @@ static int qcmp_size(const void *a, const void *b){
 
 
 /**
- * @brief comparison function used when sort style is specified as extension
+ * @brief comparison function used when sort style is specified as 'extension'
  *
  * @param[in]  a  pointer to file1
  * @param[in]  b  pointer to file2
@@ -705,7 +714,7 @@ static void print_file_owner(const file_node *file, bool numeric_id){
                 fprintf(stdout, "%8u  ", id);
                 continue;
             }
-            name = INSP_EXCESS_STR;
+            name = " #EXCESS";
         }
         fprintf(stdout, "%8s  ", name);
     } while (i--);
@@ -748,7 +757,7 @@ static void print_file_size(off_t size){
         fprintf(stdout, format, ((unsigned int) size), rem, unit);
     }
     else
-        fputs(INSP_EXCESS_STR "    ", stdout);
+        fputs(" #EXCESS    ", stdout);
 }
 
 
@@ -760,32 +769,37 @@ static void print_file_size(off_t size){
  * @param[in]  file  the file we are currently trying to display
  * @param[in]  opt  variable to store the results of option parse
  * @param[in]  link_flag  whether or not to display the information of the link destination
+ *
+ * @note elements of the color code are assigned to the output string in order from the back.
  */
 static void print_file_name(const file_node *file, const insp_opts *opt, bool link_flag){
     assert(file);
     assert(opt);
 
-    char *name, *tmp;
+    char *tmp, *output;
     mode_t mode;
-    int i = 0;
-    const char *format;
+    size_t size;
 
     if (! link_flag){
-        name = file->name;
+        tmp = file->name;
         mode = file->mode;
-        i = 4;
     }
     else {
-        name = file->link_path;
+        tmp = file->link_path;
         mode = file->link_mode;
     }
 
-    assert(name);
-    for (tmp = name; *tmp; tmp++)
-        if (iscntrl((unsigned char) *tmp))
-            *tmp = '?';
+    assert(tmp && *tmp);
+    size = 12 + (strlen(tmp) * 4 + 1) + 4;  // the length of " -> \033[??;??m%s\033[0m"
+
+    char buf[size];
+
+    output = buf + 12;
+    size = get_sanitized_string(output, tmp, false);
 
     if (opt->color){
+        memcpy((output + size), "\033[0m", 5);
+
         if (! file->link_invalid)
             switch ((mode & S_IFMT)){
                 case S_IFREG:
@@ -829,14 +843,26 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
         else
             tmp = "31";
 
-        format = " -> \033[%sm%s\033[0m";
-    }
-    else {
-        tmp = name;
-        format = " -> %s";
+        *(--output) = 'm';
+
+        size = strlen(tmp);
+        assert(size <= 5);
+        output -= size;
+        memcpy(output, tmp, size);
+
+        output -= 2;
+        memcpy(output, "\033[", 2);
     }
 
-    fprintf(stdout, (format + i), tmp, name);
+    if (link_flag){
+        output -= 4;
+        memcpy(output, " -> ", 4);
+    }
+
+    fputs(output, stdout);
+
+
+    int i;
 
     if (opt->classify){
         switch ((mode & S_IFMT)){
@@ -1017,7 +1043,7 @@ static void append_file_test(void){
 
     do {
         assert((file = (file_node *) malloc(sizeof(file_node))));
-        file->size = rand() / (INSP_INITIAL_DIRS_MAX * 2);
+        file->size = rand() / ((INSP_INITIAL_DIRS_MAX + 1) * 2);
 
         fprintf(stderr, "  Appending the %2dth element of size %d ...\n", i, ((int) file->size));
 
@@ -1035,7 +1061,7 @@ static void append_file_test(void){
         if (i <= INSP_INITIAL_DIRS_MAX)
             assert(node.children_max == INSP_INITIAL_DIRS_MAX);
         else {
-            assert(node.children_max == (INSP_INITIAL_DIRS_MAX * 2));
+            assert(node.children_max > INSP_INITIAL_DIRS_MAX);
             break;
         }
     } while (true);

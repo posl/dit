@@ -57,7 +57,7 @@ static gid_t new_gid = 0;
 int copy(int argc, char **argv){
     int i;
     copy_opts opt;
-    const char *errdesc = NULL, *first_arg = NULL;
+    const char *errdesc = NULL;
 
     if ((i = parse_opts(argc, argv, &opt)))
         i = (i < 0) ? FAILURE : SUCCESS;
@@ -68,17 +68,15 @@ int copy(int argc, char **argv){
 
         if (argc <= 0)
             errdesc = "file";
-        else if (argc == 1){
+        else if (argc == 1)
             errdesc = "destination file";
-            first_arg = *argv;
-        }
         else
             i = do_copy(argc, argv, &opt);
     }
 
     if (i){
         if (errdesc)
-            xperror_missing_args(errdesc, first_arg);
+            xperror_missing_args(errdesc);
         xperror_suggestion(true);
     }
     return i;
