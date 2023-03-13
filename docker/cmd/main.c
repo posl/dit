@@ -774,58 +774,74 @@ int execute(const char *cmd_file, char * const argv[], int null_redirs){
 /**
  * @brief the function that recursively scans the specified directory
  *
+ * @param[in]  pwdfd  file descriptor that serves as the current working directory
  * @param[in]  name  name of the directory we are currently looking at
- * @param[in]  callback  a callback function that takes a file name as an argument and returns 0 on success
- * @return bool  successful or not
+ * @param[in]  callback  a callback function like "*at()" family of syscalls
+ * @return bool  0 (success) or -1 (unexpected error)
  *
- * @note for example, you can specify 'remove' function as the callback function.
  * @attention the callback function is not called for the root directory specified at the first call.
  */
-bool walk(const char *name, int (* callback)(const char *)){
-    assert(name);
+int walkat(int pwdfd, const char *name, int (* callback)(int, const char *, bool)){
+    assert((pwdfd >= 0) || (pwdfd == AT_FDCWD));
+    assert(name && *name);
     assert(callback);
 
-    int fd = -1;
-    bool success = false;
+    int new_fd, exit_status = UNEXPECTED_ERROR;
 
-    if (check_if_pwd(name) || (! chdir(name))){
+    if ((new_fd = openat(pwdfd, name, (O_RDONLY | O_DIRECTORY))) != -1){
         DIR *dir;
 
-        if ((dir = opendir("."))){
+        if ((dir = fdopendir(new_fd))){
             struct dirent *entry;
             struct stat file_stat;
             bool isdir;
 
             while ((entry = readdir(dir))){
                 name = entry->d_name;
-                assert(name);
 
-                if (check_if_valid_dirent(name)){
+                if (check_if_valid_entry(name)){
 #ifdef _DIRENT_HAVE_D_TYPE
                     if (entry->d_type != DT_UNKNOWN)
                         isdir = (entry->d_type == DT_DIR);
                     else
 #endif
-                    if (! lstat(name, &file_stat))
+                    if (! fstatat(new_fd, name, &file_stat, AT_SYMLINK_NOFOLLOW))
                         isdir = S_ISDIR(file_stat.st_mode);
                     else
                         goto exit;
 
-                    if ((isdir && (! walk(name, callback))) || callback(name))
+                    if ((isdir && walkat(new_fd, name, callback)) || callback(new_fd, name, isdir))
                         goto exit;
                 }
             }
 
-            success = true;
+            exit_status = SUCCESS;
         exit:
             closedir(dir);
         }
-
-        if ((fd >= 0) && fchdir(fd))
-            success = false;
+        else
+            close(new_fd);
     }
 
-    return success;
+    return exit_status;
+}
+
+
+
+
+/**
+ * @brief wrapper function for 'unlinkat' syscall
+ *
+ * @param[in]  pwdfd  file descriptor that serves as the current working directory
+ * @param[in]  name  file or directory name
+ * @param[in]  isdir  whether it is a directory
+ * @return int  0 (success) or -1 (unexpected error)
+ */
+int removeat(int pwdfd, const char *name, bool isdir){
+    assert((pwdfd >= 0) || (pwdfd == AT_FDCWD));
+    assert(name && *name);
+
+    return unlinkat(pwdfd, name, (isdir ? AT_REMOVEDIR : 0));
 }
 
 
@@ -837,11 +853,11 @@ bool walk(const char *name, int (* callback)(const char *)){
  * @return bool  successful or not
  */
 bool remove_all(const char *name, bool isdir){
-    assert(name);
+    assert(name && *name);
 
     bool success = true;
 
-    if ((isdir || (unlink(name) && (success = (errno == EISDIR)))) && ((! walk(name, remove)) || rmdir(name)))
+    if ((isdir || (unlink(name) && (success = (errno == EISDIR)))) && (walk(name, removeat) || rmdir(name)))
         success = false;
 
     return success;
@@ -862,9 +878,7 @@ int filter_dirent(const struct dirent *entry){
     const char *name;
 
     name = entry->d_name;
-    assert(name);
-
-    return check_if_valid_dirent(name);
+    return check_if_valid_entry(name);
 }
 
 
@@ -1609,17 +1623,20 @@ static inf_str walked_istr = {0};
 static size_t walked_len = 0;
 
 
-static int walk_test_stub(const char *name){
-    assert(name);
+static int walk_test_stub(int pwdfd, const char *name, bool isdir){
+    assert(pwdfd >= 0);
+    assert(name && *name);
 
     size_t size;
-    int exit_status = FAILURE;
+    int exit_status = SUCCESS;
 
-    size = strlen(name) + 1;
+    if (! isdir){
+        size = strlen(name) + 1;
 
-    if (xstrcat_inf_len(&walked_istr, walked_len, name, size)){
-        exit_status = SUCCESS;
-        walked_len += size;
+        if (xstrcat_inf_len(&walked_istr, walked_len, name, size))
+            walked_len += size;
+        else
+            exit_status = FAILURE;
     }
 
     return exit_status;
@@ -1642,12 +1659,13 @@ static void walk_test(void){
     size_t name_len;
 
     for (i = 0; root_dirs[i]; i++){
+        assert(*(root_dirs[i]));
         fprintf(stderr, "  Walking '%s' ...\n", root_dirs[i]);
 
         assert(! walked_len);
-        assert(walk(root_dirs[i], walk_test_stub));
+        assert(! walk(root_dirs[i], walk_test_stub));
 
-        c = snprintf(cmdline, sizeof(cmdline), "find %s -depth -print0 > "TMP_FILE1, root_dirs[i]);
+        c = snprintf(cmdline, sizeof(cmdline), "find %s -depth ! -type d -print0 > "TMP_FILE1, root_dirs[i]);
         assert((c >= 0) && (c < sizeof(cmdline)));
         assert(system(NULL) && (! system(cmdline)));
 

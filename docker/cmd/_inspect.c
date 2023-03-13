@@ -12,6 +12,14 @@
 
 #define INSP_INITIAL_DIRS_MAX 15  // 2^n - 1
 
+#define INSP_DIRTREE_HEADER \
+    ( \
+        "\n" \
+        "Permission      User     Group      Size\n" \
+        "=========================================" \
+        "\n" \
+    )
+
 
 /** Data type for storing the results of option parse */
 typedef struct {
@@ -43,10 +51,10 @@ typedef struct file_node{
 
 
 static int parse_opts(int argc, char **argv, insp_opts *opt);
+static int do_inspect(int argc, char **argv, const insp_opts *opt);
 
-static file_node *construct_dir_tree(const char *root);
-static file_node *construct_recursive(const char *name);
-static file_node *new_file(char *name);
+static file_node *construct_dir_tree(int pwdfd, const char *name);
+static file_node *new_file(int pwdfd, char *name);
 static bool append_file(file_node *tree, file_node *file);
 
 static int qcmp_name(const void *a, const void *b);
@@ -56,8 +64,7 @@ static int fcmp_name(const void *a, const void *b, int (* fcmp)(const file_node 
 static int fcmp_size(const file_node *file1, const file_node *file2);
 static int fcmp_ext(const file_node *file1, const file_node *file2);
 
-static void destruct_dir_tree(file_node *tree, const insp_opts *opt);
-static void destruct_recursive(file_node *file, const insp_opts *opt, size_t depth);
+static void destruct_dir_tree(file_node *file, const insp_opts *opt, size_t depth);
 static void print_file_mode(mode_t mode);
 static void print_file_owner(const file_node *file, bool numeric_id);
 static void print_file_size(off_t size);
@@ -74,9 +81,6 @@ static const char * const sort_args[ARGS_NUM] = {
 
 /** comparison function used when qsort */
 static int (* qcmp)(const void *, const void *) = qcmp_name;
-
-/** global variable for interrupting the recursive processing */
-static bool fatal_error = false;
 
 
 
@@ -96,37 +100,25 @@ static bool fatal_error = false;
  * @note treated like a normal main function.
  */
 int inspect(int argc, char **argv){
-    int i;
+    int i, exit_status = SUCCESS;
     insp_opts opt;
 
-    if ((i = parse_opts(argc, argv, &opt)))
-        return (i < 0) ? FAILURE : SUCCESS;
-
-    const char *path = ".";
-    file_node *tree;
-
-    if ((argc -= optind) > 0){
-        argv += optind;
-        path = *argv;
-    }
-    else
-        argc = 1;
-
-    do {
-        if ((tree = construct_dir_tree(path)))
-            destruct_dir_tree(tree, &opt);
-        else
-            i = FAILURE;
-
-        assert(argc > 0);
-        if (--argc && (! fatal_error)){
-            path = *(++argv);
-            fputc('\n', stdout);
+    if ((i = parse_opts(argc, argv, &opt))){
+        if (i < 0){
+            exit_status = FAILURE;
+            xperror_suggestion(true);
         }
-        else
-            return i;
-    } while (true);
+    }
+    else {
+        argc -= optind;
+        argv += optind;
+        exit_status = do_inspect(argc, argv, &opt);
+    }
+
+    return exit_status;
 }
+
+
 
 
 /**
@@ -186,7 +178,6 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
                 xperror_invalid_arg('O', c, long_opts[i].name, optarg);
                 xperror_valid_args(sort_args, ARGS_NUM);
             default:
-                xperror_suggestion(true);
                 return ERROR_EXIT;
         }
 
@@ -199,71 +190,90 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
 
 
 
+/**
+ * @brief construct the directory trees and display their contents.
+ *
+ * @param[in]  argc  the number of non-optional arguments
+ * @param[in]  argv  array of strings that are non-optional arguments
+ * @param[in]  opt  variable to store the results of option parse
+ * @return int  command's exit status
+ */
+static int do_inspect(int argc, char **argv, const insp_opts *opt){
+    assert(argv);
+    assert(opt);
+
+    int offset = 1, exit_status = SUCCESS;
+    const char *path = ".";
+    file_node *tree;
+
+    if (argc > 0)
+        path = *argv;
+
+    do {
+        if (path && (tree = construct_dir_tree(AT_FDCWD, path))){
+            fputs((INSP_DIRTREE_HEADER + offset), stdout);
+            destruct_dir_tree(tree, opt, 0);
+            offset = 0;
+        }
+        else
+            exit_status = FAILURE;
+
+        if (--argc <= 0)
+            break;
+        path = *(++argv);
+    } while (true);
+
+    return exit_status;
+}
+
+
+
+
 /******************************************************************************
     * Construct & Sort Phase
 ******************************************************************************/
 
 
 /**
- * @brief construct the directory tree with details about each file also collected together.
- *
- * @param[in]  root  file path to the root of the directory tree
- * @return file_node*  the result of constructing
- */
-static file_node *construct_dir_tree(const char *root){
-    file_node *tree = NULL;
-
-    if (root){
-        tree = construct_recursive(root);
-
-        if (tree && fatal_error){
-            destruct_recursive(tree, NULL, 0);
-            tree = NULL;
-        }
-    }
-    return tree;
-}
-
-
-/**
  * @brief construct the directory tree, recursively.
  *
+ * @param[in]  pwdfd  file descriptor that serves as the current working directory
  * @param[in]  name  name of the file we are currently looking at
  * @return file_node*  the result of sub-constructing
  *
  * @note at the same time, sorts files in directory.
  */
-static file_node *construct_recursive(const char *name){
+static file_node *construct_dir_tree(int pwdfd, const char *name){
+    assert((pwdfd >= 0) || (pwdfd == AT_FDCWD));
     assert(name);
 
+    size_t len;
+    char *dest;
     file_node *file = NULL;
-    size_t name_len;
 
-    if ((name_len = strlen(name)) > 0){
-        name_len++;
+    len = strlen(name) + 1;
 
-        char *dest;
-        if ((dest = (char *) malloc(sizeof(char) * name_len))){
-            memcpy(dest, name, (sizeof(char) * name_len));
+    if ((dest = (char *) malloc(sizeof(char) * len))){
+        memcpy(dest, name, (sizeof(char) * len));
 
-            if ((file = new_file(dest))){
-                if (S_ISDIR(file->mode)){
-                    int status = -1;
-                    DIR *dir;
+        if ((file = new_file(pwdfd, dest))){
+            if (S_ISDIR(file->mode)){
+                int new_fd;
+                DIR *dir;
 
-                    if ((check_if_pwd(name) || (! (status = chdir(name)))) && (dir = opendir("."))){
+                if ((new_fd = openat(pwdfd, dest, (O_RDONLY | O_DIRECTORY)))){
+                    if ((dir = fdopendir(new_fd))){
                         struct dirent *entry;
-                        file_node *tmp;
+                        file_node *child;
 
                         while ((entry = readdir(dir))){
                             name = entry->d_name;
-                            assert(name);
 
-                            if (check_if_valid_dirent(name)){
-                                if ((! (tmp = construct_recursive(name))) || fatal_error)
+                            if (check_if_valid_entry(name)){
+                                if (! (child = construct_dir_tree(new_fd, name)))
                                     break;
-                                if (! append_file(file, tmp)){
-                                    destruct_recursive(tmp, NULL, 0);
+                                if (! append_file(file, child)){
+                                    destruct_dir_tree(child, NULL, 0);
                                     break;
                                 }
                             }
@@ -271,27 +281,20 @@ static file_node *construct_recursive(const char *name){
 
                         closedir(dir);
 
-                        if (fatal_error)
-                            goto exit;
-
                         if (file->children)
                             qsort(file->children, file->children_num, sizeof(file_node *), qcmp);
                     }
                     else
-                        file->errid = errno;
-
-                    if ((! status) && chdir("..")){
-                        fatal_error = true;
-                        xperror_standards(NULL, errno);
-                    }
+                        close(new_fd);
                 }
+                else
+                    file->errid = errno;
             }
-            else
-                free(dest);
         }
+        else
+            free(dest);
     }
 
-exit:
     return file;
 }
 
@@ -301,46 +304,36 @@ exit:
 /**
  * @brief create new element that makes up the directory tree.
  *
+ * @param[in]  pwdfd  file descriptor that serves as the current working directory
  * @param[in]  name  name of the file we are currently looking at
  * @return file_node*  new element that makes up the directory tree
  */
-static file_node *new_file(char *name){
+static file_node *new_file(int pwdfd, char *name){
+    assert((pwdfd >= 0) || (pwdfd == AT_FDCWD));
     assert(name);
 
     file_node *file;
-    if ((file = (file_node *) malloc(sizeof(file_node)))){
-        file->name = name;
-        file->mode = 0;
-        file->uid = 0;
-        file->gid = 0;
-        file->size = 0;
+    struct stat file_stat;
 
-        file->link_path = NULL;
-        file->link_mode = 0;
+    if ((file = (file_node *) calloc(1, sizeof(file_node)))){
+        file->name = name;
         file->link_invalid = true;
 
-        file->children = NULL;
-        file->children_num = 0;
-        file->children_max = 0;
-
-        file->errid = 0;
-        file->noinfo = false;
-
-        struct stat file_stat;
-        if (! lstat(name, &file_stat)){
+        if (! fstatat(pwdfd, name, &file_stat, AT_SYMLINK_NOFOLLOW)){
             file->mode = file_stat.st_mode;
             file->uid = file_stat.st_uid;
             file->gid = file_stat.st_gid;
             file->size = (file_stat.st_size > 0) ? file_stat.st_size : 0;
 
-            if (S_ISLNK(file->mode)){
+            if (S_ISLNK(file_stat.st_mode)){
                 char *link_path;
+                ssize_t link_len;
+
                 if ((link_path = (char *) malloc(sizeof(char) * (file->size + 1)))){
-                    ssize_t link_len;
-                    link_len = readlink(name, link_path, file->size);
+                    link_len = readlinkat(pwdfd, name, link_path, file->size);
 
                     if (link_len > 0){
-                        if (! stat(name, &file_stat)){
+                        if (! fstatat(pwdfd, name, &file_stat, 0)){
                             file->link_mode = file_stat.st_mode;
                             file->link_invalid = false;
                         }
@@ -362,6 +355,7 @@ static file_node *new_file(char *name){
             file->noinfo = true;
         }
     }
+
     return file;
 }
 
@@ -526,25 +520,6 @@ static int fcmp_ext(const file_node *file1, const file_node *file2){
 
 
 /**
- * @brief display the directory tree and release the dynamic memory used for it.
- *
- * @param[out] tree  pre-constructed directory tree
- * @param[in]  opt  variable to store the results of option parse
- */
-static void destruct_dir_tree(file_node *tree, const insp_opts *opt){
-    assert(tree);
-    assert(opt);
-
-    fputs(
-        "Permission      User     Group      Size\n"
-        "=========================================\n"
-    , stdout);
-
-    destruct_recursive(tree, opt, 0);
-}
-
-
-/**
  * @brief display and release the directory tree, recursively.
  *
  * @param[out] file  the file we are currently trying to display
@@ -553,10 +528,8 @@ static void destruct_dir_tree(file_node *tree, const insp_opts *opt){
  *
  * @note at the same time, releases the dynamic memory that is no longer needed.
  * @note if NULL is passed to 'opt', just releases the dynamic memory that is never used.
- *
- * @attention note that if 'depth' wraps around, the hierarchical representation of directories is disturbed.
  */
-static void destruct_recursive(file_node *file, const insp_opts *opt, size_t depth){
+static void destruct_dir_tree(file_node *file, const insp_opts *opt, size_t depth){
     assert(file);
     assert(file->name);
 
@@ -598,7 +571,7 @@ static void destruct_recursive(file_node *file, const insp_opts *opt, size_t dep
         depth++;
 
         for (file_node * const *p_file = file->children; size--; p_file++)
-            destruct_recursive(*p_file, opt, depth);
+            destruct_dir_tree(*p_file, opt, depth);
 
         free(file->children);
     }
@@ -938,7 +911,7 @@ static void new_file_test(void){
     assert((fd = open(TMP_FILE1, (O_RDWR | O_CREAT | O_TRUNC))) != -1);
     assert(! close(fd));
 
-    assert((file = new_file(TMP_FILE1)));
+    assert((file = new_file(AT_FDCWD, TMP_FILE1)));
     assert(! strcmp(file->name, TMP_FILE1));
 
     mode = file->mode;
@@ -959,7 +932,7 @@ static void new_file_test(void){
 
     assert(! symlink(TMP_FILE1, TMP_FILE2));
 
-    assert((file = new_file(TMP_FILE2)));
+    assert((file = new_file(AT_FDCWD, TMP_FILE2)));
     assert(! strcmp(file->name, TMP_FILE2));
 
     assert(S_ISLNK(file->mode));
@@ -982,7 +955,7 @@ static void new_file_test(void){
 
     assert(! unlink(TMP_FILE1));
 
-    assert((file = new_file(TMP_FILE1)));
+    assert((file = new_file(AT_FDCWD, TMP_FILE1)));
     assert(! strcmp(file->name, TMP_FILE1));
 
     assert(! (file->mode || file->uid || file->gid || file->size));
@@ -1001,7 +974,7 @@ static void new_file_test(void){
 
     // when specifying an invalid symbolic link
 
-    assert((file = new_file(TMP_FILE2)));
+    assert((file = new_file(AT_FDCWD, TMP_FILE2)));
     assert(! strcmp(file->name, TMP_FILE2));
 
     assert(S_ISLNK(file->mode));
