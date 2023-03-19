@@ -31,7 +31,7 @@
 #define getbit_check_list(list, i)  (list[getidx_check_list(i)] & getmask_check_list(i))
 #define invbit_check_list(list, i)  (list[getidx_check_list(i)] ^= getmask_check_list(i))
 
-#define ERASE_CONFIRMATION_MAX 8
+#define ERASE_CONFIRMATION_MAX 8  // n <= 32
 
 
 /** Data type for storing the results of option parse */
@@ -87,7 +87,7 @@ static int marklines_with_numbers(erase_data *data, const char *range);
 static void marklines_to_undo(erase_data *data, int undoes);
 
 static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both_flag);
-static bool confirm_deleted_lines(erase_data *data, const erase_opts *opt, const char *target_file);
+static int confirm_deleted_lines(erase_data *data, const erase_opts *opt, const char *target_file);
 
 static bool receive_range_specification(char *range, int stop, unsigned int *check_list);
 static int popcount_check_list(unsigned int *check_list, size_t size);
@@ -1030,17 +1030,16 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
  * @param[out] data  variable to store the data commonly used in this command
  * @param[in]  opt  variable to store the results of option parse
  * @param[in]  target_file  target file name
- * @return bool  whether the target file should be updated
+ * @return int  the number of lines to be deleted
  *
- * @note in the first half, empty lines are handled and lines to be deleted are extracted.
- * @note in the second half, confirmation before deleting the extracted lines is performed.
+ * @note extract lines to be deleted, confirm before deletion, and handle empty lines in this order.
  * @note whether or not to retain empty lines is only affected by 'opt->blank_c'.
  * @note index numbers pointing to deletion candidates wrap around at values less than their maximum number.
  *
  * @attention 'data' must be reliably constructed before calling this function.
  * @attention must not call this function if the target file does not contain any lines that can be deleted.
  */
-static bool confirm_deleted_lines(erase_data *data, const erase_opts *opt, const char *target_file){
+static int confirm_deleted_lines(erase_data *data, const erase_opts *opt, const char *target_file){
     assert(data);
     assert(data->lines_num > 0);
     assert(data->lines);
@@ -1048,191 +1047,203 @@ static bool confirm_deleted_lines(erase_data *data, const erase_opts *opt, const
     assert(data->check_list);
     assert(opt);
 
+    int deletes_num, max_count;
+    unsigned int i, idx, mask;
     const char *line;
-    int marked_num, max_count, truncates_num = 0, deletes_num = 0;
-    unsigned int i = 0, idx, mask;
-    bool first_blank = true;
 
-    line = data->lines;
+    deletes_num = popcount_check_list(data->check_list, data->list_size);
+    max_count = ((opt->max_count >= 0) && (opt->max_count < deletes_num)) ? opt->max_count : deletes_num;
 
-    marked_num = popcount_check_list(data->check_list, data->list_size);
-    max_count = ((opt->max_count >= 0) && (opt->max_count < marked_num)) ? opt->max_count : marked_num;
+    deletes_num = 0;
     assert(max_count >= 0);
 
-    int candidate_idx = 0;
-    const char *candidate_lines[max_count];
-    unsigned int candidate_numbers[max_count];
-
-    do {
-        idx = getidx_check_list(i);
-        mask = getmask_check_list(i);
-
-        if (! *line){
-            switch (opt->blank_c){
-                case 's':
-                    if (first_blank){
-                        first_blank = false;
-                        break;
-                    }
-                case 't':
-                    truncates_num++;
-                    data->check_list[idx] |= mask;
-                    goto next;
-                default:
-                    assert(opt->blank_c == 'p');
-            }
-        }
-        else {
-            first_blank = true;
-
-            if (max_count){
-                if (data->check_list[idx] & mask){
-                    if ((candidate_idx = deletes_num++) >= max_count){
-                        candidate_idx %= max_count;
-                        idx = candidate_numbers[candidate_idx];
-                        assert(idx < i);
-
-                        invbit_check_list(data->check_list, idx);
-                        assert(! getbit_check_list(data->check_list, idx));
-                    }
-
-                    candidate_lines[candidate_idx] = line;
-                    candidate_numbers[candidate_idx] = i;
-                }
-                goto next;
-            }
-        }
-
-        data->check_list[idx] &= ~mask;
-        assert(! getbit_check_list(data->check_list, i));
-
-    next:
-        if (++i >= data->lines_num)
-            break;
-        line += strlen(line) + 1;
-    } while (true);
-
-
-    assert(deletes_num >= 0);
-    assert(candidate_idx >= 0);
-
-    if (deletes_num > max_count){
-        deletes_num = max_count;
-        candidate_idx++;
-    }
-    else
-        candidate_idx = 0;
-
-
-    if (opt->assume_c != 'Y'){
-        int assume_c, select_idx = -1, selects_num = 0, tmp;
-        unsigned int select_list[1], start = 0, end = 0;
-        char answer[5], range[64];
+    if (max_count){
+        int candidate_idx = 0;
+        const char *candidate_lines[max_count];
+        unsigned int candidate_numbers[max_count];
 
         i = 0;
-        marked_num = deletes_num;
-        assume_c = opt->assume_c;
+        line = data->lines;
 
         do {
-            if (select_idx >= 0){
-                do {
-                    if (select_idx < selects_num){
-                        mask = 1 << (select_idx++);
+            idx = getidx_check_list(i);
+            mask = getmask_check_list(i);
 
-                        if (*select_list & mask){
-                            i++;
-                            assert(i <= marked_num);
-                            continue;
-                        }
-                    }
-                    else {
-                        select_idx = -1;
-                        selects_num = 0;
-                    }
-                    break;
-                } while (true);
+            if (! *line){
+                data->check_list[idx] &= ~mask;
+                assert(! getbit_check_list(data->check_list, i));
             }
-
-            if (i < marked_num){
-                idx = (i++) + candidate_idx;
-                idx %= max_count;
-
-                if ((assume_c != 'Q') && (select_idx < 0)){
-                    if (! selects_num){
-                        start = i - 1;
-                        end = start + ERASE_CONFIRMATION_MAX;
-
-                        if (end > marked_num)
-                            end = marked_num;
-
-                        fprintf(stderr, "\nCandidates in '%s' (%u/%d):\n", target_file, end, marked_num);
-                    }
-
-                    selects_num++;
-                    assert(selects_num <= ERASE_CONFIRMATION_MAX);
-                    fprintf(stderr, "%3d  %s\n", selects_num, candidate_lines[idx]);
-
-                    if (i == end){
-                        fputc('\n', stderr);
-
-                        if (! opt->assume_c){
-                            do {
-                                fputs("Do you want to delete all of them? [Y/n]  ", stderr);
-                                fflush(stderr);
-
-                                *answer = '\0';
-                                fscanf(stdin, "%4[^\n]%*[^\n]", answer);
-                                tmp = fgetc(stdin);
-                                assert(tmp == '\n');
-
-                            } while ((tmp = receive_expected_string(answer, assume_args, ARGS_NUM, 3)) < 0);
-
-                            assume_c = *(assume_args[tmp]);
-                        }
-                        switch (assume_c){
-                            case 'N':
-                                fputs(
-                                    "Select the lines to delete with numbers.\n"
-                                    " (separated by commas, length within 63)  "
-                                , stderr);
-
-                                fflush(stderr);
-
-                                *range = '\0';
-                                fscanf(stdin, "%63[^\n]%*[^\n]", range);
-                                tmp = fgetc(stdin);
-                                assert(tmp == '\n');
-
-                                select_idx = 0;
-                                *select_list = 0;
-                                receive_range_specification(range, selects_num, select_list);
-                            case 'Q':
-                                i = start;
-                                break;
-                            default:
-                                assert(assume_c == 'Y');
-                                selects_num = 0;
-                        }
-
-                        if ((assume_c == 'Q') || (end == marked_num))
-                            fputc('\n', stderr);
-                    }
-                    continue;
+            else if (data->check_list[idx] & mask){
+                if (deletes_num < max_count)
+                    deletes_num++;
+                else {
+                    idx = candidate_numbers[candidate_idx];
+                    invbit_check_list(data->check_list, idx);
+                    assert(! getbit_check_list(data->check_list, idx));
                 }
 
-                deletes_num--;
-                idx = candidate_numbers[idx];
-                invbit_check_list(data->check_list, idx);
-                assert(! getbit_check_list(data->check_list, idx));
+                candidate_lines[candidate_idx] = line;
+                candidate_numbers[candidate_idx] = i;
+
+                if (++candidate_idx == max_count)
+                    candidate_idx = 0;
             }
-            else
+
+            if (++i >= data->lines_num)
                 break;
+            line += strlen(line) + 1;
+        } while (true);
+
+        assert(deletes_num <= max_count);
+        assert(candidate_idx < max_count);
+
+        if (opt->assume_c != 'Y'){
+            int marked_num, assume_c, select_idx = -1, selects_num = 0, c;
+            unsigned int select_list[1], start = 0, end = 0;
+            char answer[5], range[64];
+
+            if (deletes_num < max_count)
+                candidate_idx = 0;
+
+            i = 0;
+            marked_num = deletes_num;
+            assume_c = opt->assume_c;
+
+            do {
+                if (select_idx >= 0)
+                    do {
+                        if (select_idx < selects_num){
+                            mask = 1 << (select_idx++);
+
+                            if (*select_list & mask){
+                                i++;
+                                assert(i <= marked_num);
+                                continue;
+                            }
+                        }
+                        else {
+                            select_idx = -1;
+                            selects_num = 0;
+                        }
+                        break;
+                    } while (true);
+
+                if (i < marked_num){
+                    if ((idx = (i++) + candidate_idx) >= max_count)
+                        idx -= max_count;
+
+                    if ((assume_c != 'Q') && (select_idx < 0)){
+                        if (! selects_num){
+                            start = i - 1;
+                            end = start + ERASE_CONFIRMATION_MAX;
+
+                            if (end > marked_num)
+                                end = marked_num;
+
+                            fprintf(stderr, "\nCandidates in '%s' (%u/%d):\n", target_file, end, marked_num);
+                        }
+
+                        selects_num++;
+                        assert(selects_num <= ERASE_CONFIRMATION_MAX);
+                        fprintf(stderr, "%3d  %s\n", selects_num, candidate_lines[idx]);
+
+                        if (i == end){
+                            fputc('\n', stderr);
+
+                            if (! opt->assume_c){
+                                do {
+                                    fputs("Do you want to delete all of them? [Y/n]  ", stderr);
+                                    fflush(stderr);
+
+                                    *answer = '\0';
+                                    fscanf(stdin, "%4[^\n]%*[^\n]", answer);
+                                    c = fgetc(stdin);
+                                    assert(c == '\n');
+
+                                } while ((c = receive_expected_string(answer, assume_args, ARGS_NUM, 3)) < 0);
+
+                                assume_c = *(assume_args[c]);
+                            }
+                            switch (assume_c){
+                                case 'N':
+                                    fputs(
+                                        "Select the lines to delete with numbers.\n"
+                                        " (separated by commas, length within 63)  "
+                                    , stderr);
+
+                                    fflush(stderr);
+
+                                    *range = '\0';
+                                    fscanf(stdin, "%63[^\n]%*[^\n]", range);
+                                    c = fgetc(stdin);
+                                    assert(c == '\n');
+
+                                    select_idx = 0;
+                                    *select_list = 0;
+                                    receive_range_specification(range, selects_num, select_list);
+                                case 'Q':
+                                    i = start;
+                                    break;
+                                default:
+                                    assert(assume_c == 'Y');
+                                    selects_num = 0;
+                            }
+
+                            if ((assume_c == 'Q') || (end == marked_num))
+                                fputc('\n', stderr);
+                        }
+                        continue;
+                    }
+
+                    deletes_num--;
+                    idx = candidate_numbers[idx];
+                    invbit_check_list(data->check_list, idx);
+                    assert(! getbit_check_list(data->check_list, idx));
+                }
+                else
+                    break;
+            } while (true);
+        }
+    }
+    else
+        memset(data->check_list, 0, (sizeof(unsigned int) * data->list_size));
+
+
+    if (opt->blank_c != 'p'){
+        bool first_blank = true;
+
+        i = 0;
+        line = data->lines;
+
+        do {
+            idx = getidx_check_list(i);
+            mask = getmask_check_list(i);
+
+            if (! *line){
+                assert(! (data->check_list[idx] & mask));
+
+                switch (opt->blank_c){
+                    case 's':
+                        if (first_blank){
+                            first_blank = false;
+                            break;
+                        }
+                    case 't':
+                        deletes_num++;
+                        data->check_list[idx] |= mask;
+                }
+            }
+            else if (! (data->check_list[idx] & mask))
+                first_blank = true;
+
+            if (++i >= data->lines_num)
+                break;
+            line += strlen(line) + 1;
         } while (true);
     }
 
-    assert(truncates_num >= 0);
     assert(deletes_num >= 0);
-    return (bool) (truncates_num + deletes_num);
+    return deletes_num;
 }
 
 
