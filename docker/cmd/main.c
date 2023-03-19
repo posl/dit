@@ -777,7 +777,7 @@ int execute(const char *cmd_file, char * const argv[], int null_redirs){
  * @param[in]  pwdfd  file descriptor that serves as the current working directory
  * @param[in]  name  name of the directory we are currently looking at
  * @param[in]  callback  a callback function like "*at()" family of syscalls
- * @return bool  0 (success) or -1 (unexpected error)
+ * @return int  0 (success) or -1 (unexpected error)
  *
  * @attention the callback function is not called for the root directory specified at the first call.
  */

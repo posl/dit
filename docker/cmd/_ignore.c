@@ -400,7 +400,7 @@ exit:
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  successful or not
+ * @return bool  successful or not
  */
 static bool parse_additional_settings(ig_conds *data, int argc, char **argv, ig_opts *opt){
     assert(data);
