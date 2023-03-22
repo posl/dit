@@ -17,6 +17,8 @@
 
 #define XSTRCAT_INITIAL_MAX 120   // 2^n - 8
 
+#define NULLDEV_FILENO  open("/dev/null", (O_WRONLY | O_CLOEXEC))
+
 #define sigreset(sigdfl_int, sigdfl_quit, old_mask) \
     do { \
         sigaction(SIGINT, &sigdfl_int, NULL); \
@@ -702,28 +704,36 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
  *
  * @param[in]  cmd_file  command path
  * @param[in]  argv  NULL-terminated array of strings that are command line arguments
- * @param[in]  null_redirs  the number of file descriptors to discard output
+ * @param[in]  mode  some flags (bit 1: how to handle stdout, bit 2: be quiet)
  * @return int  0 (success), -1 (syscall error) or positive integer (command error)
  *
  * @note this function is to avoid the inefficiency and the inconvenience when using 'system' function.
  * @note signal handling conforms to the specifications of 'system' function.
  * @note 'pthread_sigmask' function is not used because it is not any of async-signal-safe functions.
- * @note discarding output is attempted on stdout and stderr, in that order.
- * @note report the exit status of the abnormally terminated command only when 'null_redirs' is 1.
+ * @note discards stdout if the LSB of 'mode' is set, otherwise groups stdout with stderr.
  * @note the exit status that can be returned as a return value is based on the shell's.
  *
  * @attention the subsequent processing should not be continued if this function returns a non-zero value.
  * @attention calling this function in a multithreaded process is not recommended.
  */
-int execute(const char *cmd_file, char * const argv[], int null_redirs){
+int execute(const char *cmd_file, char * const argv[], unsigned int mode){
     assert(cmd_file);
     assert(argv && argv[0]);
-    assert((null_redirs >= 0) && (null_redirs <= 2));
+    assert(mode < 4);
 
     struct sigaction new_act = {0}, sigdfl_int, sigdfl_quit;
     sigset_t old_mask;
     pid_t pid, err = 0;
     int tmp = 0, exit_status = -1;
+
+    if (! (mode & 0b10)){
+        fputc('+', stderr);
+
+        for (char * const *p_arg = argv; *p_arg; p_arg++)
+            print_sanitized_string(*p_arg);
+
+        fputc('\n', stderr);
+    }
 
     new_act.sa_handler = SIG_IGN;
     sigemptyset(&new_act.sa_mask);
@@ -738,14 +748,15 @@ int execute(const char *cmd_file, char * const argv[], int null_redirs){
             err = -1;
             break;
         case 0:   // child
-            if (null_redirs && ((tmp = open("/dev/null", (O_WRONLY | O_CLOEXEC))) != -1)){
-                do
-                    dup2(tmp, ((! --null_redirs) ? STDOUT_FILENO : STDERR_FILENO));
-                while (null_redirs);
+            tmp = STDERR_FILENO;
+            exit_status = 126;
+
+            if (! (((mode & 0b01) && ((tmp = NULLDEV_FILENO) == -1)) || (dup2(tmp, STDOUT_FILENO) == -1))){
+                sigreset(sigdfl_int, sigdfl_quit, old_mask);
+                execv(cmd_file, argv);
+                exit_status++;
             }
-            sigreset(sigdfl_int, sigdfl_quit, old_mask);
-            execv(cmd_file, argv);
-            _exit(127);
+            _exit(exit_status);
         default:  // parent
             while (((err = waitpid(pid, &tmp, 0)) == -1) && (errno == EINTR));
             break;
@@ -762,7 +773,7 @@ int execute(const char *cmd_file, char * const argv[], int null_redirs){
                 exit_status += WTERMSIG(tmp);
         }
     }
-    if ((null_redirs == 1) ? exit_status : (exit_status < 0))
+    if ((mode & 0b10) ? (exit_status < 0) : exit_status)
         xperror_child_process(argv[0], exit_status);
 
     return exit_status;
@@ -1170,6 +1181,8 @@ char *get_suffix(char *target, int delimiter, bool retain){
 }
 
 
+
+
 /**
  * @brief get the sanitized string for display.
  *
@@ -1224,6 +1237,27 @@ size_t get_sanitized_string(char *dest, const char *target, bool quoted){
 
     assert(buf >= dest);
     return (size_t) (buf - dest);
+}
+
+
+/**
+ * @brief print the sanitized string to stderr.
+ *
+ * @param[in]  target  target string
+ *
+ * @note add a space before the target string and display it.
+ */
+void print_sanitized_string(const char *target){
+    assert(target);
+
+    size_t size;
+    size = (strlen(target) * 4 + 1) + 1;
+
+    char buf[size];
+    get_sanitized_string((buf + 1), target, false);
+
+    *buf = ' ';
+    fputs(buf, stderr);
 }
 
 
@@ -1581,35 +1615,28 @@ static void xstrcat_inf_len_test(void){
 
 
 static void execute_test(void){
-    char * const argv[] = { "cat", NULL };
+    char * const argv[] = { "cat", "-", NULL };
 
     int i, c, exit_status;
     const char *addition;
-    char cmdline[32];
 
     for (i = 0; i < 2; i++){
         if (! i){
             c = 'D';
-            addition = "-";
             exit_status = 0;
+            addition = "1>&2";
         }
         else {
             c = 'C';
-            addition = "> /dev/null";
             exit_status = 128 + SIGINT;
+            addition = "> /dev/null";
         }
 
         fprintf(stderr, "\nChecking if child process can be exited by 'Ctrl + %c' ...\n", c);
 
-        c = snprintf(cmdline, sizeof(cmdline), "+ cat %s", addition);
-        assert((c >= 0) && (c < sizeof(cmdline)));
-
-        puts(cmdline);
-
         assert(execute("/bin/cat", argv, i) == exit_status);
 
-        *cmdline = '-';
-        puts(cmdline);
+        fprintf(stderr, "- cat %s\n", addition);
 
         if (! check_if_visually_no_problem())
             assert(false);

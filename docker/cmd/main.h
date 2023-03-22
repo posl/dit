@@ -254,7 +254,7 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
     * Extensions of System Calls in Unix and C
 ******************************************************************************/
 
-int execute(const char *cmd_file, char * const argv[], int null_redirs);
+int execute(const char *cmd_file, char * const argv[], unsigned int mode);
 
 int walkat(int pwdfd, const char *name, int (* callback)(int, const char *, bool));
 
@@ -280,7 +280,9 @@ char *receive_dockerfile_instr(char *line, int *p_id);
 int get_file_size(const char *file_name);
 int get_last_exit_status(void);
 char *get_suffix(char *target, int delimiter, bool retain);
+
 size_t get_sanitized_string(char *dest, const char *target, bool quoted);
+void print_sanitized_string(const char *target);
 
 
 #endif // DOCKER_INTERACTIVE_TOOL
