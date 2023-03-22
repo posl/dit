@@ -7,7 +7,9 @@
  * @author Tsukasa Inada
  * @date 2022/09/09
  *
- * @note In the log-file, array size and the array are stored as size_t and unsigned char* respectively.
+ * @note In the log-file, array size and array of the number of previously reflected lines are stored.
+ * @note The data structure within the log-file is devised to avoid unreasonable increases in file size.
+ * @note The contents:  [  < size_t >  < unsigned char > ...  ( < int > ... )  ]
  */
 
 #include "main.h"
@@ -51,8 +53,10 @@ typedef struct {
 /** Data type for storing some log-data recorded in the log-file */
 typedef struct {
     int total;               /** the total number of reflected lines */
-    size_t size;             /** the size of array containing the log-data */
-    unsigned char *array;    /** array of the number of previously reflected lines */
+    size_t array_size;       /** the size of array below */
+    unsigned char *array;    /** array of the number of previously reflected lines less than 'UCHAR_MAX' */
+    size_t extra_size;       /** the size of additional array below */
+    int *extra;              /** additional array of the number of previously reflected lines */
     int *p_provlog;          /** variable to store the provisional number of reflected lines */
     bool reset_flag;         /** whether to reset the log-file */
 } erase_logs;
@@ -92,7 +96,7 @@ static int confirm_deleted_lines(erase_data *data, const erase_opts *opt, const 
 static bool receive_range_specification(char *range, int stop, unsigned int *check_list);
 static int popcount_check_list(unsigned int *check_list, size_t size);
 
-static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, bool concat_flag);
+static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, int concat_flag);
 
 
 extern const char * const assume_args[ARGS_NUM];
@@ -532,8 +536,11 @@ static int construct_erase_data(erase_data *data, int target_c, int provlogs[2],
     data->lines_num = 0;
     data->lines = NULL;
     data->check_list = NULL;
-    data->logs->size = 0;
+
+    data->logs->array_size = 0;
     data->logs->array = NULL;
+    data->logs->extra_size = 0;
+    data->logs->extra = NULL;
 
     if (target_c == 'd'){
         data->logs->p_provlog = provlogs;
@@ -562,7 +569,7 @@ static int construct_erase_data(erase_data *data, int target_c, int provlogs[2],
             data->logs->total = data->lines_num;
             *(data->logs->p_provlog) = 0;
         }
-        if (! (data->logs->reset_flag || manage_erase_logs(log_file, 'r', data->logs, false))){
+        if (! (data->logs->reset_flag || manage_erase_logs(log_file, 'r', data->logs, no_delete))){
             if (! data->logs->reset_flag){
                 if (! (no_delete && *(data->logs->p_provlog)))
                     mode_c = '\0';
@@ -845,25 +852,33 @@ static void marklines_to_undo(erase_data *data, int undoes){
     assert(data->logs);
 
     if (undoes > 0){
-        if ((! data->logs->reset_flag) && (data->logs->size > 0)){
-            assert(data->logs->total > 0);
-            assert(data->logs->size < INT_MAX);
+        if ((! data->logs->reset_flag) && (data->logs->total > 0)){
+            assert(data->logs->array_size > 0);
             assert(data->logs->array);
 
             unsigned int i;
-            unsigned char *logs_array;
+            unsigned char *array;
+            int *extra, num;
 
             i = data->logs->total;
-            logs_array = data->logs->array + data->logs->size;
+            array = data->logs->array + data->logs->array_size;
+            extra = data->logs->extra + data->logs->extra_size;
 
-            if (undoes > data->logs->size)
-                undoes = data->logs->size;
+            if (undoes > data->logs->array_size)
+                undoes = data->logs->array_size;
 
             assert(undoes > 0);
 
-            do
-                i -= *(--logs_array);
-            while (--undoes);
+            do {
+                if ((num = *(--array)) == UCHAR_MAX){
+                    assert(data->logs->extra);
+                    assert(data->logs->extra_size > 0);
+
+                    num = *(--extra);
+                    assert(num >= UCHAR_MAX);
+                }
+                i -= num;
+            } while (--undoes);
 
             for (; i < data->logs->total; i++)
                 setbit_check_list(data->check_list, i);
@@ -935,15 +950,20 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
 
             if ((result_fp = fopen(result_file, "w"))){
                 if ((target_fp = fopen(target_file, "w"))){
+                    int total, accum = 0, num;
+                    unsigned char *array;
+                    int *extra;
                     const char *line;
-                    int total, accum = 0, logs_idx = -1;
                     unsigned int i = 0;
 
                     offset = 0;
                     exit_status = SUCCESS;
                     mode_c = 'w';
-                    line = data->lines;
                     total = data->logs->total;
+
+                    array = data->logs->array - 1;
+                    extra = data->logs->extra - 1;
+                    line = data->lines;
 
                     do {
                         if (getbit_check_list(data->check_list, i)){
@@ -954,9 +974,18 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
                                 if (! data->logs->reset_flag){
                                     assert(data->logs->array);
 
-                                    while (i >= accum)
-                                        accum += data->logs->array[++logs_idx];
-                                    data->logs->array[logs_idx]--;
+                                    while (i >= accum){
+                                        if ((num = *(++array)) == UCHAR_MAX){
+                                            assert(data->logs->extra);
+
+                                            num = *(++extra);
+                                            assert(num >= UCHAR_MAX);
+                                        }
+                                        accum += num;
+                                    }
+
+                                    if ((*array < UCHAR_MAX) || ((*extra)-- == UCHAR_MAX))
+                                        (*array)--;
                                 }
                             }
                             else
@@ -988,21 +1017,20 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
                         line += strlen(line) + 1;
                     } while (true);
 
-                    if (! data->logs->reset_flag){
-                        assert(data->logs->size < INT_MAX);
-                        assert(data->logs->array);
+                    if ((! data->logs->reset_flag) && data->logs->extra){
+                        assert((data->logs->extra_size > 0) && (data->logs->extra_size <= INT_MAX));
 
-                        logs_idx = 0;
+                        total = data->logs->extra_size;
+                        accum = 0;
+                        extra = data->logs->extra;
 
-                        for (i = 0; i < data->logs->size; i++){
-                            if (! data->logs->array[i])
-                                logs_idx++;
-                            else if (logs_idx)
-                                data->logs->array[i - logs_idx] = data->logs->array[i];
-                        }
+                        do
+                            if ((num = *(extra++)) >= UCHAR_MAX)
+                                data->logs->extra[accum++] = num;
+                        while (--total);
 
-                        data->logs->size -= logs_idx;
-                        assert(data->logs->size < INT_MAX);
+                        data->logs->extra_size = accum;
+                        assert(data->logs->extra_size <= INT_MAX);
                     }
 
                     fclose(target_fp);
@@ -1375,27 +1403,29 @@ static int popcount_check_list(unsigned int *check_list, size_t size){
  * @param[in]  concat_flag  whether to reflect the provisional number of reflected lines in the log-file
  * @return int  0 (success) or -1 (unexpected error)
  *
- * @note when the return value is set to 0, reading or writing of the log-file are completed successfully.
+ * @note when the return value is set to 0, reading or writing the log-file are completed successfully.
  * @note when 'logs->reset_flag' is set to false, array of the log-data and its size are correctly updated.
+ * @note if 'concat_flag' is set to true, allocates the extra memory for one element of the array.
  * @note except when reading the log-data, releases the dynamic memory that is no longer needed.
  *
  * @attention 'logs' is not initialized in this function so that you can do write operations without reading.
  * @attention must not exit after only reading the log-data, as dynamic memory cannot be released.
  */
-static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, bool concat_flag){
+static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, int concat_flag){
     assert(file_name);
     assert((mode_c == 'r') || (mode_c == 'w') || (! mode_c));
     assert(logs);
     assert(logs->total >= 0);
     assert(logs->p_provlog && (*(logs->p_provlog) >= 0));
+    assert(concat_flag == ((bool) concat_flag));
 
     char fm[] = "rb";
     FILE *fp = NULL;
     int exit_status = SUCCESS;
 
-    size_t logs_size, total = 0;
-    void *ptr;
-    div_t tmp;
+    size_t size, addition = 0;
+    unsigned char *array, val;
+    int total = 0, *extra, num;
 
     if (mode_c){
         fm[0] = mode_c;
@@ -1407,17 +1437,42 @@ static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs
         case 'r':
             logs->reset_flag = true;
 
-            if (fp && (fread(&logs_size, sizeof(logs_size), 1, fp) == 1)){
-                if (logs_size){
-                    if ((logs_size < INT_MAX) && (ptr = malloc(sizeof(unsigned char) * logs_size))){
-                        logs->size = logs_size;
-                        logs->array = (unsigned char *) ptr;
+            if (fp && (fread(&size, sizeof(size), 1, fp) == 1)){
+                if (size){
+                    if ((array = (unsigned char *) malloc(sizeof(unsigned char) * (size + concat_flag)))){
+                        logs->array_size = size;
+                        logs->array = array;
 
-                        if (fread(logs->array, sizeof(unsigned char), logs_size, fp) == logs_size){
-                            exit_status = SUCCESS;
+                        if (fread(array, sizeof(unsigned char), size, fp) == size){
+                            do
+                                if ((val = *(array++)) < UCHAR_MAX){
+                                    total += val;
+                                    if (total < val)
+                                        goto exit;
+                                }
+                                else
+                                    addition++;
+                            while (--size);
 
-                            while (logs_size--)
-                                total += logs->array[logs_size];
+                            if (addition){
+                                if ((extra = (int *) malloc(sizeof(int) * (addition + concat_flag)))){
+                                    logs->extra_size = addition;
+                                    logs->extra = extra;
+
+                                    if (fread(extra, sizeof(int), addition, fp) == addition){
+                                        do {
+                                            num = *(extra++);
+                                            total += num;
+                                            if (total < num)
+                                                goto exit;
+                                        } while (--addition);
+
+                                        exit_status = SUCCESS;
+                                    }
+                                }
+                            }
+                            else
+                                exit_status = SUCCESS;
                         }
                     }
                 }
@@ -1430,49 +1485,73 @@ static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs
             break;
         case 'w':
             if (fp){
+                exit_status = SUCCESS;
+                size = logs->array_size;
+                addition = logs->extra_size;
+                array = logs->array;
+                extra = logs->extra;
+
                 if (logs->reset_flag){
                     total = logs->total;
-                    if (concat_flag)
-                        total += *(logs->p_provlog);
-
-                    logs->size = 0;
+                    size = 0;
+                    addition = 0;
                 }
-                else if (concat_flag)
-                    total = *(logs->p_provlog);
+                if (concat_flag){
+                    total += *(logs->p_provlog);
+                    assert(total >= *(logs->p_provlog));
+                }
 
-                exit_status = SUCCESS;
+                if ((total > 0) || concat_flag){
+                    assert(total >= 0);
 
-                if (total){
-                    assert(total > 0);
-                    tmp = div((total - 1), UCHAR_MAX);
+                    if (total < UCHAR_MAX){
+                        val = total;
+                        num = -1;
+                    }
+                    else {
+                        val = UCHAR_MAX;
+                        num = total;
+                    }
 
-                    logs_size = tmp.quot + 1;
-                    assert(logs_size < INT_MAX);
-                    assert(logs->size < (INT_MAX - logs_size));
-
-                    if ((ptr = realloc(logs->array, (sizeof(unsigned char) * (logs->size + logs_size))))){
-                        logs->array = (unsigned char *) ptr;
-                        memset((logs->array + logs->size), UCHAR_MAX, tmp.quot);
-
-                        logs->size += logs_size;
-                        logs->array[logs->size - 1] = tmp.rem + 1;
+                    if (! array){
+                        assert(! size);
+                        array = &val;
+                        size = 1;
                     }
                     else
-                        exit_status = UNEXPECTED_ERROR;
+                        array[size++] = val;
+
+                    if (num >= UCHAR_MAX){
+                        if (! extra){
+                            assert(! addition);
+                            extra = &num;
+                            addition = 1;
+                        }
+                        else
+                            extra[addition++] = num;
+                    }
                 }
 
-                if (! exit_status){
-                    fwrite(&(logs->size), sizeof(logs->size), 1, fp);
+                fwrite(&size, sizeof(size), 1, fp);
 
-                    if (logs->size)
-                        fwrite(logs->array, sizeof(unsigned char), logs->size, fp);
+                if (size){
+                    assert(array);
+                    fwrite(array, sizeof(unsigned char), size, fp);
+
+                    if (addition){
+                        assert(extra);
+                        fwrite(extra, sizeof(int), addition, fp);
+                    }
                 }
             }
         default:
             if (logs->array)
                 free(logs->array);
+            if (logs->extra)
+                free(logs->extra);
     }
 
+exit:
     if (fp)
         fclose(fp);
 
@@ -1507,6 +1586,7 @@ static void manage_erase_logs_test(void);
 
 void erase_test(void){
     assert(sizeof(unsigned int) >= 4);
+    assert(UCHAR_MAX == 255);
 
     do_test(assign_exit_status_macro_test);
     do_test(getsize_check_list_macro_test);
@@ -1781,22 +1861,30 @@ static void marklines_with_numbers_test(void){
 
 static void marklines_to_undo_test(void){
     // changeable part for updating test cases
-    unsigned char logs_array[] = {15, 3, 4, 1, 5, 2, 2, 4, 1, 3};
+    unsigned char array[] = { 255, 37, 0, 4, 1, 15, 255, 0, 4, 0 };
+    int extra[] = { 297, 255 };
+
+    const size_t array_size = sizeof(array) / sizeof(*array);
+    const size_t extra_size = sizeof(extra) / sizeof(*extra);
 
 
-    int i;
-    const size_t logs_size = sizeof(logs_array) / sizeof(*logs_array);
-    size_t total = 0;
+    unsigned int i, j, *check_list;
+    size_t total = 0, totals[array_size], list_size;
 
-    for (i = 0; i < logs_size; i++)
-        total += logs_array[i];
+    for (i = 0, j = 0; i < array_size; i++){
+        totals[array_size - i - 1] = total;
+        total += (array[i] < UCHAR_MAX) ? array[i] : extra[j++];
+    }
+
+    assert(i == array_size);
+    assert(j == extra_size);
 
 
-    unsigned int *check_list;
-    assert((check_list = calloc(getsize_check_list(total), sizeof(unsigned int))));
+    list_size = getsize_check_list(total);
+    assert((check_list = calloc(list_size, sizeof(unsigned int))));
 
-    erase_logs logs = { .total = total, .array = logs_array };
-    erase_data data = { .check_list = check_list, .logs = &logs };
+    erase_logs logs = { .array_size = array_size, .array = array, .extra_size = extra_size, .extra = extra };
+    erase_data data = { .list_size = list_size, .check_list = check_list, .logs = &logs };
 
 
     // when returning without marking the lines to be deleted
@@ -1805,36 +1893,36 @@ static void marklines_to_undo_test(void){
 
     marklines_to_undo(&data, 0);
     assert(data.first_mark);
-    assert(! check_list[0]);
-    assert(! check_list[1]);
+
+    for (i = list_size; i--;)
+        assert(! check_list[i]);
 
 
-    logs.size = logs_size;
+    logs.total = total;
     logs.reset_flag = false;
 
     if (rand() % 2)
-        logs.size = 0;
+        logs.total = 0;
     else
         logs.reset_flag = true;
 
     marklines_to_undo(&data, 1);
     assert(! data.first_mark);
-    assert(! check_list[0]);
-    assert(! check_list[1]);
+
+    for (i = list_size; i--;)
+        assert(! check_list[i]);
 
 
     // when recording that a few lines will be deleted from the end
 
-    unsigned int j, idx, mask;
+    unsigned int idx, mask;
 
-    logs.size = logs_size;
+    logs.total = total;
     logs.reset_flag = false;
 
-    for (i = 0; i++ < logs_size;){
-        check_list[0] = 0;
-        check_list[1] = 0;
+    for (i = 0; i < array_size;){
         data.first_mark = true;
-        total -= logs_array[logs_size - i];
+        total = totals[i++];
 
         marklines_to_undo(&data, i);
         assert(! data.first_mark);
@@ -1976,105 +2064,165 @@ static void popcount_check_list_test(void){
 static void manage_erase_logs_test(void){
     // when specifying a vvalid log-file
 
-    const unsigned char ucm = UCHAR_MAX;
-
     const struct {
         const int total;
         const int provlog;
+        const bool concat_flag;
 
         const struct {
-            const int flag;
-            const size_t size;
-            const unsigned char array[4];
+            const int reset_flag;
+            const int array[4];
+            const int extra[4];
         } read_result;
 
         const struct {
-            const int flag;
-            const size_t size;
-            const unsigned char array[4];
+            const int reset_flag;
+            const int array[4];
+            const int extra[4];
         } write_input;
     }
     // changeable part for updating test cases
     table[] = {
-        {   0,   0, {   -1,  0, {0}                  }, { false, 0, {0}       } },
-        {   0, 755, { false, 0, {0}                  }, {  true, 0, {0}       } },
-        { 755,   0, { false, 3, {ucm, ucm, 245}      }, { false, 2, {245, 88} } },
-        { 634, 333, {  true, 2, {245, 88}            }, {  true, 0, {0}       } },
-        { 967,   0, { false, 4, {ucm, ucm, ucm, 202} }, {   -1,  0, {0}       } },
-        {  -1,   0, {0},                                {0}                     }
+        {
+                0, 0, false,
+            {   -1, { -1 }, { -1 } },
+            { true, { -1 }, { -1 } }
+        },
+        {
+                0, 123, true,
+            { false, { -1 }, { -1 } },
+            { false, { -1 }, { -1 } }
+        },
+        {
+                123, 0, true,
+            { false, { 123, -1 }, { -1 } },
+            { false, {  62, -1 }, { -1 } }
+        },
+        {
+                62, 19, true,
+            { false, {    62, 0, -1 }, { -1 } },
+            {  true, { 0,  0, 0, -1 }, { -1 } }
+        },
+        {
+                43, 0, false,
+            {  true, {  81, -1 }, { -1 } },
+            { false, { 254, -1 }, { -1 } }
+        },
+        {
+                254, 255, true,
+            { false, { 254, -1 }, { -1 } },
+            { false, {  97, -1 }, { -1 } }
+        },
+        {
+                352, 0, false,
+            { false, { 97, 255, -1 }, { 255, -1 } },
+            {  true, { 97, 200, -1 }, { -1 } }
+        },
+        {
+                352, 255, true,
+            { false, { 255, -1 }, { 352, -1 } },
+            { false, { 255, -1 }, { 255, -1 } }
+        },
+        {
+                0, 0, false,
+            {  true, { 255, 255, -1 }, { 255, 255, -1 } },
+            {  true, {  47, 255, -1 }, {      255, -1 } }
+        },
+        {
+                0, 0, false,
+            { false, { -1 }, { -1 } },
+            {    -1, { -1 }, { -1 } }
+        },
+        {
+            -1, 0, false, { 0 }, { 0 }
+        }
     };
 
 
     int i, provlog, tmp;
     erase_logs logs = { .p_provlog = &provlog };
-    size_t logs_idx;
-    FILE *fp;
 
     assert((i = open(TMP_FILE1, (O_RDWR | O_CREAT | O_TRUNC))) != -1);
     assert(! close(i));
 
 
     for (i = 0; table[i].total >= 0; i++){
-        logs.total = table[i].total;
-        logs.size = 0;
+        logs.array_size = 0;
         logs.array = NULL;
+        logs.extra_size = 0;
+        logs.extra = NULL;
+
+        logs.total = table[i].total;
         provlog = table[i].provlog;
 
         tmp = SUCCESS;
-        if (table[i].read_result.flag < 0)
+        if (table[i].read_result.reset_flag < 0)
             tmp = UNEXPECTED_ERROR;
 
-        assert(manage_erase_logs(TMP_FILE1, 'r', &logs, false) == tmp);
-        assert(logs.size == table[i].read_result.size);
-
-        for (logs_idx = logs.size; logs_idx--;)
-            assert(logs.array[logs_idx] == table[i].read_result.array[logs_idx]);
-
-        assert(logs.reset_flag == ((bool) table[i].read_result.flag));
+        assert(manage_erase_logs(TMP_FILE1, 'r', &logs, table[i].concat_flag) == tmp);
         assert(provlog == table[i].provlog);
+        assert(logs.reset_flag == ((bool) table[i].read_result.reset_flag));
+
+        for (tmp = 0; table[i].read_result.array[tmp] >= 0; tmp++){
+            assert(logs.array_size-- > 0);
+            assert(logs.array[tmp] == table[i].read_result.array[tmp]);
+        }
+        assert(! logs.array_size);
+
+        for (tmp = 0; table[i].read_result.extra[tmp] >= 0; tmp++){
+            assert(logs.extra_size-- > 0);
+            assert(logs.extra[tmp] == table[i].read_result.extra[tmp]);
+        }
+        assert(! logs.extra_size);
+
+        logs.reset_flag = table[i].write_input.reset_flag;
+
+        for (tmp = 0; table[i].write_input.array[tmp] >= 0; tmp++){
+            logs.array_size++;
+            logs.array[tmp] = table[i].write_input.array[tmp];
+        }
+
+        for (tmp = 0; table[i].write_input.extra[tmp] >= 0; tmp++){
+            logs.extra_size++;
+            logs.extra[tmp] = table[i].write_input.extra[tmp];
+        }
 
         tmp = 'w';
-        if (table[i].write_input.flag < 0)
+        if (table[i].write_input.reset_flag < 0)
             tmp = '\0';
 
-        for (logs_idx = (logs.size = table[i].write_input.size); logs_idx--;)
-            logs.array[logs_idx] = table[i].write_input.array[logs_idx];
-
-        assert(manage_erase_logs(TMP_FILE1, tmp, &logs, ((bool) table[i].write_input.flag)) == SUCCESS);
+        assert(manage_erase_logs(TMP_FILE1, tmp, &logs, table[i].concat_flag) == SUCCESS);
 
         print_progress_test_loop('\0', -1, i);
-        fputs("confirmed log-data:  [ ", stderr);
-
-        for (logs_idx = 0; logs_idx < table[i].read_result.size; logs_idx++)
-            fprintf(stderr, "%d ", table[i].read_result.array[logs_idx]);
-
-        fputs("]\n", stderr);
+        fprintf(stderr, "total:  %3d\n", table[i].total);
     }
 
 
     // when specifying an invalid log-file
 
-    logs.size = 3;
+    FILE *fp;
+
+    logs.array_size = 3;
 
     for (i = 1;; i--){
         if (i){
             assert((fp = fopen(TMP_FILE1, "wb")));
-            assert(fwrite(&(logs.size), sizeof(logs.size), 1, fp) == 1);
+            assert(fwrite(&(logs.array_size), sizeof(logs.array_size), 1, fp) == 1);
             assert(! fclose(fp));
         }
         else
             assert(! unlink(TMP_FILE1));
 
-        logs.size = 0;
+        logs.array_size = 0;
         logs.array = NULL;
 
         assert(manage_erase_logs(TMP_FILE1, 'r', &logs, false) == UNEXPECTED_ERROR);
         assert(manage_erase_logs(TMP_FILE1, '\0', &logs, true) == SUCCESS);
 
         if (i)
-            assert(logs.size == 3);
+            assert(logs.array_size == 3);
         else {
-            assert(! logs.size);
+            assert(! logs.array_size);
             assert(! logs.array);
             break;
         }
