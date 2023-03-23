@@ -38,6 +38,25 @@ typedef struct {
 } xfgets_info;
 
 
+/** array of the names of the target files */
+const char * const target_files[2] = {
+    HISTORY_FILE,
+    DOCKER_FILE_DRAFT
+};
+
+/** array of the names of files for storing the result of the previous dit command 'convert' */
+const char * const convert_results[2] = {
+    CONVERT_RESULT_FILE_H,
+    CONVERT_RESULT_FILE_D
+};
+
+/** array of the names of files for storing the previous deleted lines from the target files */
+const char * const erase_results[2] = {
+    ERASE_RESULT_FILE_H,
+    ERASE_RESULT_FILE_D
+};
+
+
 /** array of strings in alphabetical order representing each dit command */
 const char * const cmd_reprs[CMDS_NUM] = {
     "cmd",

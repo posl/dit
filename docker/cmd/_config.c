@@ -231,10 +231,12 @@ static int config_contents(unsigned int code, ...){
  * @param[in]  config_arg  string for determining the modes
  * @param[out] modes  array for storing the modes used when reflecting in Dockerfile and history-file
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
+ *
+ * @note the modes are stored in order, one for the history-file and one for the Dockerfile.
  */
 int get_config(const char *config_arg, int modes[2]){
     assert(CONF_GET_FROM_CONVERT == 4);
-    return config_contents(CONF_GET_FROM_CONVERT, config_arg, modes, (modes + 1));
+    return config_contents(CONF_GET_FROM_CONVERT, config_arg, (modes + 1), modes);
 }
 
 

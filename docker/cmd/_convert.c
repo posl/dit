@@ -4,6 +4,9 @@
 #define COMMAND_LINE_FILE "/dit/srv/last-command-line"
 
 
+extern const char * const convert_results[2];
+
+
 
 
 int convert(int argc, char **argv){
@@ -11,12 +14,12 @@ int convert(int argc, char **argv){
 
     if (! get_last_exit_status()){
         char *line;
-        int errid = 0;
+        int offset = 0;
         bool first_line = true;
 
-        while (xfgets_for_loop(COMMAND_LINE_FILE, &line, &errid)){
+        while (xfgets_for_loop(COMMAND_LINE_FILE, &line, &offset)){
             if (! first_line)
-                errid = -1;
+                offset = -1;
 
             first_line = false;
         }
@@ -24,32 +27,23 @@ int convert(int argc, char **argv){
         if (line){
             int modes[2];
 
-            if (! (errid || get_config(NULL, modes))){
-                int offset = 0, mode;
-                const char *file_name;
+            if (! (offset || get_config(NULL, modes))){
                 FILE* fp;
 
                 exit_status = SUCCESS;
+                offset = 2;
 
-                do {
-                    if (! offset){
-                        mode = modes[0];
-                        file_name = CONVERT_RESULT_FILE_D;
-                    }
-                    else {
-                        mode = modes[1];
-                        file_name = CONVERT_RESULT_FILE_H;
-                    }
+                do
+                    if (modes[--offset] && (fp = fopen(convert_results[offset], "w"))){
+                        if (offset)
+                            fputs("RUN ", fp);
 
-                    if (mode && (fp = fopen(file_name, "w"))){
-                        fprintf(fp, ("RUN %s\n" + offset), line);
+                        fputs(line, fp);
+                        fputc('\n', fp);
+
                         fclose(fp);
                     }
-
-                    if (offset)
-                        break;
-                    offset = 4;
-                } while (true);
+                while (offset);
             }
 
             free(line);

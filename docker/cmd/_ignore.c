@@ -1057,18 +1057,18 @@ static bool append_ignore_set(yyjson_mut_doc *mdoc, const ig_conds *data, const 
 /**
  * @brief load the ignore-file into memory as a JSON data.
  *
- * @param[in]  offset  1 (for Dockerfile), 0 (for history-file)
+ * @param[in]  target_id  1 (targets Dockerfile), 0 (targets history-file)
  * @param[in]  original  whether to use the original ignore-file
  * @return bool  successful or not
  *
  * @attention the JSON data must be properly unloaded when finished using.
  */
-bool load_ignore_file(int offset, int original){
+bool load_ignore_file(int target_id, int original){
     assert(! idoc);
-    assert(offset == ((bool) offset));
+    assert(target_id == ((bool) target_id));
     assert(original == ((bool) original));
 
-    idoc = yyjson_read_file(ignore_files[original][offset], 0, NULL, NULL);
+    idoc = yyjson_read_file(ignore_files[original][target_id], 0, NULL, NULL);
     return (bool) idoc;
 }
 

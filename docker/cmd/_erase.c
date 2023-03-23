@@ -21,7 +21,7 @@
 #define ERASE_OPTID_UNDOES 2
 #define ERASE_OPTID_MAX_COUNT 5
 
-#define if_any_set_unexpected_error(func_call, exit_status) \
+#define monitor_unexpected_error(func_call, exit_status) \
     if (func_call && (exit_status >= 0)) \
         exit_status = UNEXPECTED_ERROR - exit_status
 
@@ -86,7 +86,7 @@ static void display_prev_verbose(int target_c);
 
 static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func marklines_func);
 
-static int construct_erase_data(erase_data *data, int target_c, int provlogs[2], int purpose_c);
+static int construct_erase_data(erase_data *data, int target_id, int provlogs[2], int purpose_c);
 
 static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, erase_data *data);
 static int marklines_containing_pattern(erase_data *data, const char *pattern, bool ignore_case);
@@ -94,7 +94,7 @@ static int marklines_containing_pattern(erase_data *data, const char *pattern, b
 static int marklines_with_numbers(erase_data *data, const char *range);
 static void marklines_to_undo(erase_data *data, int undoes);
 
-static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both_flag);
+static int delete_marked_lines(erase_data *data, const erase_opts *opt, int target_id);
 static int confirm_deleted_lines(erase_data *data, const erase_opts *opt, const char *target_file);
 
 static bool receive_range_specification(char *range, int stop, unsigned int *check_list);
@@ -103,9 +103,19 @@ static int popcount_check_list(unsigned int *check_list, size_t size);
 static int manage_erase_logs(const char *file_name, int mode_c, erase_logs *logs, int concat_flag);
 
 
+extern const char * const target_files[2];
+extern const char * const erase_results[2];
+
 extern const char * const assume_args[ARGS_NUM];
 extern const char * const blank_args[ARGS_NUM];
 extern const char * const target_args[ARGS_NUM];
+
+
+/** array of the names of files for storing the number of previously reflected lines to the target files */
+static const char * const log_files[2] = {
+    ERASE_FILE_H
+    ERASE_FILE_D
+};
 
 
 
@@ -404,7 +414,7 @@ static void display_prev_verbose(int target_c){
  *
  * @param[in]  argc  the length of the argument vector below
  * @param[out] argv  array of the arguments used to determine which lines to delete
- * @param[out] opt  variable to store the results of option parse
+ * @param[in]  opt  variable to store the results of option parse
  * @param[in]  marklines_func  function that marks the lines to be deleted based on the options for deletion
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
@@ -415,51 +425,43 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
     assert(opt);
     assert(marklines_func);
 
-    bool both_flag = false, delopt_noerr = true;
-    int reflecteds[2] = {0}, tmp, exit_status = SUCCESS;
+    int reflecteds[2] = {0}, offset = 2, exit_status = SUCCESS, tmp;
+    bool delopt_noerr = true;
 
     erase_logs logs = {0};
     erase_data data = { .logs = &logs };
 
-    if (opt->target_c == 'b'){
-        opt->target_c = 'd';
-        both_flag = true;
-    }
-
     read_provisional_report(reflecteds);
 
-    do {
-        assert((opt->target_c == 'd') || (opt->target_c == 'h'));
+    do
+        if (opt->target_c != "dh"[--offset]){
+            assert(offset == ((bool) offset));
 
-        logs.reset_flag = opt->reset_flag;
-        if_any_set_unexpected_error(construct_erase_data(&data, opt->target_c, reflecteds, 'D'), exit_status);
+            logs.reset_flag = opt->reset_flag;
+            monitor_unexpected_error(construct_erase_data(&data, offset, reflecteds, 'D'), exit_status);
 
-        if (data.lines){
-            if (data.check_list){
-                if (delopt_noerr){
-                    data.first_mark = true;
-                    marklines_to_undo(&data, opt->undoes);
+            if (data.lines){
+                if (data.check_list){
+                    if (delopt_noerr){
+                        data.first_mark = true;
+                        marklines_to_undo(&data, opt->undoes);
 
-                    if (opt->has_delopt && marklines_func(argc, argv, opt, &data))
-                        delopt_noerr = false;
+                        if (opt->has_delopt && marklines_func(argc, argv, opt, &data))
+                            delopt_noerr = false;
+                    }
+
+                    tmp = delete_marked_lines(&data, (delopt_noerr ? opt : NULL), offset);
+                    if_necessary_assign_exit_status(tmp, exit_status);
+
+                    free(data.check_list);
                 }
 
-                tmp = delete_marked_lines(&data, opt, (delopt_noerr ? both_flag : -1));
-                if_necessary_assign_exit_status(tmp, exit_status);
-
-                free(data.check_list);
+                free(data.lines);
             }
-
-            free(data.lines);
         }
+    while (offset);
 
-        if (both_flag && (opt->target_c != 'h'))
-            opt->target_c = 'h';
-        else
-            break;
-    } while (true);
-
-    if_any_set_unexpected_error(write_provisional_report(reflecteds), exit_status);
+    monitor_unexpected_error(write_provisional_report(reflecteds), exit_status);
     return exit_status;
 }
 
@@ -514,7 +516,7 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
  * @brief check the consiestency of the target log-file and construct data as needed.
  *
  * @param[out] data  variable to store the data commonly used in this command
- * @param[in]  target_c  character representing the target file ('d' or 'h')
+ * @param[in]  target_id  1 (targets Dockerfile), 0 (targets history-file)
  * @param[in]  provlogs  array of length 2 for storing the provisional number of reflected lines
  * @param[in]  purpose_c  the purpose ('D' (to delete), 'H' (to show history) or 'L' (to update the log-data))
  * @return int  0 (success) or -1 (unexpected error)
@@ -525,9 +527,10 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
  *
  * @attention 'data->logs->reset_flag' must be appropriately initialized before calling this function.
  */
-static int construct_erase_data(erase_data *data, int target_c, int provlogs[2], int purpose_c){
+static int construct_erase_data(erase_data *data, int target_id, int provlogs[2], int purpose_c){
     assert(data);
     assert(data->logs);
+    assert(target_id == ((bool) target_id));
     assert(provlogs);
     assert((purpose_c == 'D') || (purpose_c == 'H') || (purpose_c == 'L') );
 
@@ -544,16 +547,9 @@ static int construct_erase_data(erase_data *data, int target_c, int provlogs[2],
     data->logs->extra_size = 0;
     data->logs->extra = NULL;
 
-    if (target_c == 'd'){
-        data->logs->p_provlog = provlogs;
-        target_file = DOCKER_FILE_DRAFT;
-        log_file = ERASE_FILE_D;
-    }
-    else {
-        data->logs->p_provlog = provlogs + 1;
-        target_file = HISTORY_FILE;
-        log_file = ERASE_FILE_H;
-    }
+    data->logs->p_provlog = provlogs + target_id;
+    target_file = target_files[target_id];
+    log_file = log_files[target_id];
 
     if (purpose_c != 'L'){
         p_start = &(data->lines);
@@ -605,11 +601,10 @@ static int construct_erase_data(erase_data *data, int target_c, int provlogs[2],
  */
 int update_erase_logs(int reflecteds[2]){
     assert(reflecteds);
-    assert(reflecteds[0] >= 0);
     assert(reflecteds[1] >= 0);
+    assert(reflecteds[0] >= 0);
 
-    const char *targets = "dh";
-    int exit_status = SUCCESS;
+    int offset = 2, exit_status = SUCCESS;
 
     erase_logs logs = {0};
     erase_data data = { .logs = &logs };
@@ -617,9 +612,9 @@ int update_erase_logs(int reflecteds[2]){
     do {
         logs.reset_flag = false;
 
-        if (construct_erase_data(&data, *targets, reflecteds, 'L'))
+        if (construct_erase_data(&data, (--offset), reflecteds, 'L'))
             exit_status = UNEXPECTED_ERROR;
-    } while (*(++targets));
+    } while (offset);
 
     return exit_status;
 }
@@ -897,8 +892,8 @@ static void marklines_to_undo(erase_data *data, int undoes){
  * @brief delete the lines recorded on checklist from the target file, and record this in the log-file.
  *
  * @param[out] data  variable to store the data commonly used in this command
- * @param[in]  opt  variable to store the results of option parse
- * @param[in]  both_flag  whether to edit both Dockerfile and history-file or -1
+ * @param[in]  opt  variable to store the results of option parse or NULL
+ * @param[in]  target_id  1 (targets Dockerfile), 0 (targets history-file)
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note modify the contents of the log-data as lines are deleted to properly update the log-file.
@@ -908,7 +903,7 @@ static void marklines_to_undo(erase_data *data, int undoes){
  * @attention 'data' must be reliably constructed before calling this function.
  * @attention must not call this function if the target file does not contain any lines that can be deleted.
  */
-static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both_flag){
+static int delete_marked_lines(erase_data *data, const erase_opts *opt, int target_id){
     assert(data);
     assert(data->lines_num > 0);
     assert(data->lines);
@@ -916,48 +911,34 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
     assert(data->logs);
     assert(data->logs->total >= 0);
     assert(data->logs->p_provlog);
-    assert(opt);
+    assert(target_id == ((bool) target_id));
 
-    int offset, exit_status = POSSIBLE_ERROR, mode_c = '\0';
-    const char *target_file, *result_file, *log_file;
+    int exit_status = POSSIBLE_ERROR, mode_c = '\0';
 
-    if (opt->target_c == 'd'){
-        offset = 1;
-        target_file = DOCKER_FILE_DRAFT;
-        result_file = ERASE_RESULT_FILE_D;
-        log_file = ERASE_FILE_D;
-    }
-    else {
-        offset = 0;
-        target_file = HISTORY_FILE;
-        result_file = ERASE_RESULT_FILE_H;
-        log_file = ERASE_FILE_H;
-    }
-
-    if (both_flag >= 0){
+    if (opt){
         exit_status = SUCCESS;
 
-        if (both_flag && opt->verbose)
-            print_target_repr(offset);
+        if (opt->verbose && (opt->target_c == 'b'))
+            print_target_repr(target_id);
 
-        if (confirm_deleted_lines(data, opt, target_file)){
-            FILE *result_fp, *target_fp, *fps[2] = {0};
+        if (confirm_deleted_lines(data, opt, target_files[target_id])){
+            FILE *result_fp, *target_fp;
 
             exit_status = FATAL_ERROR;
 
-            if ((result_fp = fopen(result_file, "w"))){
-                if ((target_fp = fopen(target_file, "w"))){
-                    int total, accum = 0, num;
+            if ((result_fp = fopen(erase_results[target_id], "w"))){
+                if ((target_fp = fopen(target_files[target_id], "w"))){
+                    int total, accum = 0, num, offset = 0;
                     unsigned char *array;
                     int *extra;
                     const char *line;
                     unsigned int i = 0;
+                    FILE *fps[2] = {0};
 
-                    offset = 0;
                     exit_status = SUCCESS;
                     mode_c = 'w';
-                    total = data->logs->total;
 
+                    total = data->logs->total;
                     array = data->logs->array - 1;
                     extra = data->logs->extra - 1;
                     line = data->lines;
@@ -1041,7 +1022,7 @@ static int delete_marked_lines(erase_data *data, const erase_opts *opt, int both
     if (data->logs->reset_flag)
         mode_c = 'w';
 
-    if_any_set_unexpected_error(manage_erase_logs(log_file, mode_c, data->logs, false), exit_status);
+    monitor_unexpected_error(manage_erase_logs(log_files[target_id], mode_c, data->logs, false), exit_status);
     return exit_status;
 }
 
