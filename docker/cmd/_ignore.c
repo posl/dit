@@ -115,6 +115,13 @@ static const char * const conds_keys[IG_CONDITIONS_NUM] = {
 static const int has_arg_table[3] = { no_argument, required_argument, optional_argument };
 
 
+/** array for storing the error information when reading an each ignore-file */
+static struct {
+    const char *file_name;
+    yyjson_read_err info;
+} read_errs[2];
+
+
 /** immutable JSON data that is the contents of the ignore-file (to use 'check_if_ignored' as callback) */
 static yyjson_doc *idoc = NULL;
 
@@ -149,8 +156,14 @@ int ignore(int argc, char **argv){
 
     if (exit_status){
         if (exit_status < 0){
+            i = 2;
             exit_status = FAILURE;
-            xperror_internal_file();
+            do
+                if (read_errs[--i].file_name){
+                    assert(read_errs[i].info.msg);
+                    xperror_message(read_errs[i].info.msg, read_errs[i].file_name);
+                }
+            while (i);
         }
         xperror_suggestion(true);
     }
@@ -328,7 +341,7 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
             assert(offset == ((bool) offset));
             file_name = ignore_files[opt->reset_flag][offset];
 
-            if ((idoc = yyjson_read_file(file_name, 0, NULL, NULL))){
+            if ((idoc = yyjson_read_file(file_name, 0, NULL, &(read_errs[offset].info)))){
                 mdoc = NULL;
                 success = true;
 
@@ -365,8 +378,10 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
                 if (! (success || exit_status))
                     exit_status = POSSIBLE_ERROR;
             }
-            else
+            else {
+                read_errs[offset].file_name = file_name;
                 exit_status = UNEXPECTED_ERROR;
+            }
         }
     while (offset);
 

@@ -333,6 +333,12 @@ read -r REPLY
 
 # failure cases
 
+: 'warning: the target files should not be deleted. (with error message)'
+rm -f /dit/mnt/Dockerfile.draft /dit/mnt/.dit_history
+dit erase -dh
+read -r REPLY
+
+
 init_target_file d
 init_target_file h
 echo
@@ -365,10 +371,6 @@ read -r REPLY
 dit erase -dh -m -5 && exit 1
 read -r REPLY
 
-: 'error: the target files must be specified explicitly.'
-dit erase && exit 1
-read -r REPLY
-
 
 : 'error: the answer to the confirmation before deletion must be set from the following 3 ones.'
 dit erase -dh --assume EXIT && exit 1
@@ -383,11 +385,10 @@ dit erase -dh --targ Both && exit 1
 read -r REPLY
 
 
-: 'error: this command takes no non-optional arguments.'
-dit erase -dh regexp.txt && exit 1
+: 'error: the target files must be specified explicitly.'
+dit erase && exit 1
 read -r REPLY
 
-: 'error: must not execute this command if target files have been deleted.'
-rm -f /dit/mnt/Dockerfile.draft /dit/mnt/.dit_history
-dit erase -dh && exit 1
+: 'error: this command takes no non-optional arguments.'
+dit erase -dh regexp.txt && exit 1
 read -r REPLY
