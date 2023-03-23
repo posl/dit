@@ -83,7 +83,7 @@ static int parse_optargs(const char *target, ig_conds *data, optarg_info *p_info
 static bool append_optarg(ig_conds *data, const optarg_info *p_info, const char *nothing);
 static bool append_first_args(ig_conds *data, int argc, char **argv, ig_opts *opt);
 
-static void display_ignore_set(int argc, char **argv, yyjson_write_err *err);
+static void display_ignore_set(int argc, char **argv);
 static bool edit_ignore_set(yyjson_mut_doc *mdoc, int argc, char **argv, const ig_opts *opt);
 static bool append_ignore_set(yyjson_mut_doc *mdoc, const ig_conds *data, const ig_opts *opt);
 
@@ -147,8 +147,13 @@ int ignore(int argc, char **argv){
     else if (i > 0)
         exit_status = SUCCESS;
 
-    if (exit_status)
+    if (exit_status){
+        if (exit_status < 0){
+            exit_status = FAILURE;
+            xperror_internal_file();
+        }
         xperror_suggestion(true);
+    }
     return exit_status;
 }
 
@@ -289,22 +294,19 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  command's exit status
+ * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
  *
  * @note when appending ignored commands with detailed conditions, argument parsing is done first.
  */
 static int ignore_contents(int argc, char **argv, ig_opts *opt){
     assert(opt);
-    assert((opt->target_c == 'd') || (opt->target_c == 'h') || (opt->target_c == 'b'));
+    assert((opt->target_c == 'b') || (opt->target_c == 'd') || (opt->target_c == 'h'));
 
     ig_conds data = {0};
-    int offset = 1, exit_status = FAILURE;
-    const char *file_name, *errmsg;
-    bool success;
-
-    yyjson_read_err read_err;
+    int exit_status = POSSIBLE_ERROR, offset = 2;
+    const char *file_name;
     yyjson_mut_doc *mdoc;
-    yyjson_write_err write_err;
+    bool success;
 
     if (argc > 0){
         if (opt->additional_settings){
@@ -319,65 +321,54 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
     else if (! opt->reset_flag)
         opt->print_flag = true;
 
-    if (opt->target_c == 'h')
-        offset = 0;
     exit_status = SUCCESS;
 
-    do {
-        file_name = ignore_files[opt->reset_flag][offset];
+    do
+        if (opt->target_c != "dh"[--offset]){
+            assert(offset == ((bool) offset));
+            file_name = ignore_files[opt->reset_flag][offset];
 
-        if ((idoc = yyjson_read_file(file_name, 0, NULL, &read_err))){
-            success = true;
-            mdoc = NULL;
-            write_err.msg = NULL;
+            if ((idoc = yyjson_read_file(file_name, 0, NULL, NULL))){
+                mdoc = NULL;
+                success = true;
 
-            if (opt->print_flag){
-                if (opt->target_c == 'b')
-                    print_target_repr(offset);
-                display_ignore_set(argc, argv, &write_err);
-            }
-            else {
-                file_name = ignore_files[0][offset];
-
-                if (argc <= 0){
-                    assert(opt->reset_flag);
-                    yyjson_write_file(file_name, idoc, IG_WRITER_FLAG, NULL, &write_err);
+                if (opt->print_flag){
+                    if (opt->target_c == 'b')
+                        print_target_repr(offset);
+                    display_ignore_set(argc, argv);
                 }
                 else {
-                    success = false;
-                    mdoc = yyjson_doc_mut_copy(idoc, NULL);
+                    file_name = ignore_files[0][offset];
+
+                    if (argc <= 0){
+                        assert(opt->reset_flag);
+                        yyjson_write_file(file_name, idoc, IG_WRITER_FLAG, NULL, NULL);
+                    }
+                    else {
+                        mdoc = yyjson_doc_mut_copy(idoc, NULL);
+                        success = false;
+                    }
                 }
+
+                yyjson_doc_free(idoc);
+                idoc = NULL;
+
+                if (mdoc){
+                    success = (! opt->additional_settings) ?
+                        edit_ignore_set(mdoc, argc, argv, opt) : append_ignore_set(mdoc, &data, opt);
+
+                    if (success)
+                        yyjson_mut_write_file(file_name, mdoc, IG_WRITER_FLAG, NULL, NULL);
+                    yyjson_mut_doc_free(mdoc);
+                }
+
+                if (! (success || exit_status))
+                    exit_status = POSSIBLE_ERROR;
             }
-
-            yyjson_doc_free(idoc);
-            idoc = NULL;
-
-            if (mdoc){
-                success = (! opt->additional_settings) ?
-                    edit_ignore_set(mdoc, argc, argv, opt) : append_ignore_set(mdoc, &data, opt);
-
-                if (success)
-                    yyjson_mut_write_file(file_name, mdoc, IG_WRITER_FLAG, NULL, &write_err);
-                yyjson_mut_doc_free(mdoc);
-            }
-
-            if (! success)
-                exit_status = FAILURE;
-            errmsg = write_err.msg;
+            else
+                exit_status = UNEXPECTED_ERROR;
         }
-        else
-            errmsg = read_err.msg;
-
-        if (errmsg){
-            exit_status = FAILURE;
-            xperror_message(errmsg, file_name);
-        }
-
-        if (offset && (opt->target_c == 'b'))
-            offset = 0;
-        else
-            break;
-    } while (true);
+    while (offset);
 
 exit:
     yyjson_mut_doc_free(data.pool);
@@ -873,15 +864,13 @@ static bool append_first_args(ig_conds *data, int argc, char **argv, ig_opts *op
  * @brief display the contents of the ignore-file on screen.
  *
  * @param[in]  argc  the number of non-optional arguments
- * @param[in]  argv  array of strings that are non-optional arguments
- * @param[out] err  variable to store the error information for JSON writer
+ * @param[in]  argv  array of strings that are non-optional arguments\
  *
  * @note the order of command names specified in non-optional arguments make sense.
  */
-static void display_ignore_set(int argc, char **argv, yyjson_write_err *err){
+static void display_ignore_set(int argc, char **argv){
     assert(idoc);
     assert(argv);
-    assert(err);
 
     size_t size;
 
@@ -907,7 +896,7 @@ static void display_ignore_set(int argc, char **argv, yyjson_write_err *err){
                     continue;
 
                 for (i = 0; i < 2; i++)
-                    if (! (jsons[i] = yyjson_val_write_opts(ikey + i, YYJSON_WRITE_PRETTY, NULL, NULL, err)))
+                    if (! (jsons[i] = yyjson_val_write((ikey + i), YYJSON_WRITE_PRETTY, NULL)))
                         break;
 
                 if ((success = (i == 2)))
@@ -1075,7 +1064,6 @@ bool load_ignore_file(int offset, int original){
  */
 void unload_ignore_file(void){
     yyjson_doc_free(idoc);
-
     idoc = NULL;
 }
 
