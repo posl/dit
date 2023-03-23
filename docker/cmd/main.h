@@ -76,6 +76,8 @@
     * commonly used Expressions
 ******************************************************************************/
 
+#define numof(array)  (sizeof(array) / sizeof((array)[0]))
+
 #define assign_both_or_either(target, a, b, c)  (target = (target == (a)) ? (b) : (c))
 
 #define strchrcmp(str, c)  (((str)[0] == (c)) && (! (str)[1]))
