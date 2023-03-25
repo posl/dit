@@ -1055,7 +1055,7 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
  *
  * @note if the content of 'p_id' is an index number, compares only with the corresponding instruction.
  * @note when there is a corresponding instruction, its index number is stored in 'p_id'.
- * @note if any instructions can be accepted, blank lines are also accepted as valid lines.
+ * @note if any instructions can be accepted, blank lines or comments are also accepted as valid lines.
  */
 char *receive_dockerfile_instr(char *line, int *p_id){
     assert(line);
@@ -1069,7 +1069,7 @@ char *receive_dockerfile_instr(char *line, int *p_id){
             line++;
 
         if (! tmp){
-            if (*line){
+            if (*line && (*line != '#')){
                 tmp = line;
                 assert(tmp);
 
@@ -1879,6 +1879,7 @@ static void receive_dockerfile_instr_test(void){
         { "RUN make && make clean",                   -1,           ID_RUN,          4 },
         { "    OnBuild  WorkDir /",                   -1,           ID_ONBUILD,     13 },
         { "",                                         -1,             -1,            0 },
+        { " # the last success case",                 -1,             -1,            1 },
         { "COPY ./etc/dit_install.sh /dit/etc/",    ID_ADD,         ID_COPY,        -1 },
         { "MainTainer inada",                       ID_LABEL,       ID_MAINTAINER,  -1 },
         { "form alpine:latest",                     ID_FROM,          -1,           -1 },
@@ -1886,6 +1887,7 @@ static void receive_dockerfile_instr_test(void){
         { "En dit inspect",                           -1,             -1,           -1 },
         { "setcmd  [ \"/bin/bash\", \"--login\" ]",   -1,             -1,           -1 },
         { "    ",                                   ID_STOPSIGNAL,    -1,           -1 },
+        { "# escape=`",                             ID_ENV,           -1,           -1 },
         {  0,                                          0,              0,            0 }
     };
 
