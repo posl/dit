@@ -1186,7 +1186,7 @@ bool check_if_ignored(int argc, char **argv){
                 }
 
                 assert(name && *name);
-                assert(size > 0);
+                assert(size);
 
                 if (! matched)
                     matched = check_if_contained(optarg, get_setting_entity(ival, name, size));

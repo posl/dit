@@ -181,7 +181,7 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
                 return ERROR_EXIT;
         }
 
-    opt->color &= (unsigned int) isatty(fileno(stdout));
+    opt->color &= (unsigned int) isatty(STDOUT_FILENO);
     assert(opt->color == ((bool) opt->color));
 
     return SUCCESS;

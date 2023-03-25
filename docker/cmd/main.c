@@ -977,7 +977,7 @@ int receive_positive_integer(const char *target, int *p_left){
  */
 int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode){
     assert(reprs);
-    assert((size > 0) && ((size - 1) <= INT_MAX));
+    assert(size && ((size - 1) <= INT_MAX));
     assert(mode < 4);
 
     for (const char * const *p_repr = (reprs + size); (! *(--p_repr)) && --size;);
@@ -1447,10 +1447,10 @@ static void xfgets_for_loop_test(void){
     assert(! fclose(fp));
 
 #ifdef XFGETS_TEST_COMPLETE
-    assert(count > 0);
+    assert(count);
     count -= rand() % count;
 #endif
-    assert(count > 0);
+    assert(count);
     remain = rand() % count;
     count = remain;
 
@@ -1484,7 +1484,7 @@ static void xfgets_for_loop_test(void){
             assert(false);
 
         if (start_for_stdin){
-            assert(remain > 0);
+            assert(remain);
 
             fputs("Checking if the output matches the input ...\n", stderr);
 
@@ -1512,7 +1512,7 @@ static void xfgets_for_loop_test(void){
     assert(errid == -1);
 
     if (start_for_file){
-        assert(count > 0);
+        assert(count);
 
         line = start_for_file;
         p_line = lines_with_trailing_newline;
@@ -1611,7 +1611,7 @@ static void xstrcat_inf_len_test(void){
     int iter = 0;
 
     size = strlen(repeat);
-    assert(size > 0);
+    assert(size);
 
     while ((size * (++iter) + 1) <= XSTRCAT_INITIAL_MAX);
 
@@ -1949,7 +1949,7 @@ static void get_file_size_test(void){
 
         assert(get_file_size(TMP_FILE1) == size);
 
-        fprintf(stderr, "  size:  %*d\n", digit, ((int) size));
+        fprintf(stderr, "  size:  %*zu\n", digit, size);
     };
 
 
