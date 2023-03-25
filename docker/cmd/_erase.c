@@ -380,7 +380,9 @@ errexit:
  * @param[in]  opt  variable to store the results of option parse
  * @return int  0 (success) or -1 (unexpected error)
  *
- * @note 
+ * @note redundant log truncation when both files are targeted is done so that the log size is greater than 0.
+ * @note the output of the history number in descending order is colorized if possible.
+ * @note the provisional number of reflected lines are displayed along with the history number 0.
  */
 static int display_history(const erase_opts *opt){
     assert(opt);

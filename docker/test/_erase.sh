@@ -184,8 +184,12 @@ do_test(){
 #   <logs_array>    sequence of unsigned char type integers representing the array of the log-data
 #
 check_log_file(){
-    : > /dit/srv/reflect-report.real
-    dit reflect
+    set +x
+
+    if [ "${FUNC_NESTED}" = on ]; then
+        : > /dit/srv/reflect-report.real
+        dit reflect
+    fi
 
     OUTPUT="$( od -An -tuC /dit/var/erase.log."$1" | awk "{ for (i = $# - 1; i--;) print \$(NF - i) }" )"
     shift
@@ -202,6 +206,10 @@ check_log_file(){
     if [ "$#" -ne 0 ]; then
         { echo "error: the contents of the log-file may be incorrect:"; echo "${OUTPUT}"; } 1>&2
         exit 1
+    fi
+
+    if [ "${FUNC_NESTED}" != on ]; then
+        set -x
     fi
 }
 
@@ -288,6 +296,51 @@ do_test_other_options(){
 
 
 
+construct_history(){
+    set +x
+
+    cat /dit/etc/Dockerfile.base > /dit/mnt/Dockerfile.draft
+    : > /dit/mnt/.dit_history
+
+    : > /dit/srv/reflect-report.prov
+    dit erase -dhr 2>&1 | grep -F '' && exit 1
+
+    for i in 0 1 2
+    do
+        echo "# count ${i} (Dockerfile.draft)" | dit reflect -dp -
+        echo "# count ${i} (.dit_history)" | dit reflect -hp -
+
+        : > /dit/srv/reflect-report.real
+        dit reflect
+    done
+
+    echo 'config no-refl' | dit reflect -hp -
+
+
+    TARGET="$( dit erase -dvy -Z )"
+
+    if [ "${TARGET}" != '# count 2 (Dockerfile.draft)' ]; then
+        { echo 'error: the line deleted from Dockerfile may be incorrect:'; echo "${TARGET}"; } 1>&2
+        exit 1
+    fi
+
+cat <<EOF > "${TMP1}"
+ < dockerfile >
+# count 0 (Dockerfile.draft)
+
+ < history-file >
+# count 0 (.dit_history)
+EOF
+
+    dit erase -dhvy -E '^# count 0' > "${TMP2}"
+    diff -u "${TMP1}" "${TMP2}"
+
+    echo
+    set -x
+}
+
+
+
 #
 # Integration Tests
 #
@@ -309,6 +362,40 @@ echo
 #
 
 # successful cases
+
+construct_history
+COUNT="$( wc -l /dit/etc/Dockerfile.base | awk '{ print $1 }' )"
+echo
+
+: 'check if the reflection history in Dockerfile is displayed correctly. ( 4 ~ 1 )'
+dit erase -d -H
+check_log_file dock "${COUNT}" 0 1 0
+read -r REPLY
+
+: 'check if the reflection history in history-file is displayed correctly. ( 4 ~ 0 )'
+dit erase -h -H
+check_log_file hist 0 0 1 1
+read -r REPLY
+
+: 'check if the reflection history in the target files is displayed correctly. ( 3 ~ 0 )'
+dit erase -dh -H
+check_log_file dock "${COUNT}" 1 0
+check_log_file hist 0 1 1
+read -r REPLY
+
+
+: 'check if the consistency check of the log size is performed consistently.'
+dit erase -dr
+dit erase -dh -H
+check_log_file dock "$(( COUNT + 1 ))"
+read -r REPLY
+
+: 'check if the reflection history after reseting the log is displayed correctly. ( 1 ~ 0 )'
+dit erase -hr
+dit erase -dh -H
+check_log_file hist 2
+read -r REPLY
+
 
 : 'check if empty lines in target files are squeezed without confirmation.'
 init_target_file d

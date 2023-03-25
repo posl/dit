@@ -497,7 +497,7 @@ void erase_manual(void){
         "  - The target "SPECIFIED_BY_TARGET".\n"
         "  - When '-H' is given, it displays the lines reflected in the target files at each timing along\n"
         "    with the history number in descending order that can be specified as NUM of '-Z', and if both\n"
-        "    files are target, it checks the consistency of the log size and truncates the redundant log.\n"
+        "    files are targeted, it checks the consistency of the log size and truncates the redundant log.\n"
         "  - The deletion of empty lines is not performed unless '-st' or '--blank' is given.\n"
         "  - The argument for '--assume' "CAN_BE_TRUNCATED" "CASE_INSENSITIVE".\n"
         "  - By default, Y/n confirmation is performed using standard error output and standard input\n"
