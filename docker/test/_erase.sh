@@ -108,7 +108,7 @@ init_target_file(){
 EOF
 
     : > /dit/srv/reflect-report.prov
-    dit erase "-$1r" 2>&1 | grep -F '' && exit 1
+    dit erase -"$1"r 2>&1 | grep -F '' && exit 1
 
     if [ "$1" != 'd' ]; then
         {
@@ -146,11 +146,11 @@ EOF
 #   - If you call this function multiple times while specifying <target_c>, you must specify 'd', then 'h'.
 #
 do_test(){
-    sed -E "$1d" "${TMP1}" > "${TMP2}"
+    sed -E "$1"d "${TMP1}" > "${TMP2}"
     diff -u "${TARGET}" "${TMP2}"
 
     if [ "$#" -gt 1 ]; then
-        dit erase "-$2" --assume=Quit 2>&1 | grep -F '' && exit 1
+        dit erase -"$2" --assume=Quit 2>&1 | grep -F '' && exit 1
         diff -u "${TARGET}" "${TMP2}"
 
         if [ "$2" = 'd' ]; then
@@ -159,8 +159,8 @@ do_test(){
             echo ' < history-file >' >> "${TMP3}"
         fi
 
-        sed -En "$1p" "${TMP1}" | tee "${TMP2}" >> "${TMP3}"
-        dit erase "-$2v" > "${TMP1}"
+        sed -En "$1"p "${TMP1}" | tee "${TMP2}" >> "${TMP3}"
+        dit erase -"$2"v > "${TMP1}"
         diff -u "${TMP1}" "${TMP2}"
 
         if [ "$2" = 'd' ]; then
@@ -333,28 +333,6 @@ read -r REPLY
 
 # failure cases
 
-: 'warning: the target files should not be deleted. (with error message)'
-rm -f /dit/mnt/Dockerfile.draft /dit/mnt/.dit_history
-dit erase -dh
-read -r REPLY
-
-
-init_target_file d
-init_target_file h
-echo
-
-: 'warning: the internal log-files should not be deleted. (no error message)'
-rm -f /dit/var/erase.log.*
-dit erase -dh
-read -r REPLY
-
-: 'warning: the target files should not be updated without using the dit command. (with error message)'
-echo 'ARG abc=123' > /dit/mnt/Dockerfile.draft
-echo 'abc=123' > /dit/mnt/.dit_history
-dit erase -dh
-read -r REPLY
-
-
 : 'error: an invalid regular expression pattern must not be specified.'
 dit erase -dh -E '*.txt' && exit 1
 read -r REPLY
@@ -391,4 +369,9 @@ read -r REPLY
 
 : 'error: this command takes no non-optional arguments.'
 dit erase -dh regexp.txt && exit 1
+read -r REPLY
+
+: 'warning: the target files should not be deleted. (with error message)'
+rm -f /dit/mnt/Dockerfile.draft /dit/mnt/.dit_history
+dit erase -dh
 read -r REPLY

@@ -66,13 +66,13 @@ do_test 'd=normal' 'h=normal' 12
 dit config _4
 do_test 'd=normal' 'h=no-ignore' 14
 
-dit config 3,h=no-ref
+dit config '3,h=no-ref'
 do_test 'd=simple' 'h=no-reflect' 15
 
-dit config b=str,d=no-ignore
+dit config 'b=str,d=no-ignore'
 do_test 'd=no-ignore' 'h=strict' 21
 
-dit config --reset d=0
+dit config --reset 'd=0'
 do_test 'd=no-reflect' 'h=normal' 2
 
 dit config --help | head -n2 | grep -F '  dit config [OPTION]...'
@@ -91,15 +91,15 @@ dit config 5 && exit 1
 read -r REPLY
 
 : 'error: target file must be represented by one of "bdh".'
-dit config a=3 && exit 1
+dit config 'a=3' && exit 1
 read -r REPLY
 
 : 'error: mode string must be uniquely interpretable.'
-dit config -r d=no && exit 1
+dit config -r 'd=no' && exit 1
 read -r REPLY
 
 : 'error: multiple mode specifications must be separated by commas.'
-dit config d=no-ig h=1 && exit 1
+dit config 'd=no-ig' 'h=1' && exit 1
 read -r REPLY
 
 : 'error: if the internal config-file is empty, it should be reset.' > /dit/var/config.stat
