@@ -463,11 +463,11 @@ static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag){
     int file_size, exit_status = SUCCESS;
 
     if (opt->target_c == 'd'){
-        target_id = 0;
+        target_id = 1;
         dest_file = DOCKER_FILE_DRAFT;
     }
     else {
-        target_id = 1;
+        target_id = 0;
         dest_file = HISTORY_FILE;
     }
 
@@ -491,16 +491,15 @@ static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag){
                 const char *format = "%s\n";
 
                 if (opt->verbose){
-                    if (both_flag){
-                        i = target_id ^ 1;
-                        print_target_repr(i);
-                    }
+                    if (both_flag)
+                        print_target_repr(target_id);
                     fps[fpn++] = stdout;
                 }
 
                 if (file_size <= 0){
                     file_size = 0;
-                    if (opt->target_c == 'd')
+
+                    if (target_id)
                         phase = 0;
                 }
 
@@ -548,7 +547,7 @@ static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag){
                     }
                     else {
                         exit_status = (! exit_status) ? POSSIBLE_ERROR : FATAL_ERROR;
-                        xperror_message("file size overflow detected, ending soon", dest_file);
+                        xperror_message("file size overflow detected", dest_file);
                         break;
                     }
                 } while (true);
@@ -578,31 +577,34 @@ static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag){
 /**
  * @brief record the number of reflected lines in various files.
  *
- * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
+ * @return int  0 (success) or -1 (unexpected error)
  *
  * @note some functions detect errors when initializing each file, but they are ignored.
  */
 static int record_reflected_lines(void){
-    int exit_status, tmp, reflecteds[2] = {0};
+    bool first_access;
+    int exit_status, reflecteds[2] = {0};
 
+    first_access = (! get_file_size(DIT_PROFILE));
     exit_status = reset_provisional_report(reflecteds);
-    tmp = update_erase_logs(reflecteds);
 
-    if (! exit_status)
-        exit_status = tmp;
+    if ((reflecteds[1] || reflecteds[0] || first_access) && update_erase_logs(reflecteds))
+        exit_status = UNEXPECTED_ERROR;
 
-    if (exit_status && (! get_file_size(DIT_PROFILE)))
+    if (first_access)
         exit_status = SUCCESS;
 
     FILE *fp;
+    int code;
+
     if ((fp = fopen(REFLECT_FILE_R, "w"))){
-        tmp = 31;  // red
+        code = 31;  // red
         if (! get_last_exit_status())
-            tmp++;  // grean
+            code++;  // grean
 
         fprintf(
             fp, CC(" [") "d:+%hu h:+%hu" CC("] ") "\\u:\\w " CC("\\$ "),
-            tmp, reflecteds[0], reflecteds[1], tmp, tmp
+            code, reflecteds[1], reflecteds[0], code, code
         );
         fclose(fp);
     }
@@ -631,13 +633,14 @@ static int record_reflected_lines(void){
  */
 static int manage_provisional_report(int reflecteds[2], const char *mode){
     assert(reflecteds);
-    assert(reflecteds[0] >= 0);
     assert(reflecteds[1] >= 0);
+    assert(reflecteds[0] >= 0);
     assert(mode);
 
     static FILE *fp = NULL;
 
-    int *array_for_write, mode_c, keep_c, array_for_read[2], exit_status = SUCCESS;
+    int *array_for_write, array_for_read[2];
+    int mode_c, keep_c, i, j, exit_status = SUCCESS;
     char fm[] = "rb+";
 
     array_for_write = reflecteds;
@@ -658,10 +661,16 @@ static int manage_provisional_report(int reflecteds[2], const char *mode){
         if (fp){
             if (mode_c == 'r'){
                 if (fread(array_for_read, sizeof(int), 2, fp) == 2){
-                    reflecteds[0] += array_for_read[0];
-                    reflecteds[1] += array_for_read[1];
-                    assert(reflecteds[0] >= array_for_read[0]);
-                    assert(reflecteds[1] >= array_for_read[1]);
+                    i = 1;
+
+                    do {
+                        j = reflecteds[i] + array_for_read[i];
+
+                        if (reflecteds[i] <= j)
+                            reflecteds[i] = j;
+                        else
+                            exit_status = UNEXPECTED_ERROR;
+                    } while (i--);
                 }
                 else
                     exit_status = UNEXPECTED_ERROR;
@@ -681,8 +690,8 @@ static int manage_provisional_report(int reflecteds[2], const char *mode){
 
         if (*mode){
             if (! keep_c){
-                array_for_read[0] = 0;
                 array_for_read[1] = 0;
+                array_for_read[0] = 0;
                 array_for_write = array_for_read;
             }
         }
