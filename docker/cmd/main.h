@@ -208,7 +208,7 @@ void reflect_manual(void);
 
 int get_config(const char *config_arg, int modes[2]);
 
-int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assume_c);
+int delete_from_dockerfile(char **patterns, size_t count, bool verbose, int assume_c);
 int update_erase_logs(int reflecteds[2]);
 
 bool load_ignore_file(int offset, int original);

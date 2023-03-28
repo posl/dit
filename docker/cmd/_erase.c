@@ -643,19 +643,20 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
 /**
  * @brief delete the specified lines from Dockerfile, and record this in the log-file.
  *
- * @param[in]  patterns  array of pattern strings to determine which lines to delete
- * @param[in]  size  array size
+ * @param[in]  patterns  array of pattern strings to determine which lines to delete or NULL
+ * @param[in]  count  array size if 'patterns' is non-NULL, otherwise the number of lines to be deleted
  * @param[in]  verbose  whether to display deleted lines on screen
  * @param[in]  assume_c  the response to delete confirmation ('Y' or '\0')
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
- * @note assumes success if Dockerfile does not exist or if there are no lines to be deleted.
+ * @note if 'patterns' is NULL, this function tries to delete the lines added immediately before.
+ * @note considers success if Dockerfile does not exist or if there are no lines to be deleted.
  * @note if the return value is -1, an internal file error has occurred, but the deletion was successful.
  *
  * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
  */
-int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assume_c){
-    assert(size <= INT_MAX);
+int delete_from_dockerfile(char **patterns, size_t count, bool verbose, int assume_c){
+    assert(count <= INT_MAX);
     assert((assume_c == 'Y') || (! assume_c));
 
     erase_opts opt = {
@@ -670,12 +671,13 @@ int delete_from_dockerfile(char **patterns, size_t size, bool verbose, int assum
         .assume_c = assume_c
     };
 
-    if (! (patterns && size)){
+    if (! patterns){
         opt.has_delopt = false;
         opt.undoes = 1;
+        opt.max_count = count;
     }
 
-    return do_erase(size, patterns, &opt, marklines_in_dockerfile);
+    return do_erase(count, patterns, &opt, marklines_in_dockerfile);
 }
 
 
