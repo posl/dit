@@ -115,11 +115,8 @@ static const char * const conds_keys[IG_CONDITIONS_NUM] = {
 static const int has_arg_table[3] = { no_argument, required_argument, optional_argument };
 
 
-/** array for storing the error information when reading an each ignore-file */
-static struct {
-    const char *file_name;
-    yyjson_read_err info;
-} read_errs[2];
+/** boolean value to prevent display confusion in certain cases when some errors occur */
+static bool no_suggestion = false;
 
 
 /** immutable JSON data that is the contents of the ignore-file (to use 'check_if_ignored' as callback) */
@@ -154,19 +151,9 @@ int ignore(int argc, char **argv){
     else if (i > 0)
         exit_status = SUCCESS;
 
-    if (exit_status){
-        if (exit_status < 0){
-            i = 2;
-            exit_status = FAILURE;
-            do
-                if (read_errs[--i].file_name){
-                    assert(read_errs[i].info.msg);
-                    xperror_message(read_errs[i].info.msg, read_errs[i].file_name);
-                }
-            while (i);
-        }
+    if (exit_status && (! no_suggestion))
         xperror_suggestion(true);
-    }
+
     return exit_status;
 }
 
@@ -307,7 +294,7 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
  * @param[out] opt  variable to store the results of option parse
- * @return int  0 (success), 1 (possible error) or -1 (unexpected error)
+ * @return int  command's exit status
  *
  * @note when appending ignored commands with detailed conditions, argument parsing is done first.
  */
@@ -316,8 +303,9 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
     assert((opt->target_c == 'b') || (opt->target_c == 'd') || (opt->target_c == 'h'));
 
     ig_conds data = {0};
-    int exit_status = POSSIBLE_ERROR, offset = 2;
+    int exit_status = SUCCESS, offset = 2;
     const char *file_name;
+    yyjson_read_err err;
     yyjson_mut_doc *mdoc;
     bool success;
 
@@ -327,27 +315,29 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
                 argc = 1;
                 opt->additional_settings = false;
             }
-            else if (! parse_additional_settings(&data, argc, argv, opt))
+            else if (! parse_additional_settings(&data, argc, argv, opt)){
+                exit_status = FAILURE;
                 goto exit;
+            }
         }
     }
     else if (! opt->reset_flag)
         opt->print_flag = true;
-
-    exit_status = SUCCESS;
 
     do
         if (opt->target_c != "dh"[--offset]){
             assert(offset == ((bool) offset));
             file_name = ignore_files[opt->reset_flag][offset];
 
-            if ((idoc = yyjson_read_file(file_name, 0, NULL, &(read_errs[offset].info)))){
+            if ((idoc = yyjson_read_file(file_name, 0, NULL, &err))){
                 mdoc = NULL;
                 success = true;
 
                 if (opt->print_flag){
-                    if (opt->target_c == 'b')
+                    if (opt->target_c == 'b'){
+                        no_suggestion = (! offset);
                         print_target_repr(offset);
+                    }
                     display_ignore_set(argc, argv);
                 }
                 else {
@@ -375,12 +365,13 @@ static int ignore_contents(int argc, char **argv, ig_opts *opt){
                     yyjson_mut_doc_free(mdoc);
                 }
 
-                if (! (success || exit_status))
-                    exit_status = POSSIBLE_ERROR;
+                if (! success)
+                    exit_status = FAILURE;
             }
             else {
-                read_errs[offset].file_name = file_name;
-                exit_status = UNEXPECTED_ERROR;
+                assert(err.msg);
+                xperror_message(err.msg, file_name);
+                exit_status = FAILURE;
             }
         }
     while (offset);
