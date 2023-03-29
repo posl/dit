@@ -15,7 +15,7 @@
 #define XFGETS_NESTINGS_MAX 2
 #define XFGETS_INITIAL_SIZE 1023  // 2^n - 1
 
-#define XSTRCAT_INITIAL_MAX 120   // 2^n - 8
+#define XSTRCAT_INITIAL_MAX 1023  // 2^n - 1
 
 #define NULLDEV_FILENO  open("/dev/null", (O_WRONLY | O_CLOEXEC))
 
@@ -683,11 +683,11 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
 
     do {
         if ((curr - base_len) < suf_len){
-            curr += 8;
+            curr++;
             assert(! (curr & (curr - 1)));
 
             if ((curr <<= 1)){
-                curr -= 8;
+                curr--;
                 allocate_flag = true;
                 continue;
             }
@@ -699,6 +699,7 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
             base->max = curr;
             break;
         }
+
         return false;
     } while (true);
 
@@ -1053,7 +1054,7 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
  * @param[out] p_id  variable to store index number of the instruction to be compared
  * @return char*  substring that is the argument for the instruction in the target line or NULL
  *
- * @note if the content of 'p_id' is an index number, compares only with the corresponding instruction.
+ * @note if the content of 'p_id' is a valid index number, compares only with the corresponding instruction.
  * @note when there is a corresponding instruction, its index number is stored in 'p_id'.
  * @note if any instructions can be accepted, blank lines or comments are also accepted as valid lines.
  */
@@ -1061,8 +1062,9 @@ char *receive_dockerfile_instr(char *line, int *p_id){
     assert(line);
     assert(p_id);
 
-    char *tmp = NULL, instr[16];
+    char *tmp = NULL, instr[12];
     size_t instr_len = 0;
+    bool invalid;
 
     do {
         while (isspace((unsigned char) *line))
@@ -1074,44 +1076,37 @@ char *receive_dockerfile_instr(char *line, int *p_id){
                 assert(tmp);
 
                 do
-                    instr_len++;
-                while (*(++tmp) && (! isspace((unsigned char) *tmp)));
-
-                if (! *tmp)
-                    break;
-
-                if (instr_len == 11)
-                    *p_id = ID_HEALTHCHECK;
-                else if ((instr_len < 3) || ((instr_len > 7) && (instr_len != 10)))
-                    break;
+                    if (! (*(++tmp) && (++instr_len < sizeof(instr))))
+                        return NULL;
+                while (! isspace((unsigned char) *tmp));
 
                 memcpy(instr, line, (sizeof(char) * instr_len));
                 instr[instr_len] = '\0';
 
-                if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM)){
-                    if (xstrcmp_upper_case(instr, docker_instr_reprs[*p_id]))
-                        break;
+                if (*p_id < 0){
+                    *p_id = receive_expected_string(instr, docker_instr_reprs, DOCKER_INSTRS_NUM, 1);
+                    invalid = (*p_id < 0);
                 }
                 else {
-                    *p_id = receive_expected_string(instr, docker_instr_reprs, DOCKER_INSTRS_NUM, 1);
-
-                    if (*p_id < 0)
-                        break;
+                    assert(*p_id < DOCKER_INSTRS_NUM);
+                    invalid = xstrcmp_upper_case(instr, docker_instr_reprs[*p_id]);
                 }
 
-                line = tmp + 1;
-                continue;
+                if (! invalid){
+                    line = tmp + 1;
+                    continue;
+                }
             }
-            else if ((*p_id >= 0) && (*p_id < DOCKER_INSTRS_NUM))
+            else if (*p_id < 0)
                 break;
         }
-        else if (! *line)
+        else if (*line)
             break;
 
-        return line;
+        return NULL;
     } while (true);
 
-    return NULL;
+    return line;
 }
 
 
