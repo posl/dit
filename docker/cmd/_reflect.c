@@ -426,7 +426,7 @@ static int reflect_lines(refl_data *data, const refl_opts *opt){
             FILE *fps[2];
 
             if (data->target_id){
-                if (file_size < 0){
+                if (file_size <= 0){
                     if (! (remain = read_dockerfile_base(&seq))){
                         exit_status = FATAL_ERROR;
                         goto exit;
