@@ -7,7 +7,7 @@
  * @author Tsukasa Inada
  * @date 2022/08/29
  *
- * @note In the config-file, a 2-digit integer in quinary notation is stored as signed char.
+ * @note In the config-file, a 2-digit integer in quinary notation is stored as unsigned char.
  */
 
 #include "main.h"
@@ -32,7 +32,7 @@
 static int parse_opts(int argc, char **argv, unsigned int *opt);
 static int config_contents(unsigned int code, ...);
 
-static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h);
+static bool receive_mode(const char *config_arg, unsigned char result[2]);
 static int receive_mode_integer(int c, int spare);
 
 
@@ -69,35 +69,35 @@ static const int idx2mode[CONF_MODES_NUM] = {4, 0, 2, 3, 1};
  * @note treated like a normal main function.
  */
 int config(int argc, char **argv){
-    int i;
+    int i, exit_status = FAILURE;
     unsigned int reset_flag;
 
-    if ((i = parse_opts(argc, argv, &reset_flag)))
-        i = (i < 0) ? FAILURE : SUCCESS;
-    else
+    if (! (i = parse_opts(argc, argv, &reset_flag))){
         switch ((argc - optind)){
             case 0:
-                assert(CONF_RESET_OR_SHOW(reset_flag) == (reset_flag ? 3 : 0));
-                i = config_contents(CONF_RESET_OR_SHOW(reset_flag));
+                assert(CONF_RESET_OR_SHOW(reset_flag) == (reset_flag ? 0b011 : 0b000));
+                exit_status = config_contents(CONF_RESET_OR_SHOW(reset_flag));
                 break;
             case 1:
-                assert(CONF_SET_OR_UPDATE(reset_flag) == (reset_flag ? 7 : 6));
-                if ((i = config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) > 0)
+                assert(CONF_SET_OR_UPDATE(reset_flag) == (reset_flag ? 0b111 : 0b110));
+                if ((exit_status = config_contents(CONF_SET_OR_UPDATE(reset_flag), argv[optind])) > 0)
                     xperror_config_arg(argv[optind]);
                 break;
             default:
-                i = FAILURE;
                 xperror_too_many_args(1);
         }
+    }
+    else if (i > 0)
+        exit_status = SUCCESS;
 
-    if (i){
-        if (i < 0){
-            i = FAILURE;
+    if (exit_status){
+        if (exit_status < 0){
+            exit_status = FAILURE;
             xperror_internal_file();
         }
         xperror_suggestion(true);
     }
-    return i;
+    return exit_status;
 }
 
 
@@ -148,7 +148,7 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
  * @brief function that contains all the individual functions that handle the config-file
  *
  * @param[in]  code  some flags (bit 1: wheter to reset, bit 2: whether to write, bit 3: argument existence)
- * @param[out] ...  if necessary, string for determining the modes and variable to store them
+ * @param[out] ...  if necessary, string for determining the modes and array for storing store them
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  */
 static int config_contents(unsigned int code, ...){
@@ -163,43 +163,39 @@ static int config_contents(unsigned int code, ...){
     has_arg = code & CONF_ISHASARG;
 
     if ((fp = fopen(CONFIG_FILE, (reset_flag ? "wb" : "rb+")))){
-        signed char c = CONF_INITIAL_STAT;
-        int mode2d = CONF_DEFAULT_MODE, mode2h = CONF_DEFAULT_MODE;
+        unsigned char status = CONF_INITIAL_STAT, modes[2] = { CONF_DEFAULT_MODE, CONF_DEFAULT_MODE };
 
         exit_status = SUCCESS;
 
         if (! reset_flag){
-            if ((fread(&c, sizeof(c), 1, fp) == 1) && (c >= 0) && (c < CONF_EXCEED_STAT)){
+            if ((fread(&status, sizeof(status), 1, fp) == 1) && (status < CONF_EXCEED_STAT)){
                 div_t tmp;
-                tmp = div(c, CONF_MODES_NUM);
-                mode2d = tmp.quot;
-                mode2h = tmp.rem;
+                tmp = div(status, CONF_MODES_NUM);
+                modes[1] = tmp.quot;
+                modes[0] = tmp.rem;
             }
             else {
                 exit_status = UNEXPECTED_ERROR;
-                c = CONF_INITIAL_STAT;
+                status = CONF_INITIAL_STAT;
             }
 
             if (! has_arg)
-                fprintf(stdout, "d=%s\nh=%s\n", mode_reprs[mode2idx[mode2d]], mode_reprs[mode2idx[mode2h]]);
+                fprintf(
+                    stdout, "d=%s\nh=%s\n",
+                    mode_reprs[mode2idx[modes[1]]],
+                    mode_reprs[mode2idx[modes[0]]]
+                );
         }
 
         if (has_arg){
             va_list sp;
             va_start(sp, code);
 
-            if ((receive_mode(va_arg(sp, const char *), &mode2d, &mode2h))){
-                if (write_flag){
-                    signed char d;
-                    if (c != (d = CONF_STAT_FORMULA(mode2d, mode2h)))
-                        c = d;
-                    else if (! reset_flag)
-                        write_flag = false;
-                }
-                else {
-                    *(va_arg(sp, int *)) = mode2d;
-                    *(va_arg(sp, int *)) = mode2h;
-                }
+            if ((receive_mode(va_arg(sp, const char *), modes))){
+                if (write_flag)
+                    status = CONF_STAT_FORMULA(modes[1], modes[0]);
+                else
+                    memcpy(va_arg(sp, unsigned char *), modes, (sizeof(unsigned char) * 2));
             }
             else
                 exit_status = POSSIBLE_ERROR;
@@ -214,8 +210,7 @@ static int config_contents(unsigned int code, ...){
             case UNEXPECTED_ERROR:
                 if (! reset_flag)
                     fseek(fp, 0, SEEK_SET);
-
-                fwrite(&c, sizeof(c), 1, fp);
+                fwrite(&status, sizeof(status), 1, fp);
         }
 
         fclose(fp);
@@ -232,11 +227,11 @@ static int config_contents(unsigned int code, ...){
  * @param[out] modes  array for storing the modes used when reflecting in Dockerfile and history-file
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  *
- * @note the modes are stored in order, one for the history-file and one for the Dockerfile.
+ * @note the modes are stored in order, one for history-file and one for Dockerfile.
  */
-int get_config(const char *config_arg, int modes[2]){
-    assert(CONF_GET_FROM_CONVERT == 4);
-    return config_contents(CONF_GET_FROM_CONVERT, config_arg, (modes + 1), modes);
+int get_config(const char *config_arg, unsigned char modes[2]){
+    assert(CONF_GET_FROM_CONVERT == 0b100);
+    return config_contents(CONF_GET_FROM_CONVERT, config_arg, modes);
 }
 
 
@@ -251,85 +246,84 @@ int get_config(const char *config_arg, int modes[2]){
  * @brief parse the passed string, and generate next modes.
  *
  * @param[in]  config_arg  string for determining the modes
- * @param[out] p_mode2d  variable to store the mode used when reflecting in Dockerfile
- * @param[out] p_mode2h  variable to store the mode used when reflecting in history-file
+ * @param[out] results  array for storing the modes used when reflecting in Dockerfile and history-file
  * @return bool  successful or not
  */
-static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * restrict p_mode2h){
-    assert(p_mode2d);
-    assert(p_mode2h);
+static bool receive_mode(const char *config_arg, unsigned char results[2]){
+    assert(results);
+    assert(results[1] < CONF_MODES_NUM);
+    assert(results[0] < CONF_MODES_NUM);
 
     if (config_arg){
+        unsigned char modes[2];
+        memcpy(modes, results, (sizeof(unsigned char) * 2));
+
         size_t size;
         size = strlen(config_arg) + 1;
 
-        char *arg_copy, tmp[size];
-        arg_copy = tmp;
+        char *arg_copy, buf[size];
+        arg_copy = buf;
         memcpy(arg_copy, config_arg, (sizeof(char) * size));
 
         const char *token;
-        int mode2d, mode2h, mode, offset, target_c, i;
-
-        mode2d = *p_mode2d;
-        mode2h = *p_mode2h;
-        assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
-        assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
+        int target_c, i, tmp;
 
         while ((token = strtok(arg_copy, ","))){
+            size = strlen(token);
             arg_copy = NULL;
-            mode = -1;
-            offset = 0;
             target_c = 'b';
 
-            if (! (i = strlen(token) - 2)){
-                if ((i = receive_mode_integer(token[0], mode2d)) >= 0){
-                    if ((mode = receive_mode_integer(token[1], mode2h)) >= 0){
-                        mode2d = i;
-                        mode2h = mode;
-                        assert((mode2d >= 0) && (mode2d < CONF_MODES_NUM));
-                        assert((mode2h >= 0) && (mode2h < CONF_MODES_NUM));
-                        continue;
+            if (size == 2){
+                for (i = 2; i--;){
+                    if ((tmp = receive_mode_integer(token[i ^ 1], modes[i])) < 0){
+                        assert(target_c == 'b');
+                        goto strcmp;
                     }
+                    assert((tmp >= 0) && (tmp < CONF_MODES_NUM));
+                    modes[i] = tmp;
                 }
-                else
-                    i = 0;
-            }
-            else if ((i > 0) && (token[1] == '=')){
-                if ((token[0] != 'b') && (token[0] != 'd') && (token[0] != 'h'))
-                    return false;
-                if (token[3] == '\0')
-                    i = -1;
-
-                offset = 2;
-                target_c = token[0];
-            }
-
-            token += offset;
-            if ((i < 0) && ((mode = receive_mode_integer(token[0], -2)) < -1))
+                assert(i == -1);
                 continue;
-            if ((mode < 0) && ((i = receive_expected_string(token, mode_reprs, CONF_MODES_NUM, 2)) >= 0))
-                mode = idx2mode[i];
-
-            if (mode >= 0){
-                assert((mode >= 0) && (mode < CONF_MODES_NUM));
-
-                switch (target_c){
-                    case 'b':
-                        mode2h = mode;
-                    case 'd':
-                        mode2d = mode;
-                        break;
-                    default:
-                        assert(target_c == 'h');
-                        mode2h = mode;
-                }
             }
-            else
+            else if (size > 2){
+                if (token[1] == '='){
+                    if ((token[0] != 'b') && (token[0] != 'd') && (token[0] != 'h'))
+                        return false;
+                    target_c = token[0];
+                    token += 2;
+
+                    if (! token[1])
+                        goto chrcmp;
+                }
+                goto strcmp;
+            }
+
+        chrcmp:
+            switch ((i = receive_mode_integer(token[0], -2))){
+                case -1:
+                    break;
+                case -2:
+                    continue;
+                default:
+                    goto assign;
+            }
+
+        strcmp:
+            if ((i = receive_expected_string(token, mode_reprs, CONF_MODES_NUM, 2)) < 0)
                 return false;
+            i = idx2mode[i];
+
+        assign:
+            assert((i >= 0) && (i < CONF_MODES_NUM));
+            if (target_c != 'h')
+                modes[1] = i;
+            if (target_c != 'd')
+                modes[0] = i;
         }
 
-        *p_mode2d = mode2d;
-        *p_mode2h = mode2h;
+        memcpy(results, modes, (sizeof(unsigned char) * 2));
+        assert(results[1] < CONF_MODES_NUM);
+        assert(results[0] < CONF_MODES_NUM);
     }
 
     return true;
@@ -344,15 +338,15 @@ static bool receive_mode(const char *config_arg, int * restrict p_mode2d, int * 
  * @return int  the resulting integer, spare integer, or -1
  */
 static int receive_mode_integer(int c, int spare){
-    int i;
+    int i, mode = -1;
 
     if ((i = c - '0') >= 0){
         if (i < CONF_MODES_NUM)
-            return i;
-        if (c == '_')
-            return spare;
+            mode =  i;
+        else if (c == '_')
+            mode = spare;
     }
-    return -1;
+    return mode;
 }
 
 
@@ -405,43 +399,44 @@ static void receive_mode_test(void){
         {  0,                     0                  }
     };
 
-    int i, mode2d, mode2h, rand2d, rand2h, type;
+    int rand2d, rand2h, i, type;
+    unsigned char modes[2] = { CONF_DEFAULT_MODE, CONF_DEFAULT_MODE };
     div_t tmp;
     char format[] = "%-15s  %d  %d\n";
 
-    mode2d = (rand2d = CONF_DEFAULT_MODE);
-    mode2h = (rand2h = CONF_DEFAULT_MODE);
+    rand2d = CONF_DEFAULT_MODE;
+    rand2h = CONF_DEFAULT_MODE;
 
 
     for (i = 0; table[i].input; i++){
         type = SUCCESS;
 
         if (table[i].result < 0){
-            mode2d = (rand2d = rand() % CONF_MODES_NUM);
-            mode2h = (rand2h = rand() % CONF_MODES_NUM);
+            modes[1] = (rand2d = rand() % CONF_MODES_NUM);
+            modes[0] = (rand2h = rand() % CONF_MODES_NUM);
             type = FAILURE;
         }
 
-        assert(receive_mode(table[i].input, &mode2d, &mode2h) == (type == SUCCESS));
+        assert(receive_mode(table[i].input, modes) == (type == SUCCESS));
 
         if (type == SUCCESS){
             tmp = div(table[i].result, CONF_MODES_NUM);
-            assert(mode2d == tmp.quot);
-            assert(mode2h == tmp.rem);
+            assert(modes[1] == tmp.quot);
+            assert(modes[0] == tmp.rem);
 
             format[5] = ' ';
             format[6] = ' ';
         }
         else {
-            assert(mode2d == rand2d);
-            assert(mode2h == rand2h);
+            assert(modes[1] == rand2d);
+            assert(modes[0] == rand2h);
 
             format[5] = '\n';
             format[6] = '\0';
         }
 
         print_progress_test_loop('S', type, i);
-        fprintf(stderr, format, table[i].input, mode2d, mode2h);
+        fprintf(stderr, format, table[i].input, modes[1], modes[0]);
     }
 }
 

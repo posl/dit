@@ -25,7 +25,7 @@ int convert(int argc, char **argv){
         }
 
         if (line){
-            int modes[2];
+            unsigned char modes[2];
 
             if (! (offset || get_config(NULL, modes))){
                 FILE* fp;
