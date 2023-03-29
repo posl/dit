@@ -634,8 +634,6 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
  * @param[in]  a  pointer to string1
  * @param[in]  b  pointer to string2
  * @return int  comparison result
- *
- * @note keep NULLs clustered at the end of the array.
  */
 int qstrcmp(const void *a, const void *b){
     assert(a);
@@ -645,7 +643,8 @@ int qstrcmp(const void *a, const void *b){
     str1 = *((const char **) a);
     str2 = *((const char **) b);
 
-    return str1 ? (str2 ? strcmp(str1, str2) : -1) : (str2 ? 1 : 0);
+    assert(str1 && str2);
+    return strcmp(str1, str2);
 }
 
 
@@ -974,15 +973,12 @@ int receive_positive_integer(const char *target, int *p_left){
  * @return int  index number of the corresponding string, -1 (ambiguous) or -2 (invalid)
  *
  * @note make efficient by applying binary search sequentially from the first character of target string.
- * @attention the array must be pre-sorted alphabetically and NULLs must be clustered at the end of it.
  */
 int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode){
     assert(reprs);
     assert(size && ((size - 1) <= INT_MAX));
-    assert(mode < 4);
-
-    for (const char * const *p_repr = (reprs + size); (! *(--p_repr)) && --size;);
     assert(check_if_alphabetical_order(reprs, size));
+    assert(mode < 4);
 
     if (target && (size > 0)){
         const char *expecteds[size];
@@ -1687,9 +1683,9 @@ static int walk_test_stub(int pwdfd, const char *name, bool isdir){
 static void walk_test(void){
     // changeable part for updating test cases
     const char * const root_dirs[] = {
-        ".",
-        "/dit/",
+        "/dit",
         "/etc/./",
+        "/usr/local/..",
         NULL
     };
 
@@ -1703,12 +1699,12 @@ static void walk_test(void){
         assert(*(root_dirs[i]));
         fprintf(stderr, "  Walking '%s' ...\n", root_dirs[i]);
 
-        assert(! walked_len);
-        assert(! walk(root_dirs[i], walk_test_stub));
-
         c = snprintf(cmdline, sizeof(cmdline), "find %s -depth ! -type d -print0 > "TMP_FILE1, root_dirs[i]);
         assert((c >= 0) && (c < sizeof(cmdline)));
         assert(system(NULL) && (! system(cmdline)));
+
+        assert(! walked_len);
+        assert(! walk(root_dirs[i], walk_test_stub));
 
         assert((c = open(TMP_FILE1, O_RDONLY)) != -1);
         assert(! fstat(c, &file_stat));

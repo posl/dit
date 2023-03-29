@@ -121,18 +121,15 @@ static bool parse_opts(int argc, char **argv){
  */
 bool check_if_alphabetical_order(const char * const *reprs, size_t size){
     assert(reprs);
+    assert(size);
 
-    if (size > 1){
-        const char * const *p_repr;
-        const char *repr;
-
-        p_repr = reprs;
-        size--;
+    if (--size){
+        const char *target;
 
         do {
-            assert((repr = *(p_repr++)));
+            assert((target = *(reprs++)));
 
-            if (strcmp(repr, *p_repr) >= 0)
+            if (strcmp(target, *reprs) >= 0)
                 return false;
         } while (--size);
     }
