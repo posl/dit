@@ -51,7 +51,7 @@ int package(int argc, char **argv){
                     fputc('\n', stdout);
                 }
                 else
-                    reflect_to_dockerfile(&instr, 1, true, '\0');
+                    reflect_to_dockerfile(1, instr, true, '\0');
             }
         }
 

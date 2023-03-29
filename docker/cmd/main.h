@@ -215,7 +215,7 @@ bool load_ignore_file(int offset, int original);
 void unload_ignore_file(void);
 bool check_if_ignored(int argc, char **argv);
 
-int reflect_to_dockerfile(char **lines, size_t size, bool verbose, int flag_c);
+int reflect_to_dockerfile(size_t lines_num, char *lines, bool verbose, int instr_c);
 int read_provisional_report(int reflecteds[2]);
 int write_provisional_report(int reflecteds[2]);
 

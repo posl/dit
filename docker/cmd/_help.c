@@ -706,13 +706,13 @@ void reflect_manual(void){
         "  - The argument for '--target' or '--blank' "CAN_BE_TRUNCATED".\n"
         "  - Destination "SPECIFIED_BY_TARGET".\n"
         "  - If both files are destination, the reflection contents cannot be specified by SOURCEs.\n"
-        "  - If the size of destination file exceeds the upper limit (2G), it exits with the error, and\n"
-        "    if the upper limit is exceeded during reflection, it aborts the processing in the middle.\n"
+        "  - If the size of destination file exceeds its upper limit (2GB), it exits without doing\n"
+        "    anything, and if the upper limit is exceeded during reflection, it exits at that point.\n"
         "  - When reflecting in Dockerfile, each instruction to be reflected must be on one line.\n"
         "  - When reflecting CMD or ENTRYPOINT instruction in Dockerfile, each of them must be one or\n"
         "    less, and the existing CMD and ENTRYPOINT instructions are deleted before reflection.\n"
         "  - When reflecting in history-file, it does not check the syntax of the lines to be reflected.\n"
-        "  - Internally, logging such as the number of reflected lines is performed.\n"
+        "  - Internally, the necessary logging such as the number of reflected lines is performed.\n"
     , stdout);
 }
 

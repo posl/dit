@@ -18,7 +18,7 @@
 #define REFLECT_FILE_P "/dit/srv/reflect-report.prov"
 #define REFLECT_FILE_R "/dit/srv/reflect-report.real"
 
-#define REFL_INITIAL_LINES_MAX 32
+#define PTNFOR_CMD_OR_ENTRYPOINT "^[[:space:]]*(CMD|ENTRYPOINT)[[:space:]]"
 
 #define update_provisional_report(reflecteds)  manage_provisional_report(reflecteds, "r+w\0")
 #define reset_provisional_report(reflecteds)  manage_provisional_report(reflecteds, "r\0w\0")
@@ -36,30 +36,41 @@ typedef struct {
 
 /** Data type for storing some data commonly used in this command */
 typedef struct {
+    int target_id;        /** 1 (targets Dockerfile), 0 (targets history-file) */
     size_t lines_num;     /** the number of lines to be reflected */
-    char **lines;         /** array of lines to be reflected */
-    size_t ptrs_num;      /** the number of dynamic memory allocated */
-    char **ptrs;          /** array of pointers to the beginning of dynamic memory allocated */
+    char *lines;          /** sequence of all lines to be reflected in the target file */
     int reflecteds[2];    /** array of length 2 for storing the provisional number of reflected lines */
-    bool cmd_flag;        /** whether to reflect CMD or ENTRYPOINT instruction in Dockerfile */
-    bool onbuild_flag;    /** whether to convert normal Dockerfile instructions to ONBUILD instructions */
+    int instr_c;          /** flag set when reflecting specific Dockerfile instructions ('C', 'O' or '\0') */
 } refl_data;
 
 
 static int parse_opts(int argc, char **argv, refl_opts *opt);
-static int do_reflect(int argc, char **argv, refl_opts *opt);
+static int do_reflect(int argc, char **argv, const refl_opts *opt);
 
-static int construct_refl_data(refl_data *data, int argc, char **argv, const refl_opts *opt);
-static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag);
+static int construct_refl_data(refl_data *data, int argc, char **argv, int blank_c);
+static int reflect_lines(refl_data *data, const refl_opts *opt);
+
+static const char *check_dockerfile_instr(char *target);
+static size_t read_dockerfile_base(char **p_start);
 
 static int record_reflected_lines(void);
 static int manage_provisional_report(int reflecteds[2], const char *mode);
 
 
+extern const char * const target_files[2];
+extern const char * const convert_results[2];
+
 extern const char * const blank_args[ARGS_NUM];
 extern const char * const target_args[ARGS_NUM];
 
-extern const char * const docker_instr_reprs[DOCKER_INSTRS_NUM];
+
+/** boolean value to prevent display confusion in certain cases when some errors occur */
+static bool no_suggestion = false;
+
+
+/** whether this command found a CMD/ENTRYPOINT instruction in the lines to be reflected in Dockerfile */
+static bool first_cmd = true;
+static bool first_entrypoint = true;
 
 
 
@@ -104,8 +115,12 @@ int reflect(int argc, char **argv){
             exit_status = FAILURE;
             xperror_internal_file();
         }
+        else if (no_suggestion)
+            goto exit;
         xperror_suggestion(true);
     }
+
+exit:
     return exit_status;
 }
 
@@ -182,8 +197,10 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
                 return ERROR_EXIT;
         }
 
-    if (opt->target_c)
+    if (opt->target_c){
+        assert((opt->target_c == 'b') || (opt->target_c == 'd') || (opt->target_c == 'h'));
         return SUCCESS;
+    }
 
     xperror_target_files();
     return ERROR_EXIT;
@@ -197,50 +214,33 @@ static int parse_opts(int argc, char **argv, refl_opts *opt){
  *
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
- * @param[out] opt  variable to store the results of option parse
+ * @param[in]  opt  variable to store the results of option parse
  * @return int  0 (success), 1 (possible error) or negative integer (unexpected error)
  */
-static int do_reflect(int argc, char **argv, refl_opts *opt){
+static int do_reflect(int argc, char **argv, const refl_opts *opt){
     assert(opt);
 
-    int tmp, exit_status = SUCCESS;
-    bool both_flag = false;
+    int offset = 2, tmp, exit_status = SUCCESS;
+    refl_data data = { .reflecteds = {0} };
 
-    tmp = argc;
-
-    if (argc <= 0){
+    if (argc < 0)
         argc = 0;
-        tmp = 1;
-    }
 
-    if (opt->target_c == 'b'){
-        opt->target_c = 'd';
-        both_flag = true;
-    }
+    do
+        if (opt->target_c != "dh"[--offset]){
+            data.target_id = offset;
 
-    char *ptrs[tmp], **p_ptr;
-    refl_data data = { .reflecteds = {0}, .ptrs = ptrs };
+            if (! construct_refl_data(&data, argc, argv, opt->blank_c)){
+                if ((tmp = reflect_lines(&data, opt)) && (exit_status >= 0))
+                    exit_status = tmp;
+            }
+            else if (! exit_status)
+                exit_status = POSSIBLE_ERROR;
 
-    do {
-        assert((opt->target_c == 'd') || (opt->target_c == 'h'));
-
-        if (! construct_refl_data(&data, argc, argv, opt)){
-            if ((tmp = reflect_lines(&data, opt, both_flag)) && (exit_status >= 0))
-                exit_status = tmp;
+            if (data.lines)
+                free(data.lines);
         }
-        else if (! exit_status)
-            exit_status = POSSIBLE_ERROR;
-
-        if (data.lines)
-            free(data.lines);
-        for (p_ptr = data.ptrs; data.ptrs_num--; p_ptr++)
-            free(*p_ptr);
-
-        if (both_flag && (opt->target_c != 'h'))
-            opt->target_c = 'h';
-        else
-            break;
-    } while (true);
+    while (offset);
 
     if (update_provisional_report(data.reflecteds))
         exit_status = UNEXPECTED_ERROR;
@@ -252,27 +252,27 @@ static int do_reflect(int argc, char **argv, refl_opts *opt){
 /**
  * @brief reflect the specified lines in Dockerfile, and record the number of reflected lines.
  *
- * @param[in]  lines  array of lines to be reflected
- * @param[in]  size  array size
- * @param[in]  cmd_flag  whether to reflect CMD or ENTRYPOINT instruction
- * @param[in]  flag_c  flag code ('C' (cmd_flag), 'O' (onbuild_flag) or '\0' (no flags))
+ * @param[in]  lines_num  the number of lines to be reflected
+ * @param[in]  lines  sequence of all lines to be reflected in the target file
+ * @param[in]  verbose  whether to display reflected lines on screen
+ * @param[in]  instr_c  flag set when reflecting specific Dockerfile instructions ('C', 'O' or '\0')
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note if the return value is -1, an internal file error has occurred, but the processing can be continued.
  * @attention internally, it may use 'xfgets_for_loop' with a depth of 1.
  */
-int reflect_to_dockerfile(char **lines, size_t size, bool verbose, int flag_c){
+int reflect_to_dockerfile(size_t lines_num, char *lines, bool verbose, int instr_c){
     assert(lines);
-    assert((flag_c == 'C') || (flag_c == 'O') || (! flag_c));
+    assert((instr_c == 'C') || (instr_c == 'O') || (! instr_c));
 
     int exit_status;
 
     refl_data data = {
-        .lines_num = size,
+        .target_id = 1,
+        .lines_num = lines_num,
         .lines = lines,
         .reflecteds = {0},
-        .cmd_flag = (flag_c == 'C'),
-        .onbuild_flag = (flag_c == 'O')
+        .instr_c = instr_c
     };
 
     refl_opts opt = {
@@ -280,7 +280,7 @@ int reflect_to_dockerfile(char **lines, size_t size, bool verbose, int flag_c){
         .verbose = verbose
     };
 
-    exit_status = reflect_lines(&data, &opt, false);
+    exit_status = reflect_lines(&data, &opt);
 
     if (update_provisional_report(data.reflecteds) && (exit_status >= 0))
         exit_status = UNEXPECTED_ERROR - exit_status;
@@ -302,140 +302,94 @@ int reflect_to_dockerfile(char **lines, size_t size, bool verbose, int flag_c){
  * @param[out] data  variable to store the data commonly used in this command
  * @param[in]  argc  the number of non-optional arguments
  * @param[in]  argv  array of strings that are non-optional arguments
- * @param[in]  opt  variable to store the results of option parse
+ * @param[in]  blank_c  how to handle the empty lines ('p', 's' or 't')
  * @return int  0 (success) or 1 (possible error)
  *
  * @note if no non-optional arguments, uses the convert-file prepared by this tool and reset it after use.
  * @note squeezing repeated empty lines is done across multiple source files.
  * @note each CMD and ENTRYPOINT instruction must meet the limit of 1 or less.
  */
-static int construct_refl_data(refl_data *data, int argc, char **argv, const refl_opts *opt){
+static int construct_refl_data(refl_data *data, int argc, char **argv, int blank_c){
     assert(data);
-    assert(data->ptrs);
+    assert(data->target_id == ((bool) data->target_id));
+    assert(! data->reflecteds[data->target_id]);
     assert(argc >= 0);
     assert(argv);
-    assert(opt);
 
-    char **p_ptr, *line;
     const char *src_file, *errdesc = NULL;
-    int exit_status = SUCCESS, lineno, id;
-    bool first_blank = true, first_cmd = true, first_entrypoint = true;
-    size_t curr_size = 0, old_size = 0;
-    void *ptr;
+    int lineno, tmp, exit_status = SUCCESS;
+    char *line;
+    bool first_blank = true;
+    size_t total = 0, size;
+    inf_str istr = {0};
 
     data->lines_num = 0;
-    data->lines = NULL;
-    data->ptrs_num = 0;
-    p_ptr = data->ptrs;
+    data->instr_c = '\0';
 
     do {
         if (argc){
-            if (! ((src_file = *(argv++)) && *src_file))
+            if (! (src_file = *(argv++)))
                 continue;
-            if (check_if_stdin(src_file))
+            if (*src_file && check_if_stdin(src_file))
                 src_file = NULL;
         }
-        else if (opt->target_c == 'd')
-            src_file = CONVERT_RESULT_FILE_D;
         else
-            src_file = CONVERT_RESULT_FILE_H;
+            src_file = convert_results[data->target_id];
 
-        if (src_file && (get_file_size(src_file) < 0)){
-            exit_status = POSSIBLE_ERROR;
-            xperror_standards(src_file, errno);
-            break;
-        }
-
-        for (lineno = 0; (line = xfgets_for_loop(src_file, p_ptr, &exit_status)); lineno++){
-            if (! *line){
-                switch (opt->blank_c){
-                    case 's':
-                        if (first_blank){
-                            first_blank = false;
-                            break;
-                        }
-                    case 't':
-                        continue;
-                    default:
-                        assert(opt->blank_c == 'p');
-                }
-            }
-            else
-                first_blank = true;
-
-            if (argc && (opt->target_c == 'd')){
-                id = -1;
-
-                if (receive_dockerfile_instr(line, &id)){
-                    assert((id >= -1) && (id < DOCKER_INSTRS_NUM));
-
-                    switch (id){
-                        case ID_CMD:
-                            if (! first_cmd)
-                                errdesc = "duplicated CMD instruction";
-                            first_cmd = false;
-                            break;
-                        case ID_ENTRYPOINT:
-                            if (! first_entrypoint)
-                                errdesc = "duplicated ENTRYPOINT instruction";
-                            first_entrypoint = false;
-                            break;
-                        case ID_FROM:
-                        case ID_MAINTAINER:
-                            errdesc = "instruction not allowed";
+        if ((! src_file) || (get_file_size(src_file) >= 0)){
+            for (lineno = 0, tmp = 0; (line = xfgets_for_loop(src_file, NULL, &tmp)); lineno++){
+                if (! *line){
+                    switch (blank_c){
+                        case 's':
+                            if (first_blank){
+                                first_blank = false;
+                                break;
+                            }
+                        case 't':
+                            continue;
+                        default:
+                            assert(blank_c == 'p');
                     }
                 }
                 else
-                    errdesc = "invalid instruction";
+                    first_blank = true;
 
-                if (errdesc){
-                    exit_status = -1;
-                    continue;
+                assert(! errdesc);
+                assert(total <= INT_MAX);
+
+                tmp = -1;
+
+                if (! (argc && data->target_id && (errdesc = check_dockerfile_instr(line)))){
+                    size = strlen(line) + 1;
+
+                    if (size >= (INT_MAX - total))
+                        errdesc = "read size overflow detected";
+                    else if (xstrcat_inf_len(&istr, total, line, size)){
+                        tmp = 0;
+                        total += size;
+                        data->lines_num++;
+                    }
                 }
             }
 
-            if (data->lines_num == curr_size){
-                curr_size = old_size ? (old_size * 2) : REFL_INITIAL_LINES_MAX;
-
-                if ((old_size < curr_size) && (ptr = realloc(data->lines, (sizeof(char *) * curr_size)))){
-                    data->lines = (char **) ptr;
-                    old_size = curr_size;
-                }
-                else {
-                    exit_status = -1;
-                    continue;
-                }
+            if (tmp){
+                if (errdesc)
+                    xperror_file_contents(src_file, lineno, errdesc);
+                exit_status = POSSIBLE_ERROR;
+                break;
             }
-
-            assert(data->lines);
-            data->lines[data->lines_num++] = line;
         }
-
-        if (*p_ptr){
-            data->ptrs_num++;
-            p_ptr++;
-        }
-        if (exit_status){
+        else {
             exit_status = POSSIBLE_ERROR;
-
-            if (errdesc)
-                xperror_file_contents(src_file, lineno, errdesc);
-            break;
-        }
-        if (! argc){
-            assert(src_file);
-            assert(! errdesc);
-
-            if ((id = open(src_file, (O_RDWR | O_CREAT | O_TRUNC))) != -1)
-                close(id);
+            xperror_standards(src_file, errno);
         }
     } while (--argc > 0);
 
-    data->cmd_flag = false;
-    data->onbuild_flag = false;
+    assert(data->lines_num < INT_MAX);
+    data->lines = istr.ptr;
 
     if (! (first_cmd && first_entrypoint))
-        data->cmd_flag = true;
+        data->instr_c = 'C';
 
     return exit_status;
 }
@@ -448,122 +402,199 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, const ref
  *
  * @param[out] data  variable to store the data commonly used in this command
  * @param[in]  opt  variable to store the results of option parse
- * @param[in]  both_flag  whether to edit both Dockerfile and history-file
  * @return int  0 (success), 1 (possible error), -1 (unexpected error) -2 (unexpected error & error exit)
  *
  * @note if the return value is -1, an internal file error has occurred, but the processing can be continued.
- * @note if the Dockerfile.draft is empty, it will be initialized based on its base file.
+ * @note if Dockerfile is empty, it will be initialized based on its base file.
  */
-static int reflect_lines(refl_data *data, const refl_opts *opt, bool both_flag){
+static int reflect_lines(refl_data *data, const refl_opts *opt){
     assert(data);
+    assert(data->target_id == ((bool) data->target_id));
+    assert(! data->reflecteds[data->target_id]);
     assert(opt);
 
-    unsigned int target_id;
     const char *dest_file;
     int file_size, exit_status = SUCCESS;
+    char *seq = NULL;
 
-    if (opt->target_c == 'd'){
-        target_id = 1;
-        dest_file = DOCKER_FILE_DRAFT;
-    }
-    else {
-        target_id = 0;
-        dest_file = HISTORY_FILE;
-    }
-
-    assert(! data->reflecteds[target_id]);
+    dest_file = target_files[data->target_id];
 
     if ((file_size = get_file_size(dest_file)) != -2){
-        if (data->cmd_flag && (file_size >= 0)){
-            char seq[] = "^[[:space:]]*CMD[[:space:]]\0^[[:space:]]*ENTRYPOINT[[:space:]]";
-            char *patterns[2] = { seq, (seq + 28) };
-
-            exit_status = delete_from_dockerfile(patterns, 2, false, 'Y');
-        }
-
-        if ((exit_status == SUCCESS) || (exit_status == UNEXPECTED_ERROR)){
+        if (data->lines_num){
+            size_t remain = 0;
+            char *line;
             FILE *fps[2];
 
+            if (data->target_id){
+                if (file_size < 0){
+                    if (! (remain = read_dockerfile_base(&seq))){
+                        exit_status = FATAL_ERROR;
+                        goto exit;
+                    }
+                    assert(seq);
+                    line = seq;
+                }
+                else if (data->instr_c == 'C'){
+                    line = PTNFOR_CMD_OR_ENTRYPOINT;
+                    exit_status = delete_from_dockerfile(&line, 1, false, 'Y');
+
+                    if (exit_status && (exit_status != UNEXPECTED_ERROR)){
+                        assert((exit_status == POSSIBLE_ERROR) || (exit_status == FATAL_ERROR));
+                        goto exit;
+                    }
+                }
+            }
+
             if ((fps[0] = fopen(dest_file, "a"))){
-                int i, fpn = 1, phase = 1, id = 0, addition = 1;
-                size_t remain, new_size;
-                char **p_line, *line;
+                int fpn = 1, extra_size = 0, offset;
                 const char *format = "%s\n";
+                size_t size, new_size;
+
+                if (file_size < 0)
+                    file_size = 0;
 
                 if (opt->verbose){
-                    if (both_flag)
-                        print_target_repr(target_id);
+                    if (opt->target_c == 'b'){
+                        no_suggestion = (! data->target_id);
+                        print_target_repr(data->target_id);
+                    }
                     fps[fpn++] = stdout;
                 }
 
-                if (file_size <= 0){
-                    file_size = 0;
-
-                    if (target_id)
-                        phase = 0;
-                }
-
-                remain = data->lines_num;
-                p_line = data->lines;
-
-                new_size = file_size;
-
                 do {
-                    switch (phase){
-                        case 0:
-                            if ((line = xfgets_for_loop(DOCKER_FILE_BASE, NULL, &id))){
-                                id = -1;
-                                if (receive_dockerfile_instr(line, &id) && (file_size || (id == ID_FROM))){
-                                    id = 0;
-                                    break;
-                                }
+                    if (! remain){
+                        remain = data->lines_num;
+                        line = data->lines;
+                        data->lines_num = 0;
+
+                        if (data->instr_c == 'O'){
+                            format = "ONBUILD %s\n";
+                            extra_size = 8;
+                        }
+                    }
+                    assert(remain);
+                    assert(line);
+
+                    do {
+                        size = strlen(line) + 1;
+                        new_size = size + extra_size;
+
+                        if (size <= new_size){
+                            assert(new_size);
+                            new_size += file_size;
+
+                            if ((file_size < new_size) && (new_size < INT_MAX)){
+                                file_size = new_size;
+                                data->reflecteds[data->target_id]++;
+
+                                for (offset = fpn; offset--;)
+                                    fprintf(fps[offset], format, line);
+
+                                line += size;
                                 continue;
                             }
-                            if (id){
-                                exit_status = FATAL_ERROR;
-                                break;
-                            }
-                        case 1:
-                            if (data->onbuild_flag){
-                                format = "ONBUILD %s\n";
-                                addition += 8;
-                            }
-                            phase = 2;
-                        default:
-                            line = (remain--) ? *(p_line++) : NULL;
-                    }
-                    if (! line)
+                        }
+                        xperror_message("write size overflow detected", dest_file);
+                        assert(! data->lines_num);
                         break;
+                    } while (--remain);
 
-                    assert(addition);
-                    new_size += strlen(line) + addition;
-
-                    if ((file_size < new_size) && (new_size < INT_MAX)){
-                        file_size = new_size;
-                        data->reflecteds[target_id]++;
-
-                        for (i = fpn; i--;)
-                            fprintf(fps[i], format, line);
-                    }
-                    else {
-                        exit_status = (! exit_status) ? POSSIBLE_ERROR : FATAL_ERROR;
-                        xperror_message("file size overflow detected", dest_file);
-                        break;
-                    }
-                } while (true);
+                } while (data->lines_num);
 
                 fclose(fps[0]);
             }
             else
-                exit_status = (! exit_status) ? POSSIBLE_ERROR : FATAL_ERROR;
+                exit_status = FATAL_ERROR;
         }
     }
     else {
-        exit_status = POSSIBLE_ERROR;
+        assert(errno == EFBIG);
         xperror_standards(dest_file, errno);
     }
 
+exit:
+    if (seq)
+        free(seq);
+
     return exit_status;
+}
+
+
+
+
+/******************************************************************************
+    * Utilities
+******************************************************************************/
+
+
+/**
+ * @brief receive the target string as a Dockerfile instruction and determine if there is an error.
+ *
+ * @param[in]  target  target string
+ * @return const char*  a message indicating an error, if any
+ *
+ * @note updates the global variables 'first_cmd' and 'first_entrypoint' appropriately..
+ */
+static const char *check_dockerfile_instr(char *target){
+    assert(target);
+
+    int instr_id = -1;
+    const char *errdesc = "invalid instruction";
+
+    if (receive_dockerfile_instr(target, &instr_id)){
+        assert((instr_id >= -1) && (instr_id < DOCKER_INSTRS_NUM));
+        errdesc = NULL;
+
+        switch (instr_id){
+            case ID_CMD:
+                if (! first_cmd)
+                    errdesc = "duplicated CMD instruction";
+                first_cmd = false;
+                break;
+            case ID_ENTRYPOINT:
+                if (! first_entrypoint)
+                    errdesc = "duplicated ENTRYPOINT instruction";
+                first_entrypoint = false;
+                break;
+            case ID_FROM:
+            case ID_MAINTAINER:
+                errdesc = "instruction not allowed";
+        }
+    }
+
+    return errdesc;
+}
+
+
+/**
+ * @brief load into memory the base file of Dockerfile developed by this tool.
+ *
+ * @param[out] p_start  pointer to the beginning of a series of strings
+ * @return size_t  the number of lines loaded or 0
+ *
+ * @note the return value of 0 means an unexpected error occurred.
+ * @attention if the contents of 'p_start' is non-NULL, it should be released by the caller.
+ */
+static size_t read_dockerfile_base(char **p_start){
+    assert(p_start);
+
+    char *line;
+    int errid = 0, instr_id;
+    size_t lines_num = 0;
+
+    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, p_start, &errid))){
+        instr_id = -1;
+
+        if (receive_dockerfile_instr(line, &instr_id) && (lines_num || (instr_id == ID_FROM)))
+            lines_num++;
+        else {
+            errid = -1;
+            lines_num = 0;
+        }
+    }
+
+    assert(! (errid && lines_num));
+    return lines_num;
 }
 
 
