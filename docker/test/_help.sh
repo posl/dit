@@ -10,7 +10,7 @@ dit help --unit-tests
 
 
 #
-# Preprocessings
+# Preprocessing
 #
 
 set +x
