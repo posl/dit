@@ -820,7 +820,6 @@ int update_erase_logs(int reflecteds[2]){
  *
  * @note the argument types match those of 'parse_opts' in order to treat this function in the same way.
  * @note the actual types are 'size_t', 'const char * const *', 'const erase_opts *' and 'erase_data *'.
- * @note set 'data->first_mark' to true during the loop to combine the conditions with a logical OR.
  *
  * @attention there must be at least one regular expression pattern to determine which lines to delete.
  */
@@ -832,14 +831,12 @@ static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, e
 
     int exit_status = SUCCESS;
 
-    do {
-        data->first_mark = true;
-
+    do
         if (marklines_containing_pattern(data, *(patterns++), opt->ignore_case)){
             exit_status = ERROR_EXIT;
             break;
         }
-    } while (--size);
+    while (--size);
 
     return exit_status;
 }
