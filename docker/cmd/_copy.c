@@ -127,9 +127,17 @@ static int parse_opts(int argc, char **argv, copy_opts *opt){
                 copy_manual();
                 return NORMALLY_EXIT;
             case 0:
-                if (optarg && parse_owner(optarg)){
-                    opt->chown_arg = optarg;
-                    break;
+                if (optarg){
+                    if ((! *optarg) || strchrcmp(optarg, ':')){
+                        uid = 0;
+                        gid = 0;
+                        opt->chown_arg = NULL;
+                        break;
+                    }
+                    if (parse_owner(optarg)){
+                        opt->chown_arg = optarg;
+                        break;
+                    }
                 }
                 xperror_invalid_arg('O', 1, long_opts[i].name, optarg);
             default:
