@@ -201,11 +201,14 @@ int main(int argc, char **argv){
     setvbuf(stderr, NULL, _IOLBF, 0);
 
     if ((argc > 0) && argv && *argv){
-        *argv = get_suffix(*argv, '/', true);
+        char *tmp;
+        int cmd_id;
+
+        if ((tmp = strrchr(*argv, '/')))
+            *argv = tmp + 1;
 
         // compare with "dit"
         if (strcmp(*argv, program_name) || (--argc && *(++argv))){
-            int cmd_id;
             cmd_id = receive_expected_string(*argv, cmd_reprs, CMDS_NUM, 0);
 
 #ifndef NDEBUG
@@ -1162,35 +1165,6 @@ int get_last_exit_status(void){
 }
 
 
-/**
- * @brief get the suffix of target string.
- *
- * @param[in]  target  target string
- * @param[in]  delimiter  delimiter character
- * @param[in]  retain  whether to retain target string if it has no delimiter
- * @return char*  the resulting suffix
- *
- * @note target string is of type 'char *', but its contents are not changed inside this function.
- */
-char *get_suffix(char *target, int delimiter, bool retain){
-    assert(target);
-    assert(delimiter == ((char) delimiter));
-
-    char *suffix, *tmp;
-
-    suffix = (tmp = target);
-
-    while (*tmp)
-        if (*(tmp++) == delimiter)
-            suffix = tmp;
-
-    if ((! retain) && (suffix == target))
-        suffix = tmp;
-
-    return suffix;
-}
-
-
 
 
 /**
@@ -1300,7 +1274,6 @@ static void receive_dockerfile_instr_test(void);
 
 static void get_file_size_test(void);
 static void get_last_exit_status_test(void);
-static void get_suffix_test(void);
 static void get_sanitized_string_test(void);
 
 
@@ -1317,7 +1290,6 @@ void dit_test(void){
 
     do_test(get_file_size_test);
     do_test(get_last_exit_status_test);
-    do_test(get_suffix_test);
     do_test(get_sanitized_string_test);
 
     do_test(execute_test);
@@ -1692,7 +1664,8 @@ static void walk_test(void){
     int i, c;
     char cmdline[128];
     struct stat file_stat;
-    void *addr, *found, *walked;
+    void *addr;
+    const char *found, *walked, *tmp;
     size_t name_len;
 
     for (i = 0; root_dirs[i]; i++){
@@ -1711,14 +1684,15 @@ static void walk_test(void){
         assert(file_stat.st_size >= 0);
         assert((addr = mmap(NULL, file_stat.st_size, PROT_READ, MAP_PRIVATE, c, 0)) != MAP_FAILED);
 
-        found = addr;
+        found = (const char *) addr;
         walked = walked_istr.ptr;
 
         while (walked_len){
-            found = get_suffix(found, '/', true);
+            if ((tmp = strrchr(found, '/')))
+                found = tmp + 1;
             name_len = strlen(found) + 1;
 
-            fprintf(stderr, "    strcmp(W, F):  '%s'  '%s'\n", ((char *) walked), ((char *) found));
+            fprintf(stderr, "    strcmp(W, F):  '%s'  '%s'\n", walked, found);
             assert(! memcmp(walked, found, name_len));
 
             found += name_len;
@@ -2000,45 +1974,6 @@ static void get_last_exit_status_test(void){
 
         print_progress_test_loop('\0', -1, i);
         fprintf(stderr, "% 6d  % 4d\n", table[i].input, table[i].result);
-    }
-}
-
-
-
-
-static void get_suffix_test(void){
-    const struct {
-        const char *target;
-        const int delimiter;
-        const bool retain;
-        const char *suffix;
-    }
-    // changeable part for updating test cases
-    table[] = {
-        { "main.c",             '/',  true, "main.c"    },
-        { "/etc/profile.d",     '/',  true, "profile.d" },
-        { "/usr/local/bin/dit", '/',  true, "dit"       },
-        { "~/.bashrc",          '/',  true, ".bashrc"   },
-        { "//var//",            '/',  true, ""          },
-        { "../test//main.sh",   '/',  true, "main.sh"   },
-        { "main.c",             '.', false, "c"         },
-        { "README.md",          '.', false, "md"        },
-        { "..",                 '.', false, ""          },
-        { "utils.py.test",      '.', false, "test"      },
-        { "ISSUE_TEMPLATE",     '.', false, ""          },
-        { ".gitignore",         '.', false, "gitignore" },
-        {  0,                    0,     0,   0          }
-    };
-
-    int i;
-    char target[32];
-
-    for (i = 0; table[i].target; i++){
-        memcpy(target, table[i].target, (sizeof(char) * (strlen(table[i].target) + 1)));
-        assert(! strcmp(get_suffix(target, table[i].delimiter, table[i].retain), table[i].suffix));
-
-        print_progress_test_loop('\0', -1, i);
-        fprintf(stderr, "%-18s  '%s'\n", table[i].target, table[i].suffix);
     }
 }
 

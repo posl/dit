@@ -281,7 +281,6 @@ char *receive_dockerfile_instr(char *line, int *p_id);
 
 int get_file_size(const char *file_name);
 int get_last_exit_status(void);
-char *get_suffix(char *target, int delimiter, bool retain);
 
 size_t get_sanitized_string(char *dest, const char *target, bool quoted);
 void print_sanitized_string(const char *target);

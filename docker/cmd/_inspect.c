@@ -503,12 +503,18 @@ static int fcmp_ext(const file_node *file1, const file_node *file2){
     assert(file1);
     assert(file2);
 
-    const char *ext1, *ext2;
+    const char *names[2], *tmp;
 
-    ext1 = get_suffix(file1->name, '.', false);
-    ext2 = get_suffix(file2->name, '.', false);
+    names[0] = file1->name;
+    names[1] = file2->name;
 
-    return strcmp(ext1, ext2);
+    for (int i = 2; i--;){
+        assert(i == ((bool) i));
+        assert(names[i]);
+        names[i] = (tmp = strrchr(names[i], '.')) ? (tmp + 1) : "";
+    }
+
+    return strcmp(names[0], names[1]);
 }
 
 
@@ -708,29 +714,30 @@ static void print_file_owner(const file_node *file, bool numeric_id){
 static void print_file_size(off_t size){
     assert(size >= 0);
 
-    unsigned int i = 0, rem = 0;
-    char unit = '\0';
-    const char *format;
+    unsigned int i = 0;
+    lldiv_t tmp = {0};
+    const char *format = " #EXCESS    ";
+    int rem = 0, unit = '\0';
 
     while (size >= 1000){
         i++;
-        rem = size % 1000;
-        size /= 1000;
+        tmp = lldiv(size, 1000);
+
+        assert(size > tmp.quot);
+        size = tmp.quot;
     }
 
     if (i < 8){
-        if (i){
-            rem /= 100;
-            unit = " kMGTPEZ"[i];
-            format = "%3u.%1u %cB    ";
-        }
-        else
-            format = "%6u B    ";
+        format = "%6u B    ";
 
-        fprintf(stdout, format, ((unsigned int) size), rem, unit);
+        if (i){
+            format = "%3u.%1d %cB    ";
+            rem = tmp.rem / 100;
+            unit = " kMGTPEZ"[i];
+        }
     }
-    else
-        fputs(" #EXCESS    ", stdout);
+
+    fprintf(stdout, format, ((unsigned int) size), rem, unit);
 }
 
 
