@@ -252,17 +252,15 @@ int main(int argc, char **argv){
 void xperror_invalid_arg(int code_c, int state, const char *desc, const char *arg){
     assert(desc);
 
-    size_t size = 1;
-
-    if (arg)
-        size = strlen(arg) * 4 + 1;
+    size_t size;
+    size = arg ? (strlen(arg) * 4 + 1) : 6;
 
     char buf[size];
 
     if (arg)
         get_sanitized_string(buf, arg, true);
     else
-        *buf = '\0';
+        memcpy(buf, "#NULL", 6);
 
     const char *format, *addition = "", *adjective;
 
@@ -1117,6 +1115,37 @@ char *receive_dockerfile_instr(char *line, int *p_id){
 
 
 /**
+ * @brief get the first line of target file.
+ *
+ * @param[in]  file_name  target file name
+ * @return char*  the resulting line or NULL
+ *
+ * @note if the content of the target file spans multiple lines, it is regarded as an error.
+ *
+ * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
+ * @attention if the return value is non-NULL, it should be released by the caller.
+ */
+char *get_one_liner(const char *file_name){
+    char *line;
+    int errid = 0;
+    bool first_line = true;
+
+    while (xfgets_for_loop(file_name, &line, &errid)){
+        if (! first_line){
+            assert(line);
+            free(line);
+            line = NULL;
+            errid = -1;
+        }
+        first_line = false;
+    }
+    return line;
+}
+
+
+
+
+/**
  * @brief get the size of target file.
  *
  * @param[in]  file_name  target file name
@@ -1138,7 +1167,6 @@ int get_file_size(const char *file_name){
             errno = EFBIG;
         }
     }
-
     return i;
 }
 
@@ -1151,16 +1179,14 @@ int get_file_size(const char *file_name){
  * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
  */
 int get_last_exit_status(void){
-    const char *line;
-    int errid = 0, i = -1;
+    char *line;
+    int i = -1;
 
-    while ((line = xfgets_for_loop(EXIT_STATUS_FILE, NULL, &errid))){
-        errid = -1;
-
+    if ((line = get_one_liner(EXIT_STATUS_FILE))){
         if ((i = receive_positive_integer(line, NULL)) >= 256)
             i = -1;
+        free(line);
     }
-
     return i;
 }
 
@@ -1272,6 +1298,7 @@ static void receive_positive_integer_test(void);
 static void receive_expected_string_test(void);
 static void receive_dockerfile_instr_test(void);
 
+static void get_one_liner_test(void);
 static void get_file_size_test(void);
 static void get_last_exit_status_test(void);
 static void get_sanitized_string_test(void);
@@ -1288,6 +1315,7 @@ void dit_test(void){
     do_test(receive_expected_string_test);
     do_test(receive_dockerfile_instr_test);
 
+    do_test(get_one_liner_test);
     do_test(get_file_size_test);
     do_test(get_last_exit_status_test);
     do_test(get_sanitized_string_test);
@@ -1890,6 +1918,56 @@ static void receive_dockerfile_instr_test(void){
 
 
 
+static void get_one_liner_test(void){
+    const struct {
+        const char * const input;
+        const char * const result;
+    }
+    // changeable part for updating test cases
+    table[] = {
+        { "\n",           ""       },
+        { "abc de\n",     "abc de" },
+        { "\t-1",         "\t-1"   },
+        { "%%~%%",        "%%~%%"  },
+        { "",              NULL    },
+        { "apple\npen\n",  NULL    },
+        { "\n\n",          NULL    },
+        { "\n\n\n",        NULL    },
+        {  0,                0     }
+    };
+
+
+    int i;
+    FILE *fp;
+    char *line;
+
+    for (i = 0; table[i].input; i++){
+        assert((fp = fopen(TMP_FILE1, "w")));
+        assert(fputs(table[i].input, fp) >= 0);
+        assert(! fclose(fp));
+
+        line = get_one_liner(TMP_FILE1);
+
+        if (table[i].result){
+            assert(line);
+            assert(! strcmp(line, table[i].result));
+            free(line);
+            line = NULL;
+        }
+        assert(! line);
+
+        print_progress_test_loop('\0', -1, i);
+        fprintf(stderr, "'%s'\n", table[i].result ? table[i].result : "#NULL");
+    }
+
+    assert(! unlink(TMP_FILE1));
+    assert(! get_one_liner(TMP_FILE1));
+    assert(errno == ENOENT);
+}
+
+
+
+
 static void get_file_size_test(void){
     assert(sizeof(char) == 1);
 
@@ -1952,13 +2030,15 @@ static void get_last_exit_status_test(void){
     // changeable part for updating test cases
     table[] = {
         { "%d\n",                     0,    0 },
-        { "%d\nto be ignored\n",    128,  128 },
-        { "%d",                       1,    1 },
-        { "%d\n",                 18610,   -1 },
-        { "-1\ninvalid status\n",    -1,   -1 },
+        { "127\n",                   -1,  127 },
+        { "%d",                     255,  255 },
+        { "1",                       -1,    1 },
+        { "%d\n",                   256,   -1 },
+        { "\n",                      -1,   -1 },
+        { "%d\nsuperfluous\n",        2,   -1 },
         { "",                        -1,   -1 },
         { "%d\n",                  curr, curr },
-        {  0,                         0,    0 },
+        {  0,                         0,    0 }
     };
 
 

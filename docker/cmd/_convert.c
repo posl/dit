@@ -14,24 +14,15 @@ int convert(int argc, char **argv){
 
     if (! get_last_exit_status()){
         char *line;
-        int offset = 0;
-        bool first_line = true;
 
-        while (xfgets_for_loop(COMMAND_LINE_FILE, &line, &offset)){
-            if (! first_line)
-                offset = -1;
-
-            first_line = false;
-        }
-
-        if (line){
+        if ((line = get_one_liner(COMMAND_LINE_FILE))){
             unsigned char modes[2];
 
-            if (! (offset || get_config(NULL, modes))){
+            if (! get_config(NULL, modes)){
+                int offset = 2;
                 FILE* fp;
 
                 exit_status = SUCCESS;
-                offset = 2;
 
                 do
                     if (modes[--offset] && (fp = fopen(convert_results[offset], "w"))){

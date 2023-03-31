@@ -29,19 +29,10 @@
  */
 int package(int argc, char **argv){
     char *line;
-    int errid = 0;
-    bool first_line = true;
 
-    while (xfgets_for_loop("/dit/etc/package_manager", &line, &errid)){
-        if (! first_line)
-            errid = -1;
-
-        first_line = false;
-    }
-
-    if (line){
-        if (! (errid || strcmp(line, "apk"))){
-            char *cmd[] = { "apk", "add", "--no-cache", "bash", NULL };
+    if ((line = get_one_liner("/dit/etc/package_manager"))){
+        if (! strcmp(line, "apk")){
+            char * const cmd[] = { "apk", "add", "--no-cache", "bash", NULL };
 
             if (! execute("/sbin/apk", cmd, 1)){
                 char *instr = "RUN apk add --no-cache bash";
@@ -54,7 +45,6 @@ int package(int argc, char **argv){
                     reflect_to_dockerfile(1, instr, true, '\0');
             }
         }
-
         free(line);
     }
     return SUCCESS;
