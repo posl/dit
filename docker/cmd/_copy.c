@@ -23,6 +23,7 @@ typedef struct {
 
 
 static int parse_opts(int argc, char **argv, copy_opts *opt);
+static bool parse_owner(const char *target);
 static int do_copy(int argc, char **argv, copy_opts *opt);
 
 /*
@@ -34,8 +35,8 @@ static int reflect_copy_instr();
 
 
 /** owner information of the files to be newly created */
-static uid_t new_uid = 0;
-static gid_t new_gid = 0;
+static uid_t uid = 0;
+static gid_t gid = 0;
 
 
 
@@ -83,6 +84,8 @@ int copy(int argc, char **argv){
 }
 
 
+
+
 /**
  * @brief parse optional arguments.
  *
@@ -112,10 +115,6 @@ static int parse_opts(int argc, char **argv, copy_opts *opt){
     opt->chown_arg = NULL;
 
     int c, i;
-    char *tmp, *p_colon;
-    struct passwd *passwd;
-    struct group *group;
-
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0)
         switch (c){
             case 'v':
@@ -128,51 +127,62 @@ static int parse_opts(int argc, char **argv, copy_opts *opt){
                 copy_manual();
                 return NORMALLY_EXIT;
             case 0:
-                if (! optarg)
-                    goto errexit;
-                for (tmp = optarg, p_colon = NULL; *tmp; tmp++){
-                    if (isspace((unsigned  char) *tmp))
-                        goto errexit;
-                    if (*tmp == ':'){
-                        if (p_colon)
-                            goto errexit;
-                        p_colon = tmp;
-                    }
+                if (optarg && parse_owner(optarg)){
+                    opt->chown_arg = optarg;
+                    break;
                 }
-                if (optarg == p_colon)
-                    new_uid = 0;
-                else {
-                    if (p_colon)
-                        *p_colon = '\0';
-                    if ((c = receive_positive_integer(optarg, NULL)) < 0)
-                        c = (passwd = getpwnam(optarg)) ? passwd->pw_uid : -1;
-                    if (p_colon)
-                        *p_colon = ':';
-                    if (c < 0)
-                        goto errexit;
-                    new_uid = c;
-                }
-                if (! ((tmp = p_colon) && *(++tmp)))
-                    new_gid = new_uid;
-                else {
-                    if ((c = receive_positive_integer(tmp, NULL)) < 0){
-                        if (! (group = getgrnam(tmp)))
-                            goto errexit;
-                        c = group->gr_gid;
-                    }
-                    new_gid = c;
-                }
-                opt->chown_arg = optarg;
-                break;
+                xperror_invalid_arg('O', 1, long_opts[i].name, optarg);
             default:
                 return ERROR_EXIT;
         }
 
     return SUCCESS;
+}
+
+
+/**
+ * @brief parse the target string as the argument to set in the chown flag of the COPY instruction.
+ *
+ * @param[in]  target  target string
+ * @return bool  successful or not
+ *
+ * @note neither 'UID_MAX' nor 'GID_MAX' were defined.
+ */
+static bool parse_owner(const char *target){
+    assert(target);
+
+    char *brk;
+    int tmp;
+    struct passwd *passwd;
+    struct group *group;
+
+    if ((brk = strchr(target, ':')))
+        *(brk++) = '\0';
+
+    if (! *target)
+        uid = 0;
+    else if ((tmp = receive_positive_integer(target, NULL)) >= 0)
+        uid = tmp;
+    else if ((passwd = getpwnam(target)))
+        uid = passwd->pw_uid;
+    else
+        goto errexit;
+
+    if (! (brk && *brk))
+        gid = uid;
+    else if ((tmp = receive_positive_integer(brk, NULL)) >= 0)
+        gid = tmp;
+    else if ((group = getgrnam(brk)))
+        gid = group->gr_gid;
+    else
+        goto errexit;
+
+    return true;
 
 errexit:
-    xperror_invalid_arg('O', 1, long_opts[i].name, optarg);
-    return ERROR_EXIT;
+    if (brk)
+        *(--brk) = ':';
+    return false;
 }
 
 
