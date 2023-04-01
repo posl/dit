@@ -6,7 +6,7 @@
 #
 
 do_test_startup_error(){
-    : 'error: a subcommand to be invoked must be specified'
+    : 'error: a subcommand to be invoked must be specified.'
     dit && exit 1
     read -r REPLY
 

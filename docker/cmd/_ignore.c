@@ -273,7 +273,7 @@ static int parse_opts(int argc, char **argv, ig_opts *opt){
 
         if (opt->nothing){
             for (char *tmp = opt->nothing; *tmp; tmp++)
-                *tmp = toupper(*tmp);
+                *tmp = toupper((unsigned char) *tmp);
         }
         else
             opt->nothing = "NONE";
@@ -526,7 +526,7 @@ static int parse_short_opts(const char *target){
 
         exit_status = SUCCESS;
 
-        while ((i = *(target++))){
+        while ((i = (unsigned char) *(target++))){
             assert(i <= UCHAR_MAX);
 
             if (i == ':'){
@@ -577,7 +577,7 @@ static int parse_long_opts(const char *target, ig_conds *data){
         name = target;
 
         for (; i; target++){
-            if ((i = *target) == ':'){
+            if ((i = (unsigned char) *target) == ':'){
                 if (colons < 2){
                     colons++;
                     continue;
@@ -1096,7 +1096,7 @@ bool check_if_ignored(int argc, char **argv){
         yyjson_val *ival;
         yyjson_obj_iter iter;
 
-        for (key = *argv;; key = get_suffix(key, '/', false))
+        for (key = *argv;; key = strrchr(key, '/'))
             if ((ival = get_setting_entity(idoc->root, key, strlen(key))))
                 break;
             else if (! *key)
