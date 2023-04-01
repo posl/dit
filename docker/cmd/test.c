@@ -144,22 +144,14 @@ bool check_if_alphabetical_order(const char * const *reprs, size_t size){
  * @return bool  the resulting boolean
  */
 bool check_if_visually_no_problem(void){
+    char response[2] = "";
     bool no_problem = false;
 
-    fputs("If everything is fine, press enter to proceed: ", stderr);
-    fflush(stderr);
+    get_response("If everything is fine, press enter to proceed: ", "%1[^\n]", response);
 
-    switch (fgetc(stdin)){
-        case '\n':
-            no_problem = true;
-            fputs("Done!\n", stderr);
-            break;
-        case EOF:
-            clearerr(stdin);
-            break;
-        default:
-            fscanf(stdin, "%*[^\n]%*c");
-            break;
+    if (! *response){
+        no_problem = true;
+        fputs("Done!\n", stderr);
     }
 
     return no_problem;

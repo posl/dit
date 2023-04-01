@@ -1143,6 +1143,34 @@ char *get_one_liner(const char *file_name){
 }
 
 
+/**
+ * @brief get the response to the specified inquiry.
+ *
+ * @param[in]  inquiry  inquiry body
+ * @param[in]  format  the format of the input you want to receive
+ * @param[out] ...  variables to receive the input
+ *
+ * @attention the expected input must fit on one line.
+ */
+void get_response(const char *inquiry, const char *format, ...){
+    assert(inquiry);
+    assert(format && strstr(format, "[^\n]"));
+
+    va_list sp;
+    int i;
+
+    fputs(inquiry, stderr);
+    fflush(stderr);
+
+    va_start(sp, format);
+    i = vscanf(format, sp);
+    va_end(sp);
+
+    if ((i == EOF) || (scanf("%*[^\n]") == EOF) || (getchar() == EOF))
+        clearerr(stdin);
+}
+
+
 
 
 /**
@@ -1471,8 +1499,7 @@ static void xfgets_for_loop_test(void){
         assert(puts(line) != EOF);
 
     do {
-        if (! check_if_visually_no_problem())
-            assert(false);
+        assert(check_if_visually_no_problem());
 
         if (start_for_stdin){
             assert(remain);
@@ -1648,8 +1675,7 @@ static void execute_test(void){
 
         fprintf(stderr, "- cat %s\n", addition);
 
-        if (! check_if_visually_no_problem())
-            assert(false);
+        assert(check_if_visually_no_problem());
     }
 }
 

@@ -1342,32 +1342,23 @@ static int confirm_deleted_lines(erase_data *data, const erase_opts *opt, const 
 
                             if (! opt->assume_c){
                                 do {
-                                    fputs("Do you want to delete all of them? [Y/n]  ", stderr);
-                                    fflush(stderr);
-
                                     *answer = '\0';
-                                    fscanf(stdin, "%4[^\n]%*[^\n]", answer);
-                                    c = fgetc(stdin);
-                                    assert(c == '\n');
-
+                                    get_response(
+                                        "Do you want to delete all of them? [Y/n]  ",
+                                            "%4[^\n]", answer
+                                    );
                                 } while ((c = receive_expected_string(answer, assume_args, ARGS_NUM, 3)) < 0);
 
                                 assume_c = *(assume_args[c]);
                             }
                             switch (assume_c){
                                 case 'N':
-                                    fputs(
-                                        "Select the lines to delete with numbers.\n"
-                                        " (separated by commas, length within 63)  "
-                                    , stderr);
-
-                                    fflush(stderr);
-
                                     *range = '\0';
-                                    fscanf(stdin, "%63[^\n]%*[^\n]", range);
-                                    c = fgetc(stdin);
-                                    assert(c == '\n');
-
+                                    get_response(
+                                        "Select the lines to delete with numbers.\n"
+                                        " (separated by commas, length within 63)  ",
+                                            "%63[^\n]", range
+                                    );
                                     select_idx = 0;
                                     *select_list = 0;
                                     receive_range_specification(range, selects_num, select_list);

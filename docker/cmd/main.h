@@ -280,6 +280,7 @@ char *receive_dockerfile_instr(char *line, int *p_id);
 ******************************************************************************/
 
 char *get_one_liner(const char *file_name);
+void get_response(const char *inquiry, const char *format, ...);
 
 int get_file_size(const char *file_name);
 int get_last_exit_status(void);
