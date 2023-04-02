@@ -92,7 +92,7 @@ void reflect_test(void);
     * Utilities
 ******************************************************************************/
 
-bool check_if_alphabetical_order(const char * const *reprs, size_t size);
+bool check_if_presorted(const char * const *reprs, size_t size);
 bool check_if_visually_no_problem(void);
 bool check_if_correct_cmp_result(comptest_type type, int result);
 

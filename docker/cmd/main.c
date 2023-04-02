@@ -13,7 +13,7 @@
 #define EXIT_STATUS_FILE "/dit/srv/last-exit-status"
 
 #define XFGETS_NESTINGS_MAX 2
-#define XFGETS_INITIAL_SIZE 1023  // 2^n - 1
+#define XFGETS_INITIAL_MAX 1023  // 2^n - 1
 
 #define XSTRCAT_INITIAL_MAX 1023  // 2^n - 1
 
@@ -33,7 +33,7 @@ typedef struct {
     FILE *fp;                /** handler for the source file */
     char **p_start;          /** pointer to the beginning of a series of strings or NULL */
     char *dest;              /** pointer to the beginning of dynamic memory allocated */
-    size_t curr_size;        /** the size of dynamic memory currently in use */
+    size_t curr_max;         /** the current maximum length of the string that can be preserved */
     size_t curr_len;         /** the total length of the preserved strings including null characters */
 } xfgets_info;
 
@@ -480,6 +480,7 @@ void xperror_file_contents(const char *file_name, int lineno, const char *msg){
  *
  * @attention the value of 'p_start' only makes sense for the first one in a series of calls.
  * @attention if 'p_start' and its contents are non-NULL, its contents should be released by the caller.
+ * @attention the return value must not used outside the loop because 'realloc' function may invalidate it.
  * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
  */
 char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
@@ -510,7 +511,7 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
             p_info->p_start = p_start;
 
             p_info->dest = NULL;
-            p_info->curr_size = XFGETS_INITIAL_SIZE;
+            p_info->curr_max = XFGETS_INITIAL_MAX;
             p_info->curr_len = 0;
 
             allocate_flag = true;
@@ -532,9 +533,9 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
 
     do {
         if (allocate_flag){
-            assert(p_info->curr_size <= INT_MAX);
+            assert(p_info->curr_max <= INT_MAX);
 
-            if ((start = (char *) realloc(p_info->dest, (sizeof(char) * p_info->curr_size)))){
+            if ((start = (char *) realloc(p_info->dest, (sizeof(char) * p_info->curr_max)))){
                 if (p_info->p_start)
                     *(p_info->p_start) = start;
 
@@ -547,7 +548,7 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
             assert(start == p_info->dest);
             start += len;
 
-            tmp = p_info->curr_size - len;
+            tmp = p_info->curr_max - len;
             assert((tmp > 0) && (tmp <= INT_MAX));
 
             if (fgets(start, tmp, p_info->fp)){
@@ -555,11 +556,11 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
                 len += tmp;
 
                 if (! (tmp && (start[--tmp] == '\n'))){
-                    tmp = p_info->curr_size + 1;
-                    assert(! (p_info->curr_size & tmp));
+                    tmp = p_info->curr_max + 1;
+                    assert(! (p_info->curr_max & tmp));
 
                     if ((tmp <<= 1)){
-                        p_info->curr_size = tmp - 1;
+                        p_info->curr_max = tmp - 1;
                         allocate_flag = true;
                         continue;
                     }
@@ -974,18 +975,22 @@ int receive_positive_integer(const char *target, int *p_left){
  * @return int  index number of the corresponding string, -1 (ambiguous) or -2 (invalid)
  *
  * @note make efficient by applying binary search sequentially from the first character of target string.
+ * @note array of expected strings can contain duplicate strings and empty strings.
+ * @note in normal mode, it uses 'strcmp' function for speed efficiency, albeit verbosely.
+ *
+ * @attention array of expected strings must be pre-sorted.
  */
 int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode){
     assert(reprs);
     assert(size && ((size - 1) <= INT_MAX));
-    assert(check_if_alphabetical_order(reprs, size));
+    assert(check_if_presorted(reprs, size));
     assert(mode < 4);
 
     if (target && (size > 0)){
         const char *expecteds[size];
         memcpy(expecteds, reprs, (sizeof(const char *) * size));
 
-        bool upper_case, forward_match, break_flag;
+        bool upper_case, forward_match;
         int min, max, tmp, c, mid;
 
         upper_case = mode & 0b01;
@@ -995,49 +1000,59 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
         max = size - 1;
         tmp = -max;
 
-        while ((c = (unsigned char) *(target++))){
+    next:
+        assert(tmp == (min - max));
+        assert(tmp <= 0);
+
+        // while statement
+        if ((c = (unsigned char) *(target++))){
             if (upper_case)
                 c = toupper(c);
 
-            break_flag = false;
-
-            assert(tmp == (min - max));
             while (tmp){
-                if (tmp < 0){
-                    mid = (min + max) / 2;
+                mid = (min + max) / 2;
+                tmp = c - ((unsigned char) *(expecteds[mid]++));
 
-                    tmp = c - ((unsigned char) *(expecteds[mid]++));
-                    if (tmp){
-                        if (tmp > 0)
-                            min = mid + 1;
-                        else
-                            max = mid - 1;
-                    }
-                    else {
-                        for (tmp = mid; (--tmp >= min) && (c == ((unsigned char) *(expecteds[tmp]++))););
-                        min = tmp + 1;
+                if (! tmp){
+                    for (tmp = mid; (--tmp >= min) && (c == ((unsigned char) *(expecteds[tmp]++))););
+                    min = tmp + 1;
+                    assert(min <= mid);
 
-                        for (tmp = mid; (++tmp <= max) && (c == ((unsigned char) *(expecteds[tmp]++))););
-                        max = tmp - 1;
-
-                        break_flag = true;
-                    }
+                    for (tmp = mid; (++tmp <= max) && (c == ((unsigned char) *(expecteds[tmp]++))););
+                    max = tmp - 1;
+                    assert(max >= mid);
 
                     tmp = min - max;
-                    if (break_flag)
-                        break;
+                    goto next;
                 }
+                if (tmp > 0)
+                    min = mid + 1;
                 else
+                    max = mid - 1;
+
+                tmp = min - max;
+                assert(tmp || (min != mid));
+
+                if (tmp > 0)
                     return -2;
             }
 
-            if (! (break_flag || (c == ((unsigned char) *(expecteds[min]++)))))
-                return -2;
+            assert(min == max);
+
+            if (c == ((unsigned char) *(expecteds[min]++))){
+                if (mode)
+                    goto next;
+                if (! strcmp(target, expecteds[min]))
+                    return min;
+            }
+            return -2;
         }
 
+        if (! *(expecteds[min]))
+            return min;
         if (tmp)
             return -1;
-        if (forward_match || (! *(expecteds[min])))
+        if (forward_match)
             return min;
     }
     return -2;
@@ -1361,7 +1376,7 @@ static void xfgets_for_loop_test(void){
     // changeable part for updating test cases
     const char * const lines_without_newline[] = {
         "The parts where the test case can be updated by changing the code are commented as shown above.",
-        "You can try changing the value of the macro 'XFGETS_INITIAL_SIZE' before testing.",
+        "You can try changing the value of the macro 'XFGETS_INITIAL_MAX' before testing.",
         "",
         NULL
     };
