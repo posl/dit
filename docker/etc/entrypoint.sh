@@ -82,6 +82,7 @@ touch \
     /dit/var/erase.log.hist \
     /dit/var/ignore.json.dock \
     /dit/var/ignore.json.hist \
+    /dit/var/ignore.list.args \
     /dit/var/optimize.json
 
 umask "${DEFAULT_UMASK_VALUE}"
@@ -110,6 +111,7 @@ echo '0' > /dit/srv/last-exit-status
 echo '-1' > /dit/srv/last-history-number
 
 config -r
+ignore -r
 ignore -dhr
 optimize -r
 reflect
