@@ -103,16 +103,14 @@ int inspect(int argc, char **argv){
     int i, exit_status = SUCCESS;
     insp_opts opt;
 
-    if ((i = parse_opts(argc, argv, &opt))){
-        if (i < 0){
-            exit_status = FAILURE;
-            xperror_suggestion(true);
-        }
-    }
-    else {
+    if (! (i = parse_opts(argc, argv, &opt))){
         argc -= optind;
         argv += optind;
         exit_status = do_inspect(argc, argv, &opt);
+    }
+    else if (i < 0){
+        exit_status = FAILURE;
+        xperror_suggestion(true);
     }
 
     return exit_status;
@@ -199,15 +197,20 @@ static int parse_opts(int argc, char **argv, insp_opts *opt){
  * @return int  command's exit status
  */
 static int do_inspect(int argc, char **argv, const insp_opts *opt){
-    assert(argv);
     assert(opt);
 
-    int offset = 1, exit_status = SUCCESS;
-    const char *path = ".";
+    const char *path;
     file_node *tree;
+    int offset = 1, exit_status = SUCCESS;
 
-    if (argc > 0)
+    if (argc <= 0){
+        argc = 1;
+        path = ".";
+    }
+    else {
+        assert(argv);
         path = *argv;
+    }
 
     do {
         if (path && (tree = construct_dir_tree(AT_FDCWD, path))){
@@ -218,7 +221,7 @@ static int do_inspect(int argc, char **argv, const insp_opts *opt){
         else
             exit_status = FAILURE;
 
-        if (--argc <= 0)
+        if (! --argc)
             break;
         path = *(++argv);
     } while (true);
@@ -247,15 +250,10 @@ static file_node *construct_dir_tree(int pwdfd, const char *name){
     assert((pwdfd >= 0) || (pwdfd == AT_FDCWD));
     assert(name);
 
-    size_t len;
     char *dest;
     file_node *file = NULL;
 
-    len = strlen(name) + 1;
-
-    if ((dest = (char *) malloc(sizeof(char) * len))){
-        memcpy(dest, name, (sizeof(char) * len));
-
+    if ((dest = strdup(name))){
         if ((file = new_file(pwdfd, dest))){
             if (S_ISDIR(file->mode)){
                 int new_fd;

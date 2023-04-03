@@ -184,39 +184,38 @@ int help(int argc, char **argv){
     int i, exit_status = SUCCESS;
     help_conts code;
 
-    if ((i = parse_opts(argc, argv, &code))){
-        if (i < 0){
-            exit_status = FAILURE;
-            xperror_suggestion(true);
+    if (! (i = parse_opts(argc, argv, &code))){
+        const char *target;
+
+        if ((argc -= optind) > 0){
+            argv += optind;
+            target = *argv;
+
+            if (code != manual)
+                i = 1;
         }
-        return exit_status;
-    }
+        else {
+            argc = 1;
+            target = NULL;
+        }
 
-    const char *target = NULL;
+        do {
+            if (! display_help(code, target))
+                exit_status = FAILURE;
 
-    if ((argc -= optind) > 0){
-        argv += optind;
-        target = *argv;
-    }
-    else
-        argc = 1;
-
-    assert(! i);
-    if (code != manual)
-        i = 1;
-
-    do {
-        if (! display_help(code, target))
-            exit_status = FAILURE;
-
-        assert(argc > 0);
-        if (--argc){
+            if (! --argc)
+                break;
             target = *(++argv);
             puts("\n" + i);
-        }
-        else
-            return exit_status;
-    } while (true);
+
+        } while (true);
+    }
+    else if (i < 0){
+        exit_status = FAILURE;
+        xperror_suggestion(true);
+    }
+
+    return exit_status;
 }
 
 
