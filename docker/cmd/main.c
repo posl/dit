@@ -33,8 +33,8 @@ typedef struct {
     FILE *fp;                /** handler for the source file */
     char **p_start;          /** pointer to the beginning of a series of strings or NULL */
     char *dest;              /** pointer to the beginning of dynamic memory allocated */
-    size_t curr_max;         /** the current maximum length of the string that can be preserved */
-    size_t curr_len;         /** the total length of the preserved strings including null characters */
+    int curr_max;            /** the current maximum length of the string that can be preserved */
+    int curr_len;            /** the total length of the preserved strings including null characters */
 } xfgets_info;
 
 
@@ -468,6 +468,7 @@ void xperror_file_contents(const char *file_name, int lineno, const char *msg){
  * @param[in]  src_file  source file name or NULL to indicate that the source is standard input
  * @param[out] p_start  pointer to the beginning of a series of strings corresponding to each line or NULL
  * @param[out] p_errid  variable to store the error ID when an error occurs
+ * @param[out] p_len  variable to store the length of the resulting line
  * @return char*  the resulting line or NULL
  *
  * @note read to the end of the file by using it as a conditional expression in a loop statement.
@@ -475,7 +476,8 @@ void xperror_file_contents(const char *file_name, int lineno, const char *msg){
  * @note if 'p_start' is non-NULL, preserves read line into the dynamic memory pointed to by its contents.
  * @note all lines of the file whose size is larger than 'INT_MAX' cannot be preserved.
  * @note this function updates the contents of 'p_errid' only when an error occurs while opening the file.
- * @note if the contents of 'p_errid' was set to something other than 0, performs finish processing.
+ * @note if the contents of 'p_errid' is changed to a non-zero value in the loop, does finish processing.
+ * @note this function updates the contents of 'p_len' only when the return value is non-NULL.
  * @note the trailing newline character of the line that is the return value is stripped.
  *
  * @attention the value of 'p_start' only makes sense for the first one in a series of calls.
@@ -483,16 +485,18 @@ void xperror_file_contents(const char *file_name, int lineno, const char *msg){
  * @attention the return value must not used outside the loop because 'realloc' function may invalidate it.
  * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
  */
-char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
+char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid, size_t *p_len){
+    assert(XFGETS_NESTINGS_MAX > 0);
+
     static int info_idx = -1;
     static xfgets_info info_list[XFGETS_NESTINGS_MAX];
 
-    xfgets_info *p_info;
-    bool allocate_flag = false;
+    xfgets_info info;
+    char *start;
+    int len = 0;
+    unsigned int tmp;
 
-    p_info = info_list + info_idx;
-
-    if ((info_idx < 0) || (p_info->src_file != src_file)){
+    if ((info_idx < 0) || (src_file != info_list[info_idx].src_file)){
         FILE *fp = stdin;
         errno = 0;
 
@@ -501,107 +505,116 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid){
 
         if ((info_idx < (XFGETS_NESTINGS_MAX - 1)) && ((! src_file) || (fp = fopen(src_file, "r")))){
             info_idx++;
-            p_info++;
+            assert(info_idx >= 0);
 
-            assert((info_idx >= 0) && (info_idx < XFGETS_NESTINGS_MAX));
-            assert(p_info == (info_list + info_idx));
+            info.src_file = src_file;
+            info.fp = fp;
+            info.p_start = p_start;
 
-            p_info->src_file = src_file;
-            p_info->fp = fp;
-            p_info->p_start = p_start;
+            info.dest = NULL;
+            info.curr_max = XFGETS_INITIAL_MAX;
+            info.curr_len = 0;
 
-            p_info->dest = NULL;
-            p_info->curr_max = XFGETS_INITIAL_MAX;
-            p_info->curr_len = 0;
-
-            allocate_flag = true;
+            goto allocate;
         }
-        else {
-            if (p_errid)
-                *p_errid = errno;
-            return NULL;
-        }
+
+        if (p_errid)
+            *p_errid = errno;
+        return NULL;
     }
 
-    char *start;
-    size_t len;
-    unsigned int tmp;
-    bool reset_flag = true;
+    assert(info_idx < XFGETS_NESTINGS_MAX);
+    memcpy(&info, (info_list + info_idx), sizeof(info));
 
-    start = p_info->dest;
-    len = p_info->curr_len;
+    if ((! (p_errid && *p_errid)) && info.curr_max){
+        start = info.dest;
+        len = info.curr_len;
+        goto reading;
+    }
 
-    do {
-        if (allocate_flag){
-            assert(p_info->curr_max <= INT_MAX);
+    goto finish;
 
-            if ((start = (char *) realloc(p_info->dest, (sizeof(char) * p_info->curr_max)))){
-                if (p_info->p_start)
-                    *(p_info->p_start) = start;
 
-                p_info->dest = start;
-                allocate_flag = false;
-                continue;
-            }
-        }
-        else if (! (p_errid && *p_errid)){
-            assert(start == p_info->dest);
-            start += len;
+resize:
+    tmp = info.curr_max + 1;
+    assert(! (tmp & (tmp - 1)));
 
-            tmp = p_info->curr_max - len;
-            assert((tmp > 0) && (tmp <= INT_MAX));
+    if (! (tmp <<= 1))
+        goto finish;
+    info.curr_max = tmp - 1;
 
-            if (fgets(start, tmp, p_info->fp)){
-                tmp = strlen(start);
-                len += tmp;
+allocate:
+    assert(info.curr_max > 0);
 
-                if (! (tmp && (start[--tmp] == '\n'))){
-                    tmp = p_info->curr_max + 1;
-                    assert(! (p_info->curr_max & tmp));
+    if (! (start = (char *) realloc(info.dest, (sizeof(char) * info.curr_max))))
+        goto finish;
+    info.dest = start;
 
-                    if ((tmp <<= 1)){
-                        p_info->curr_max = tmp - 1;
-                        allocate_flag = true;
-                        continue;
-                    }
-                }
-                else {
-                    len--;
-                    start[tmp] = '\0';
-                    reset_flag = false;
-                }
-            }
-            else if (len != p_info->curr_len)
-                reset_flag = false;
-        }
+    if (info.p_start)
+        *(info.p_start) = start;
 
-        start = p_info->dest;
 
-        if (reset_flag){
-            assert(src_file == p_info->src_file);
+reading:
+    assert(start == info.dest);
+    start += len;
 
-            if (src_file)
-                fclose(p_info->fp);
-            else
-                clearerr(p_info->fp);
+    tmp = info.curr_max - len;
+    assert(tmp && (tmp <= INT_MAX));
 
-            if ((! (p_info->p_start && p_info->curr_len)) && start){
-                free(start);
+    if (fgets(start, tmp, info.fp)){
+        tmp = strlen(start);
+        len += tmp;
+        assert(len >= 0);
 
-                if (p_info->p_start)
-                    *(p_info->p_start) = NULL;
-            }
+        if ((! tmp) || (start[--tmp] != '\n'))
+            goto resize;
+        len--;
+        start[tmp] = '\0';
+    }
+    else if (len > info.curr_len)
+        info.curr_max = 0;
+    else
+        goto finish;
 
-            info_idx--;
-            start = NULL;
-        }
-        else if (p_info->p_start){
-            start += p_info->curr_len;
-            p_info->curr_len = len + 1;
-        }
+    start = info.dest;
 
-        return start;
-    } while (true);
+    if (p_len){
+        *p_len = len - info.curr_len;
+        assert(*p_len < INT_MAX);
+    }
+    if (info.p_start){
+        start += info.curr_len;
+        info.curr_len = len + 1;
+    }
+
+    assert(info.dest);
+    assert(info.curr_max >= 0);
+    assert(info.curr_len >= 0);
+
+    memcpy((info_list + info_idx), &info, sizeof(info));
+    return start;
+
+
+finish:
+    info_idx--;
+
+    assert(src_file == info.src_file);
+    assert(info.fp);
+
+    if (src_file)
+        fclose(info.fp);
+    else
+        clearerr(info.fp);
+
+    if (info.p_start){
+        if (info.curr_len)
+            return NULL;
+        *(info.p_start) = NULL;
+    }
+    if (info.dest)
+        free(info.dest);
+
+    return NULL;
 }
 
 
@@ -982,7 +995,7 @@ int receive_positive_integer(const char *target, int *p_left){
  */
 int receive_expected_string(const char *target, const char * const *reprs, size_t size, unsigned int mode){
     assert(reprs);
-    assert(size && ((size - 1) <= INT_MAX));
+    assert(size && (size < INT_MAX));
     assert(check_if_presorted(reprs, size));
     assert(mode < 4);
 
@@ -1145,7 +1158,7 @@ char *get_one_liner(const char *file_name){
     int errid = 0;
     bool first_line = true;
 
-    while (xfgets_for_loop(file_name, &line, &errid)){
+    while (xfgets_for_loop(file_name, &line, &errid, NULL)){
         if (! first_line){
             assert(line);
             free(line);
@@ -1397,7 +1410,7 @@ static void xfgets_for_loop_test(void){
         isempty = (! **p_line);
 
         do {
-            line = xfgets_for_loop(TMP_FILE1, NULL, &errid);
+            line = xfgets_for_loop(TMP_FILE1, NULL, &errid, NULL);
             assert(! errid);
 
             if (isempty){
@@ -1469,38 +1482,34 @@ static void xfgets_for_loop_test(void){
     };
 
 
-    size_t count = 1, remain;
+    size_t size, count, len;
     char *start_for_file;
 
     assert((fp = fopen(TMP_FILE1, "w")));
     for (p_line = lines_with_trailing_newline; *p_line; p_line++){
-        count++;
         assert(fputs(*p_line, fp) != EOF);
         assert(fputc('\n', fp) != EOF);
     }
     assert(! fclose(fp));
 
+    size = numof(lines_with_trailing_newline);
+
 #ifdef XFGETS_TEST_COMPLETE
-    assert(count);
-    count -= rand() % count;
+    assert(size);
+    size -= rand() % size;
 #endif
-    assert(count);
-    remain = rand() % count;
-    count = remain;
+    assert(size);
+    size = rand() % size;
+    count = size;
 
 
-    for (p_line = lines_with_trailing_newline; remain--; p_line++){
-#ifndef XFGETS_TEST_COMPLETE
+    for (p_line = lines_with_trailing_newline; size--; p_line++){
         fprintf(stderr, "  Reading '%s' ...\n", *p_line);
-#endif
-        assert((line = xfgets_for_loop(TMP_FILE1, &start_for_file, &errid)));
-        assert(! strcmp(line, *p_line));
-        assert(! errid);
 
-#ifdef XFGETS_TEST_COMPLETE
-        for (; *line; line++)
-            fputc(((*line != '8') ? *line : '\n'), stderr);
-#endif
+        assert((line = xfgets_for_loop(TMP_FILE1, &start_for_file, &errid, &len)));
+        assert(len == strlen(*p_line));
+        assert(! memcmp(line, *p_line, (len + 1)));
+        assert(! errid);
     }
 
 
@@ -1510,15 +1519,16 @@ static void xfgets_for_loop_test(void){
 
     fputs("\nChecking if it works the same as 'cat -' ...\n", stderr);
 
-    for (remain = 0; (line = xfgets_for_loop(NULL, &start_for_stdin, NULL)); remain++)
+    for (size = 0; (line = xfgets_for_loop(NULL, &start_for_stdin, NULL, &len)); size++){
+        assert(len == strlen(line));
         assert(puts(line) != EOF);
+    }
 
     do {
         assert(check_if_visually_no_problem());
 
         if (start_for_stdin){
-            assert(remain);
-
+            assert(size);
             fputs("Checking if the output matches the input ...\n", stderr);
 
             line = start_for_stdin;
@@ -1526,13 +1536,13 @@ static void xfgets_for_loop_test(void){
             do {
                 assert(puts(line) != EOF);
                 line += strlen(line) + 1;
-            } while (--remain);
+            } while (--size);
 
             free(start_for_stdin);
             start_for_stdin = NULL;
         }
         else {
-            assert(! remain);
+            assert(! size);
             break;
         }
     } while (true);
@@ -1540,8 +1550,13 @@ static void xfgets_for_loop_test(void){
 
     // when performing terminate processing for the interrupted file reading and confirming its correctness
 
+#ifdef XFGETS_TEST_COMPLETE
+    char *tmp;
+    struct timespec req;
+#endif
+
     errid = -1;
-    assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, &errid));
+    assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, &errid, NULL));
     assert(errid == -1);
 
     if (start_for_file){
@@ -1551,11 +1566,24 @@ static void xfgets_for_loop_test(void){
         p_line = lines_with_trailing_newline;
 
         do {
-            assert(! strcmp(line, *(p_line++)));
-            line += strlen(line) + 1;
+            size = strlen(*p_line) + 1;
+            assert(! memcmp(line, *(p_line++), size));
+
+#ifdef XFGETS_TEST_COMPLETE
+            if ((tmp = strchr(line, '8')))
+                *tmp = '\n';
+            fputs(line, stderr);
+#endif
+            line += size;
         } while (--count);
 
         free(start_for_file);
+
+#ifdef XFGETS_TEST_COMPLETE
+        req.tv_sec = rand() % 3;
+        req.tv_nsec = rand() % 1000000000;
+        nanosleep(&req, NULL);
+#endif
     }
 
     assert(! count);
@@ -1564,7 +1592,7 @@ static void xfgets_for_loop_test(void){
     // when specifying a non-existing file
 
     assert(! unlink(TMP_FILE1));
-    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid));
+    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid, &len));
     assert(errid == ENOENT);
 }
 
@@ -1761,7 +1789,7 @@ static void walk_test(void){
                 found = tmp + 1;
             name_len = strlen(found) + 1;
 
-            fprintf(stderr, "    strcmp(W, F):  '%s'  '%s'\n", walked, found);
+            fprintf(stderr, "    memcmp(W, F):  '%s'  '%s'\n", walked, found);
             assert(! memcmp(walked, found, name_len));
 
             found += name_len;
@@ -2122,12 +2150,13 @@ static void get_sanitized_string_test(void){
 
     int i;
     char buf[64];
-    size_t size;
+    size_t len;
 
     for (i = 0; table[i].target; i++){
-        size = get_sanitized_string(buf, table[i].target, table[i].quoted);
-        assert(size == strlen(table[i].result));
-        assert(! strcmp(buf, table[i].result));
+        len = get_sanitized_string(buf, table[i].target, table[i].quoted);
+        assert(len < 64);
+        assert(len == strlen(table[i].result));
+        assert(! memcmp(buf, table[i].result, (len + 1)));
 
         print_progress_test_loop('\0', -1, i);
         fprintf(stderr, "'%s'\n", table[i].result);

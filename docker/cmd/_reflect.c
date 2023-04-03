@@ -319,8 +319,8 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
     const char *src_file, *errdesc = NULL;
     int lineno, tmp, exit_status = SUCCESS;
     char *line;
+    size_t size, total = 0;
     bool first_blank = true;
-    size_t total = 0, size;
     inf_str istr = {0};
 
     data->lines_num = 0;
@@ -337,8 +337,8 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
             src_file = convert_results[data->target_id];
 
         if ((! src_file) || (get_file_size(src_file) >= 0)){
-            for (lineno = 0, tmp = 0; (line = xfgets_for_loop(src_file, NULL, &tmp)); lineno++){
-                if (! *line){
+            for (lineno = 0, tmp = 0; (line = xfgets_for_loop(src_file, NULL, &tmp, &size)); lineno++){
+                if (! size){
                     switch (blank_c){
                         case 's':
                             if (first_blank){
@@ -360,7 +360,7 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
                 tmp = -1;
 
                 if (! (argc && data->target_id && (errdesc = check_dockerfile_instr(line)))){
-                    size = strlen(line) + 1;
+                    size++;
 
                     if (size >= (INT_MAX - total))
                         errdesc = "read size overflow detected";
@@ -582,7 +582,7 @@ static size_t read_dockerfile_base(char **p_start){
     int errid = 0, instr_id;
     size_t lines_num = 0;
 
-    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, p_start, &errid))){
+    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, p_start, &errid, NULL))){
         instr_id = -1;
 
         if (receive_dockerfile_instr(line, &instr_id) && (lines_num || (instr_id == ID_FROM)))

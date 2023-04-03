@@ -295,13 +295,13 @@ static void display_cmd_list(void){
 /**
  * @brief display the version of this tool on screen.
  *
- * @return int  0 (success) or -1 (unexpected error)
+ * @return int  0 (success) or others (unexpected error)
  */
 static int display_version(void){
     const char *line;
     int errid = 0;
 
-    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid)))
+    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid, NULL)))
         puts(line);
 
     return errid;

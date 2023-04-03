@@ -565,7 +565,7 @@ static void display_prev_verbose(int target_c){
             print_target_repr(offset);
         }
 
-        while ((line = xfgets_for_loop(src_file, NULL, NULL)))
+        while ((line = xfgets_for_loop(src_file, NULL, NULL, NULL)))
             puts(line);
     } while ((target_c = next_c));
 
@@ -737,7 +737,7 @@ static int construct_erase_data(erase_data *data, int target_id, int provlogs[2]
         concat_flag = false;
     }
 
-    while (xfgets_for_loop(target_file, p_start, &errid))
+    while (xfgets_for_loop(target_file, p_start, &errid, NULL))
         data->lines_num++;
 
     if (! errid){
