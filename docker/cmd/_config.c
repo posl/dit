@@ -255,23 +255,26 @@ static bool receive_mode(const char *config_arg, unsigned char results[2]){
     assert(results[0] < CONF_MODES_NUM);
 
     if (config_arg){
+        char *arg_copy;
         unsigned char modes[2];
-        memcpy(modes, results, (sizeof(unsigned char) * 2));
+        const char *token;
+        int target_c, i, tmp;
 
         size_t size;
         size = strlen(config_arg) + 1;
 
-        char *arg_copy, buf[size];
-        arg_copy = buf;
-        memcpy(arg_copy, config_arg, (sizeof(char) * size));
+        char buf[size];
+        memcpy(buf, config_arg, (sizeof(char) * size));
 
-        const char *token;
-        int target_c, i, tmp;
+        arg_copy = buf;
+        assert(arg_copy);
+
+        memcpy(modes, results, (sizeof(unsigned char) * 2));
 
         while ((token = strtok(arg_copy, ","))){
-            size = strlen(token);
             arg_copy = NULL;
             target_c = 'b';
+            size = strlen(token);
 
             if (size == 2){
                 for (i = 2; i--;){

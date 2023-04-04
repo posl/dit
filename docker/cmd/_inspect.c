@@ -768,15 +768,14 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
     }
 
     assert(tmp && *tmp);
-    size = 12 + (strlen(tmp) * 4 + 1) + 4;  // the length of " -> \033[??;??m%s\033[0m"
+    size = 12 + (strlen(tmp) * 4 + 1) + 4;  // the length of " -> \e[??;??m%s\e[0m"
 
     char buf[size];
-
     output = buf + 12;
     size = get_sanitized_string(output, tmp, false);
 
     if (opt->color){
-        memcpy((output + size), "\033[0m", 5);
+        memcpy((output + size), "\e[0m", 5);
 
         if (! file->link_invalid)
             switch ((mode & S_IFMT)){
@@ -829,7 +828,7 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
         memcpy(output, tmp, size);
 
         output -= 2;
-        memcpy(output, "\033[", 2);
+        memcpy(output, "\e[", 2);
     }
 
     if (link_flag){

@@ -116,11 +116,9 @@ int reflect(int argc, char **argv){
             xperror_internal_file();
         }
         else if (no_suggestion)
-            goto exit;
+            return FAILURE;
         xperror_suggestion(true);
     }
-
-exit:
     return exit_status;
 }
 
