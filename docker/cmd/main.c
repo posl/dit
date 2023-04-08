@@ -17,24 +17,14 @@
 
 #define XSTRCAT_INITIAL_MAX 1023  // 2^n - 1
 
-#define NULLDEV_FILENO  open("/dev/null", (O_WRONLY | O_CLOEXEC))
-
-#define sigreset(sigdfl_int, sigdfl_quit, old_mask) \
-    do { \
-        sigaction(SIGINT, &sigdfl_int, NULL); \
-        sigaction(SIGQUIT, &sigdfl_quit, NULL); \
-        sigprocmask(SIG_SETMASK, &old_mask, NULL); \
-    } while (false)
-
 
 /** Data type for storing the information for one loop for 'xfgets_for_loop' */
 typedef struct {
-    const char *src_file;    /** source file name or NULL */
-    FILE *fp;                /** handler for the source file */
-    char **p_start;          /** pointer to the beginning of a series of strings or NULL */
-    char *dest;              /** pointer to the beginning of dynamic memory allocated */
-    int curr_max;            /** the current maximum length of the string that can be preserved */
-    int curr_len;            /** the total length of the preserved strings including null characters */
+    void *src_file;    /** address of the area where the source file name is stored or NULL */
+    FILE *fp;          /** handler for the source file */
+    char *dest;        /** pointer to the beginning of dynamic memory for storing read lines as string */
+    int curr_max;      /** the current maximum length of the string that can be preserved */
+    int curr_len;      /** the total length of the preserved strings including null characters */
 } xfgets_info;
 
 
@@ -466,69 +456,81 @@ void xperror_file_contents(const char *file_name, int lineno, const char *msg){
  * @brief read the contents of the specified file exactly one line at a time.
  *
  * @param[in]  src_file  source file name or NULL to indicate that the source is standard input
- * @param[out] p_start  pointer to the beginning of a series of strings corresponding to each line or NULL
- * @param[out] p_errid  variable to store the error ID when an error occurs
- * @param[out] p_len  variable to store the length of the resulting line
+ * @param[out] p_start  variable to store the beginning of a series of strings corresponding to read lines
+ * @param[out] p_len  variable to store the total length of the preserved strings including null characters
+ * @param[out] p_errid  variable to store the error number when an error occurs
  * @return char*  the resulting line or NULL
  *
- * @note read to the end of the file by using it as a conditional expression in a loop statement.
+ * @note read all lines of the file by using this function as a conditional expression in a loop statement.
  * @note this function can be nested up to a depth of 'XFGETS_NESTINGS_MAX' by passing different 'src_file'.
- * @note if 'p_start' is non-NULL, preserves read line into the dynamic memory pointed to by its contents.
+ * @note if 'p_start' is non-NULL, preserves read lines into the dynamic memory pointed to by its contents.
+ * @note the contents of 'p_start' points to a valid address only when the file has one or more lines.
  * @note all lines of the file whose size is larger than 'INT_MAX' cannot be preserved.
- * @note this function updates the contents of 'p_errid' only when an error occurs while opening the file.
- * @note if the contents of 'p_errid' is changed to a non-zero value in the loop, does finish processing.
- * @note this function updates the contents of 'p_len' only when the return value is non-NULL.
+ * @note the contents of 'p_len' acts as an offset for concatenating newly read line into preserved lines.
+ * @note line concatenation by specifying a valid 'p_len' will occur even between separate series of calls.
+ * @note if the contents of 'p_errid' is changed to a non-zero value in the loop, it does finish processing.
+ * @note the contents of 'p_errid' will be either the error number or 0 to indicate that no error occurred.
  * @note the trailing newline character of the line that is the return value is stripped.
  *
- * @attention the value of 'p_start' only makes sense for the first one in a series of calls.
+ * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
+ * @attention if you specify a non-NULL value for the argument, its contents should be properly initialized.
+ * @attention normally, the address pointed to by 'p_start' should remain constant during a series of calls.
  * @attention if 'p_start' and its contents are non-NULL, its contents should be released by the caller.
  * @attention the return value must not used outside the loop because 'realloc' function may invalidate it.
- * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
+ * @attention except for trivial cases, you should check for errors and abort when an error has occurred.
  */
-char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid, size_t *p_len){
+char *xfgets_for_loop(const char *src_file, char **p_start, size_t *p_len, int *p_errid){
     assert(XFGETS_NESTINGS_MAX > 0);
 
     static int info_idx = -1;
-    static xfgets_info info_list[XFGETS_NESTINGS_MAX];
+    static xfgets_info info_list[XFGETS_NESTINGS_MAX] = {0};
 
     xfgets_info info;
     char *start;
-    int len = 0;
-    unsigned int tmp;
+    int used_len = 0, errid = 0;
+    unsigned int len;
 
     if ((info_idx < 0) || (src_file != info_list[info_idx].src_file)){
-        FILE *fp = stdin;
-        errno = 0;
+        if (info_idx >= (XFGETS_NESTINGS_MAX - 1))
+            return NULL;
 
-        if (p_start)
-            *p_start = NULL;
+        info.src_file = src_file;
+        info.fp = stdin;
 
-        if ((info_idx < (XFGETS_NESTINGS_MAX - 1)) && ((! src_file) || (fp = fopen(src_file, "r")))){
-            info_idx++;
-            assert(info_idx >= 0);
+        if (src_file && (! (info.fp = fopen(src_file, "r")))){
+            if (p_errid)
+                *p_errid = errno;
+            return NULL;
+        }
 
-            info.src_file = src_file;
-            info.fp = fp;
-            info.p_start = p_start;
+        info_idx++;
+        assert(info_idx >= 0);
 
+        if (! (p_len && *p_len && (*p_len < info_list[info_idx].curr_max))){
             info.dest = NULL;
             info.curr_max = XFGETS_INITIAL_MAX;
             info.curr_len = 0;
-
             goto allocate;
         }
 
-        if (p_errid)
-            *p_errid = errno;
-        return NULL;
+        info.dest = info_list[info_idx].dest;
+        info.curr_max = info_list[info_idx].curr_max;
+        info.curr_len = *p_len;
+    }
+    else {
+        memcpy(&info, (info_list + info_idx), sizeof(xfgets_info));
+
+        if (p_len && (*p_len < info.curr_max))
+            info.curr_len = *p_len;
     }
 
-    assert(info_idx < XFGETS_NESTINGS_MAX);
-    memcpy(&info, (info_list + info_idx), sizeof(info));
+    assert(info.dest);
+    assert(info.curr_max > 0);
+    assert(info.curr_len < info.curr_max);
 
-    if ((! (p_errid && *p_errid)) && info.curr_max){
+    if (! (p_errid && *p_errid)){
         start = info.dest;
-        len = info.curr_len;
+        used_len = info.curr_len;
         goto reading;
     }
 
@@ -536,67 +538,69 @@ char *xfgets_for_loop(const char *src_file, char **p_start, int *p_errid, size_t
 
 
 resize:
-    tmp = info.curr_max + 1;
-    assert(! (tmp & (tmp - 1)));
+    len = info.curr_max + 1;
+    assert(! (len & (len - 1)));
 
-    if (! (tmp <<= 1))
+    if (! (len <<= 1)){
+        errid = EFBIG;
         goto finish;
-    info.curr_max = tmp - 1;
+    }
+    info.curr_max = len - 1;
 
 allocate:
     assert(info.curr_max > 0);
 
-    if (! (start = (char *) realloc(info.dest, (sizeof(char) * info.curr_max))))
+    if (! (start = (char *) realloc(info.dest, (sizeof(char) * info.curr_max)))){
+        errid = errno;
         goto finish;
+    }
     info.dest = start;
-
-    if (info.p_start)
-        *(info.p_start) = start;
 
 
 reading:
     assert(start == info.dest);
-    start += len;
+    assert((used_len >= 0) && (used_len < info.curr_max));
 
-    tmp = info.curr_max - len;
-    assert(tmp && (tmp <= INT_MAX));
+    errno = 0;
+    start += used_len;
 
-    if (fgets(start, tmp, info.fp)){
-        tmp = strlen(start);
-        len += tmp;
-        assert(len >= 0);
+    if (fgets(start, (info.curr_max - used_len), info.fp)){
+        len = strlen(start);
+        used_len += len;
+        assert(used_len >= len);
 
-        if ((! tmp) || (start[--tmp] != '\n'))
+        if ((! len) || (start[--len] != '\n'))
             goto resize;
-        len--;
-        start[tmp] = '\0';
+
+        start[len] = '\0';
     }
-    else if (len > info.curr_len)
-        info.curr_max = 0;
-    else
+    else if ((ferror(info.fp) && (errid = errno)) || (used_len == info.curr_len))
         goto finish;
 
     start = info.dest;
 
-    if (p_len){
-        *p_len = len - info.curr_len;
-        assert(*p_len < INT_MAX);
-    }
-    if (info.p_start){
+    if (p_start){
+        *p_start = start;
         start += info.curr_len;
-        info.curr_len = len + 1;
+        info.curr_len = used_len;
+    }
+    if (p_len){
+        assert(info.curr_len < INT_MAX);
+        *p_len = info.curr_len;
     }
 
     assert(info.dest);
-    assert(info.curr_max >= 0);
-    assert(info.curr_len >= 0);
+    assert(info.curr_max > 0);
 
-    memcpy((info_list + info_idx), &info, sizeof(info));
+    memcpy((info_list + info_idx), &info, sizeof(xfgets_info));
     return start;
 
 
 finish:
     info_idx--;
+
+    if (p_errid && errid)
+        *p_errid = errid;
 
     assert(src_file == info.src_file);
     assert(info.fp);
@@ -606,14 +610,23 @@ finish:
     else
         clearerr(info.fp);
 
-    if (info.p_start){
-        if (info.curr_len)
+    if (p_start){
+        if ((! errid) && (info.curr_len > 0)){
+            assert(info.dest);
+            assert(info.curr_max > 0);
+            assert(info_list[info_idx + 1].dest == info.dest);
+            assert(info_list[info_idx + 1].curr_max == info.curr_max);
+
+            *p_start = info.dest;
             return NULL;
-        *(info.p_start) = NULL;
+        }
+        *p_start = NULL;
     }
+
     if (info.dest)
         free(info.dest);
 
+    info_list[info_idx + 1].curr_max = 0;
     return NULL;
 }
 
@@ -685,32 +698,32 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
     assert(suf);
     assert(suf_len == (strlen(suf) + 1));
 
-    size_t curr;
+    size_t curr_max;
     bool allocate_flag = false;
     void *ptr;
     char *dest;
 
-    if (! (curr = base->max)){
-        curr = XSTRCAT_INITIAL_MAX;
+    if (! (curr_max = base->max)){
+        curr_max = XSTRCAT_INITIAL_MAX;
         allocate_flag = true;
     }
 
     do {
-        if ((curr - base_len) < suf_len){
-            curr++;
-            assert(! (curr & (curr - 1)));
+        if ((curr_max - base_len) < suf_len){
+            curr_max++;
+            assert(! (curr_max & (curr_max - 1)));
 
-            if ((curr <<= 1)){
-                curr--;
+            if ((curr_max <<= 1)){
+                curr_max--;
                 allocate_flag = true;
                 continue;
             }
         }
         else if (! allocate_flag)
             break;
-        else if ((ptr = realloc(base->ptr, (sizeof(char) * curr)))){
+        else if ((ptr = realloc(base->ptr, (sizeof(char) * curr_max)))){
             base->ptr = (char *) ptr;
-            base->max = curr;
+            base->max = curr_max;
             break;
         }
 
@@ -738,7 +751,7 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
  *
  * @param[in]  cmd_file  command path
  * @param[in]  argv  NULL-terminated array of strings that are command line arguments
- * @param[in]  mode  some flags (bit 1: how to handle stdout, bit 2: be quiet)
+ * @param[in]  mode  some flags (bit 1: how to handle stdout, bit 2: refrain from printing extra messages)
  * @return int  0 (success), -1 (syscall error) or positive integer (command error)
  *
  * @note this function is to avoid the inefficiency and the inconvenience when using 'system' function.
@@ -755,9 +768,9 @@ int execute(const char *cmd_file, char * const argv[], unsigned int mode){
     assert(argv && argv[0]);
     assert(mode < 4);
 
-    struct sigaction new_act = {0}, sigdfl_int, sigdfl_quit;
+    struct sigaction new_act = {0}, sigint_act, sigquit_act;
     sigset_t old_mask;
-    pid_t pid, err = 0;
+    pid_t pid, err = -1;
     int tmp = 0, exit_status = -1;
 
     if (! (mode & 0b10)){
@@ -770,34 +783,47 @@ int execute(const char *cmd_file, char * const argv[], unsigned int mode){
     }
 
     new_act.sa_handler = SIG_IGN;
-    sigemptyset(&new_act.sa_mask);
-    sigaction(SIGINT, &new_act, &sigdfl_int);
-    sigaction(SIGQUIT, &new_act, &sigdfl_quit);
+    sigemptyset(&(new_act.sa_mask));
+    sigaction(SIGINT, &new_act, &sigint_act);
+    sigaction(SIGQUIT, &new_act, &sigquit_act);
 
-    sigaddset(&new_act.sa_mask, SIGCHLD);
-    sigprocmask(SIG_BLOCK, &new_act.sa_mask, &old_mask);
+    sigaddset(&(new_act.sa_mask), SIGCHLD);
+    sigprocmask(SIG_BLOCK, &(new_act.sa_mask), &old_mask);
 
     switch ((pid = fork())){
-        case -1:  // error
-            err = -1;
-            break;
         case 0:   // child
-            tmp = STDERR_FILENO;
+            tmp = (mode & 0b01) ? open("/dev/null", O_WRONLY) : STDERR_FILENO;
             exit_status = 126;
 
-            if (! (((mode & 0b01) && ((tmp = NULLDEV_FILENO) == -1)) || (dup2(tmp, STDOUT_FILENO) == -1))){
-                sigreset(sigdfl_int, sigdfl_quit, old_mask);
-                execv(cmd_file, argv);
-                exit_status++;
+            if (tmp >= 0){
+                if (dup2(tmp, STDOUT_FILENO) != -1){
+                    err = 0;
+                    exit_status++;
+                }
+                if (tmp != STDERR_FILENO)
+                    close(tmp);
             }
-            _exit(exit_status);
+            break;
+        case -1:  // error
+            break;
         default:  // parent
             while (((err = waitpid(pid, &tmp, 0)) == -1) && (errno == EINTR));
-            break;
     }
 
-    sigreset(sigdfl_int, sigdfl_quit, old_mask);
+    sigaction(SIGINT, &sigint_act, NULL);
+    sigaction(SIGQUIT, &sigquit_act, NULL);
+    sigprocmask(SIG_SETMASK, &old_mask, NULL);
 
+    // child
+    if (! pid){
+        if (! err){
+            execv(cmd_file, argv);
+            assert(exit_status == 127);
+        }
+        _exit(exit_status);
+    }
+
+    // parent
     if (err != -1){
         if (WIFEXITED(tmp))
             exit_status = WEXITSTATUS(tmp);
@@ -999,7 +1025,7 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
     assert(check_if_presorted(reprs, size));
     assert(mode < 4);
 
-    if (target && (size > 0)){
+    if (target && size){
         const char *expecteds[size];
         memcpy(expecteds, reprs, (sizeof(const char *) * size));
 
@@ -1236,14 +1262,14 @@ int get_file_size(const char *file_name){
  */
 int get_last_exit_status(void){
     char *line;
-    int i = -1;
+    int exit_status = -1;
 
     if ((line = get_one_liner(EXIT_STATUS_FILE))){
-        if ((i = receive_positive_integer(line, NULL)) >= 256)
-            i = -1;
+        if ((exit_status = receive_positive_integer(line, NULL)) >= 256)
+            exit_status = -1;
         free(line);
     }
-    return i;
+    return exit_status;
 }
 
 
@@ -1410,7 +1436,7 @@ static void xfgets_for_loop_test(void){
         isempty = (! **p_line);
 
         do {
-            line = xfgets_for_loop(TMP_FILE1, NULL, &errid, NULL);
+            line = xfgets_for_loop(TMP_FILE1, NULL, NULL, &errid);
             assert(! errid);
 
             if (isempty){
@@ -1430,99 +1456,114 @@ static void xfgets_for_loop_test(void){
     // changeable part for updating test cases
     const char * const lines_with_trailing_newline[] = {
         "                                   .... (:((!\"`'?7OC+--...                      ",
-        "          8                            ...?7~           _~_~~_.<~<!`.-?9~..     ",
-        "                     8                        ..?!                ``````` ``    ",
-        "  `_!__<~.                      8                     ..^      .`               ",
-        "                    `_<.   ,^~?-           8                   .?`       .(~    ",
-        "    .              _.             `_<>.    1.         8                 .?      ",
-        "   (``      .(!              `` <.               <-    <         8              ",
-        " .?         .>``     .J~.`                 `__                1.   1        8   ",
+        "                                       ...?7~           _~_~~_.<~<!`.-?9~..     ",
+        "                                              ..?!                ``````` ``    ",
+        "  `_!__<~.                                            ..^      .`               ",
+        "                    `_<.   ,^~?-                               .?`       .(~    ",
+        "    .              _.             `_<>.    1.                           .?      ",
+        "   (``      .(!              `` <.               <-    <                        ",
+        " .?         .>``     .J~.`                 `__                1.   1            ",
         "           J`         .~`     ..!_~ `                  `(                 (-. ._",
-        "       8             >`  `      `z     .c~   .`    ._               <           ",
-        "     . 1.`1       8            :` .(.     ._     `.:`   -    . ~..       .`    .",
-        "`  .l            ``<..       8           >   _>.    .C`     .:`  .<.    .( ``   ",
-        "    .-     :`  j_              (_-(.    8          J.   (>`   .Z_     .C   .v.  ",
-        "   q  .        (.      \\` (:              `<!  (   8         .!    (z.   d:     ",
-        " v~  .C_      j  .        <.` .....  (>               .1  /   8         <     (l",
-        "_  /f.     (:   v~      ..  .    ....>.JJWWV1Jn.(l:               _+(_   8      ",
+        "                     >`  `      `z     .c~   .`    ._               <           ",
+        "     . 1.`1                    :` .(.     ._     `.:`   -    . ~..       .`    .",
+        "`  .l            ``<..                   >   _>.    .C`     .:`  .<.    .( ``   ",
+        "    .-     :`  j_              (_-(.               J.   (>`   .Z_     .C   .v.  ",
+        "   q  .        (.      \\` (:              `<!  (             .!    (z.   d:     ",
+        " v~  .C_      j  .        <.` .....  (>               .1  /             <     (l",
+        "_  /f.     (:   v~      ..  .    ....>.JJWWV1Jn.(l:               _+(_          ",
         "   ~     _1l  O>     :V   J:      .-C> .-<((((! v      (0f.(I& >             ~(2",
-        "    8        .      ~+'`ld      (<  .<      `-  I (OAwOwn  }_ -+WVY=..(Z   :~   ",
-        "        _([    8        (.      (l`lR      y~ .C       ;   O _yZAmdphgX77=~_..  ",
-        "-dr   <:~_          :O.   8        <        ? dD     ( _ (~   .7<_(   O  (AWWY\"!",
-        ".(_.`      _Hk    _~~_..(~.    :(~   8        (.        ?S5     j . 0:     ((v, ",
-        "     v>      -`       (Wk  .wxuuXVT4X_    ~(;   8        ._~       Jtr     U _.I",
-        ":    J>  %~~(<   -      (`      _JTWkX\"\"  :  (0Y:    :~[   8        `1_~     (  ",
-        "r    ( :_JI  ~(v~       h~~<n-      >      ,v)IWAQ._v+US_~     _~~[   8         ",
+        "             .      ~+'`ld      (<  .<      `-  I (OAwOwn  }_ -+WVY=..(Z   :~   ",
+        "        _([             (.      (l`lR      y~ .C       ;   O _yZAmdphgX77=~_..  ",
+        "-dr   <:~_          :O.            <        ? dD     ( _ (~   .7<_(   O  (AWWY\"!",
+        ".(_.`      _Hk    _~~_..(~.    :(~            (.        ?S5     j . 0:     ((v, ",
+        "     v>      -`       (Wk  .wxuuXVT4X_    ~(;            ._~       Jtr     U _.I",
+        ":    J>  %~~(<   -      (`      _JTWkX\"\"  :  (0Y:    :~[            `1_~     (  ",
+        "r    ( :_JI  ~(v~       h~~<n-      >      ,v)IWAQ._v+US_~     _~~[             ",
         " -(~    J  $    z :_Kv:(Jnwg       (<{  I<     .-     >),7wWW9rX<\\        ~:_\\  ",
-        " 8          (!    _0'  w   k ~(HWqHHMHHHHHH@H   &-$j       . >~h\\(\"\"  (?k    d  ",
-        "     ~~._   8          (_   ~( '` :   w :?0Y::(MQHMHHHHMMHHMHU~l  l   }>)   (f.-",
-        "(   ?Xkzw      (c~(~   8          !.   -Z~_~k~   O ~(`````WMM#=,``P:~?THb._   ( ",
-        "        -dHHMHHHHWky      (6 $    8         w`    f``.      t ~(``  .MNd, .(, ``",
-        "__~~ `:  ?_    .MHMWH@MHr<<7THHH  (< I  (    8        zt    (!``~      t ~(_` .J",
-        "MHWNB=?b  ``      -!?<m`J ..#=,M| ````(0=(  :, k  %     8       J ~    (_``_~j  ",
-        "  t _({`  J|  \"= .F  `          ``  JMB, .?b   ``` (   U<   SJ`    8      .  ~. ",
-        "   L ` ~d    t  ($`  .h.77!.d!                 .MMTH=J]    ``.l V:~  tk`      8 ",
+        "            (!    _0'  w   k ~(HWqHHMHHHHHH@H   &-$j       . >~h\\(\"\"  (?k    d  ",
+        "     ~~._              (_   ~( '` :   w :?0Y::(MQHMHHHHMMHHMHU~l  l   }>)   (f.-",
+        "(   ?Xkzw      (c~(~              !.   -Z~_~k~   O ~(`````WMM#=,``P:~?THb._   ( ",
+        "        -dHHMHHHHWky      (6 $              w`    f``.      t ~(``  .MNd, .(, ``",
+        "__~~ `:  ?_    .MHMWH@MHr<<7THHH  (< I  (             zt    (!``~      t ~(_` .J",
+        "MHWNB=?b  ``      -!?<m`J ..#=,M| ````(0=(  :, k  %             J ~    (_``_~j  ",
+        "  t _({`  J|  \"= .F  `          ``  JMB, .?b   ``` (   U<   SJ`           .  ~. ",
+        "   L ` ~d    t  ($`  .h.77!.d!                 .MMTH=J]    ``.l V:~  tk`        ",
         "     R y _     n.``(    ld-?d_`  -?9.J\"                   J|  & .F    .zc&JZl  $",
-        "         8     .+ r`     d  a,,    1   <-                            .h?7!uF    ",
-        "` ? H\\  O  (S       8     v  }`     O _       ( b.   ~_(<_~                     ",
-        "  9.7^    `  (R 'I (Z   9      8    J!  !`     l   tw .  . d_    ````           ",
-        "        ._     _>)~     X0'`x  (<  l      8   ,(! .``     v  0  [ ,    {        ",
-        "                          ````     W '`k   ?  ._     8  . I  ( `     I d `  $  _",
-        " 4u                      _              (v?Td `-'|     <_ 1     8  C.) `( `   . ",
-        " _0 `' C    : OU-.                 / ``\"        _-?4. ``?2~.       <  .    8 . (",
+        "               .+ r`     d  a,,    1   <-                            .h?7!uF    ",
+        "` ? H\\  O  (S             v  }`     O _       ( b.   ~_(<_~                     ",
+        "  9.7^    `  (R 'I (Z   9           J!  !`     l   tw .  . d_    ````           ",
+        "        ._     _>)~     X0'`x  (<  l          ,(! .``     v  0  [ ,    {        ",
+        "                          ````     W '`k   ?  ._        . I  ( `     I d `  $  _",
+        " 4u                      _              (v?Td `-'|     <_ 1        C.) `( `   . ",
+        " _0 `' C    : OU-.                 / ``\"        _-?4. ``?2~.       <  .      . (",
         "!   -`   ~( _I `'` j-  z:    yU+..(?77=i.                 ````j_?+.``z+     |   ",
-        " >`   8  3._   t``_ ~d_(Z `'`  ;. _z_4x7=!...-77<. `?.               .>? d6*~_=.",
-        "CC     ({   (_   8         7. _(Zt(7~~_Id(X_ .?- l._~(v````.(/   42TM#NNmgmO&+jV",
-        "\"`   <>?v~_(d     .l    |   8           _7_d(i,     I;j-..O   (J>     `,L  `.Ye ",
-        "   79% w  ,N,, 1j    ~(W     ((   `~   8                        jI1+(   +z!     ",
-        ". ,H, .< ,h..J!      .#Nz.?(    _(v    _C.    `   8                         (<~`",
-        "  >+!     .  ` .\"YSa+JMMSaJ....JY-X3..`.. -~Z JJ__J`,   J    8                  ",
-        "      J~.``  j!`.   .C     .._-z   ?M   @ +Hg>?1z-. .~(!_~999  77!`     8",
+        " >`      3._   t``_ ~d_(Z `'`  ;. _z_4x7=!...-77<. `?.               .>? d6*~_=.",
+        "CC     ({   (_             7. _(Zt(7~~_Id(X_ .?- l._~(v````.(/   42TM#NNmgmO&+jV",
+        "\"`   <>?v~_(d     .l    |               _7_d(i,     I;j-..O   (J>     `,L  `.Ye ",
+        "   79% w  ,N,, 1j    ~(W     ((   `~                            jI1+(   +z!     ",
+        ". ,H, .< ,h..J!      .#Nz.?(    _(v    _C.    `                             (<~`",
+        "  >+!     .  ` .\"YSa+JMMSaJ....JY-X3..`.. -~Z JJ__J`,   J                       ",
+        "      J~.``  j!`.   .C     .._-z   ?M   @ +Hg>?1z-. .~(!_~999  77!`      ",
         NULL
     };
 
 
-    size_t size, count, len;
-    char *start_for_file;
+    size_t size, count, len = 0;
+    char *start_for_file = NULL;
+
+    size = numof(lines_with_trailing_newline);
+    assert(size);
+
+#ifdef XFGETS_TEST_COMPLETE
+    size -= rand() % size;
+    assert(size);
+#endif
+    size = rand() % size;
+    count = size;
+
 
     assert((fp = fopen(TMP_FILE1, "w")));
+
     for (p_line = lines_with_trailing_newline; *p_line; p_line++){
         assert(fputs(*p_line, fp) != EOF);
         assert(fputc('\n', fp) != EOF);
     }
     assert(! fclose(fp));
 
-    size = numof(lines_with_trailing_newline);
-
-#ifdef XFGETS_TEST_COMPLETE
-    assert(size);
-    size -= rand() % size;
-#endif
-    assert(size);
-    size = rand() % size;
-    count = size;
-
 
     for (p_line = lines_with_trailing_newline; size--; p_line++){
         fprintf(stderr, "  Reading '%s' ...\n", *p_line);
 
-        assert((line = xfgets_for_loop(TMP_FILE1, &start_for_file, &errid, &len)));
-        assert(len == strlen(*p_line));
-        assert(! memcmp(line, *p_line, (len + 1)));
+        assert((line = xfgets_for_loop(TMP_FILE1, &start_for_file, &len, &errid)));
+        assert(! strcmp(line, *p_line));
+        assert(len-- && (len == strlen(start_for_file)));
         assert(! errid);
     }
+
+#ifdef XFGETS_TEST_COMPLETE
+    if (start_for_file){
+        assert(len && (! (len % 91)));
+
+        do {
+            start_for_file[len - 1] = '\n';
+            len -= 91;
+        } while (len);
+
+        fprintf(stderr, "\n%s\n", start_for_file);
+
+        for (line = start_for_file; (line = strchr(line, '\n')); *(line++) = ' ');
+    }
+#endif
 
 
     // when accepting the input from standard input while reading other file
 
-    char *start_for_stdin;
+    char *start_for_stdin = NULL;
 
     fputs("\nChecking if it works the same as 'cat -' ...\n", stderr);
 
-    for (size = 0; (line = xfgets_for_loop(NULL, &start_for_stdin, NULL, &len)); size++){
-        assert(len == strlen(line));
+    for (size = 0; (line = xfgets_for_loop(NULL, &start_for_stdin, NULL, NULL)); size++)
         assert(puts(line) != EOF);
-    }
 
     do {
         assert(check_if_visually_no_problem());
@@ -1550,14 +1591,9 @@ static void xfgets_for_loop_test(void){
 
     // when performing terminate processing for the interrupted file reading and confirming its correctness
 
-#ifdef XFGETS_TEST_COMPLETE
-    char *tmp;
-    struct timespec req;
-#endif
-
     errid = -1;
-    assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, &errid, NULL));
-    assert(errid == -1);
+    assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, NULL, &errid));
+    assert(! errid);
 
     if (start_for_file){
         assert(count);
@@ -1566,24 +1602,13 @@ static void xfgets_for_loop_test(void){
         p_line = lines_with_trailing_newline;
 
         do {
-            size = strlen(*p_line) + 1;
-            assert(! memcmp(line, *(p_line++), size));
-
-#ifdef XFGETS_TEST_COMPLETE
-            if ((tmp = strchr(line, '8')))
-                *tmp = '\n';
-            fputs(line, stderr);
-#endif
-            line += size;
+            len = strlen(*p_line);
+            assert(! memcmp(line, *p_line, len));
+            line += len;
+            p_line++;
         } while (--count);
 
         free(start_for_file);
-
-#ifdef XFGETS_TEST_COMPLETE
-        req.tv_sec = rand() % 3;
-        req.tv_nsec = rand() % 1000000000;
-        nanosleep(&req, NULL);
-#endif
     }
 
     assert(! count);
@@ -1592,7 +1617,7 @@ static void xfgets_for_loop_test(void){
     // when specifying a non-existing file
 
     assert(! unlink(TMP_FILE1));
-    assert(! xfgets_for_loop(TMP_FILE1, NULL, &errid, &len));
+    assert(! xfgets_for_loop(TMP_FILE1, NULL, &len, &errid));
     assert(errid == ENOENT);
 }
 
@@ -1652,13 +1677,13 @@ static void xstrcat_inf_len_test(void){
     };
 
     int i;
-    inf_str istr = {0};
+    inf_str start = {0};
 
     for (i = 0; table[i].path; i++){
-        assert(xstrcat_inf_len(&istr, table[i].inherit, table[i].path, (strlen(table[i].path) + 1)));
-        assert(istr.ptr);
-        assert(istr.max == XSTRCAT_INITIAL_MAX);
-        assert(! strcmp(istr.ptr, table[i].result));
+        assert(xstrcat_inf_len(&start, table[i].inherit, table[i].path, (strlen(table[i].path) + 1)));
+        assert(start.ptr);
+        assert(start.max == XSTRCAT_INITIAL_MAX);
+        assert(! strcmp(start.ptr, table[i].result));
 
         print_progress_test_loop('\0', -1, i);
         fprintf(stderr, "%s\n", table[i].result);
@@ -1668,7 +1693,7 @@ static void xstrcat_inf_len_test(void){
     // changeable part for updating test cases
     const char *repeat = "'a string of arbitrary length'";
 
-    size_t size, istr_len = 0;
+    size_t size, len = 0;
     int iter = 0;
 
     size = strlen(repeat);
@@ -1677,18 +1702,18 @@ static void xstrcat_inf_len_test(void){
     while ((size * (++iter) + 1) <= XSTRCAT_INITIAL_MAX);
 
     for (i = 0; i < iter;){
-        assert(istr.max == XSTRCAT_INITIAL_MAX);
-        assert(xstrcat_inf_len(&istr, istr_len, repeat, (size + 1)));
-        assert(istr.ptr);
+        assert(start.max == XSTRCAT_INITIAL_MAX);
+        assert(xstrcat_inf_len(&start, len, repeat, (size + 1)));
+        assert(start.ptr);
 
-        istr_len += size;
+        len += size;
         print_progress_test_loop('\0', -1, i);
         fprintf(stderr, "%s * %d\n", repeat, ++i);
     }
 
-    assert(istr.max > XSTRCAT_INITIAL_MAX);
+    assert(start.max > XSTRCAT_INITIAL_MAX);
 
-    free(istr.ptr);
+    free(start.ptr);
 }
 
 
@@ -1725,7 +1750,7 @@ static void execute_test(void){
 
 
 
-static inf_str walked_istr = {0};
+static inf_str walked_start = {0};
 static size_t walked_len = 0;
 
 
@@ -1739,7 +1764,7 @@ static int walk_test_stub(int pwdfd, const char *name, bool isdir){
     if (! isdir){
         size = strlen(name) + 1;
 
-        if (xstrcat_inf_len(&walked_istr, walked_len, name, size))
+        if (xstrcat_inf_len(&walked_start, walked_len, name, size))
             walked_len += size;
         else
             exit_status = FAILURE;
@@ -1782,7 +1807,7 @@ static void walk_test(void){
         assert((addr = mmap(NULL, file_stat.st_size, PROT_READ, MAP_PRIVATE, c, 0)) != MAP_FAILED);
 
         found = (const char *) addr;
-        walked = walked_istr.ptr;
+        walked = walked_start.ptr;
 
         while (walked_len){
             if ((tmp = strrchr(found, '/')))
@@ -1801,8 +1826,8 @@ static void walk_test(void){
         assert(! close(c));
     }
 
-    assert(walked_istr.ptr);
-    free(walked_istr.ptr);
+    assert(walked_start.ptr);
+    free(walked_start.ptr);
 }
 
 
@@ -2038,27 +2063,21 @@ static void get_one_liner_test(void){
 
 
 static void get_file_size_test(void){
-    assert(sizeof(char) == 1);
-
     // when specifying a valid file
 
     // changeable part for updating test cases
     const unsigned int digit = 6;
-    assert(digit <= 10);
+    assert(digit && (digit <= 10));
 
-    int i, divisor = 1, fd;
+    int i, divisor, fd;
     size_t size;
-    char *tmp;
 
-    for (i = -1; ++i < digit; divisor *= 10) {
+    for (i = 0, divisor = 1; i < digit; i++, divisor *= 10) {
         size = rand() % divisor;
+        assert(size < INT_MAX);
 
-        assert((fd = open(TMP_FILE1, (O_WRONLY | O_CREAT | O_TRUNC))) != -1);
-        if (size){
-            assert((tmp = calloc(size, sizeof(char))));
-            assert(write(fd, tmp, size) == size);
-            free(tmp);
-        }
+        assert((fd = open(TMP_FILE1, (O_WRONLY | O_CREAT))) != -1);
+        assert(! ftruncate(fd, size));
         assert(! close(fd));
 
         assert(get_file_size(TMP_FILE1) == size);
@@ -2069,7 +2088,7 @@ static void get_file_size_test(void){
 
     // when specifying a file that is too large
 
-    assert(system(NULL) && (! system("dd if=/dev/zero of="TMP_FILE1" bs=1M count=2K 2> /dev/null")));
+    assert(! truncate(TMP_FILE1, INT_MAX));
     assert(get_file_size(TMP_FILE1) == -2);
     assert(errno == EFBIG);
 
