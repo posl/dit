@@ -10,8 +10,6 @@
 
 #include "main.h"
 
-#define INSP_INITIAL_DIRS_MAX 15  // 2^n - 1
-
 #define INSP_DIRTREE_HEADER \
     ( \
         "\n" \
@@ -19,6 +17,8 @@
         "=========================================" \
         "\n" \
     )
+
+#define INSP_INITIAL_DIRS_MAX 15  // 2^n - 1
 
 
 /** Data type for storing the results of option parse */

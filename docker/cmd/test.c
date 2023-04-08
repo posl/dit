@@ -39,7 +39,7 @@ void test(int argc, char **argv, int cmd_id){
     assert(cmd_id < CMDS_NUM);
 
     bool test_flag = false;
-    void (* test_func)(void) = dit_test;
+    void (* test_func)(void);
 
     if (cmd_id >= 0){
         void (* const test_funcs[CMDS_NUM])(void) = {
@@ -62,8 +62,10 @@ void test(int argc, char **argv, int cmd_id){
         test_flag = parse_opts(argc, argv);
         test_func = test_funcs[cmd_id];
     }
-    else if (argc == 1)
+    else if (argc == 1){
         test_flag = (! strcmp(*argv, "test"));
+        test_func = dit_test;
+    }
 
     if (test_flag){
         test_func();
