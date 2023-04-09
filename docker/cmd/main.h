@@ -235,7 +235,7 @@ void xperror_suggestion(bool cmd_flag);
 
 void xperror_standards(const char *entity, int errid);
 void xperror_child_process(const char *cmd_name, int status);
-void xperror_file_contents(const char *file_name, int lineno, const char *msg);
+void xperror_file_contents(const char *file_name, size_t lineno, const char *msg);
 
 
 

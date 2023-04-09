@@ -18,10 +18,10 @@
 #define REFLECT_FILE_P "/dit/srv/reflect-report.prov"
 #define REFLECT_FILE_R "/dit/srv/reflect-report.real"
 
-#define PTNFOR_CMD_OR_ENTRYPOINT "^[[:space:]]*(CMD|ENTRYPOINT)[[:space:]]"
-
 #define update_provisional_report(reflecteds)  manage_provisional_report(reflecteds, "r+w\0")
 #define reset_provisional_report(reflecteds)  manage_provisional_report(reflecteds, "r\0w\0")
+
+#define PATTERN_CMD_OR_ENTRYPOINT "^[[:space:]]*(CMD|ENTRYPOINT)[[:space:]]"
 
 #define CC(target)  "\\[\\e[1;%dm\\]" target "\\[\\e[m\\]"
 
@@ -314,14 +314,14 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
     assert(argc >= 0);
     assert(argv);
 
-    const char *src_file, *errdesc = NULL;
-    int lineno, tmp, exit_status = SUCCESS;
+    const char *src_file, *msg = NULL;
+    size_t lineno, size = 0;
     char *line;
-    size_t size, total = 0;
+    int errid = 0, exit_status = SUCCESS;
     bool first_blank = true;
-    inf_str istr = {0};
 
     data->lines_num = 0;
+    data->lines = NULL;
     data->instr_c = '\0';
 
     do {
@@ -335,8 +335,8 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
             src_file = convert_results[data->target_id];
 
         if ((! src_file) || (get_file_size(src_file) >= 0)){
-            for (lineno = 0, tmp = 0; (line = xfgets_for_loop(src_file, NULL, &tmp, &size)); lineno++){
-                if (! size){
+            for (lineno = 1; (line = xfgets_for_loop(src_file, &(data->lines), &size, &errid));){
+                if (! *line){
                     switch (blank_c){
                         case 's':
                             if (first_blank){
@@ -344,35 +344,29 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
                                 break;
                             }
                         case 't':
+                            lineno++;
+                            size--;
                             continue;
                         default:
                             assert(blank_c == 'p');
                     }
                 }
-                else
-                    first_blank = true;
-
-                assert(! errdesc);
-                assert(total <= INT_MAX);
-
-                tmp = -1;
-
-                if (! (argc && data->target_id && (errdesc = check_dockerfile_instr(line)))){
-                    size++;
-
-                    if (size >= (INT_MAX - total))
-                        errdesc = "read size overflow detected";
-                    else if (xstrcat_inf_len(&istr, total, line, size)){
-                        tmp = 0;
-                        total += size;
-                        data->lines_num++;
+                else {
+                    if (argc && data->target_id && (msg = check_dockerfile_instr(line))){
+                        errid = -1;
+                        continue;
                     }
+                    first_blank = true;
                 }
+                lineno++;
+                data->lines_num++;
             }
 
-            if (tmp){
-                if (errdesc)
-                    xperror_file_contents(src_file, lineno, errdesc);
+            if (errid){
+                if (errid == EFBIG)
+                    msg = "read size overflow detected";
+                if (msg)
+                    xperror_file_contents(src_file, lineno, msg);
                 exit_status = POSSIBLE_ERROR;
                 break;
             }
@@ -384,7 +378,6 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
     } while (--argc > 0);
 
     assert(data->lines_num < INT_MAX);
-    data->lines = istr.ptr;
 
     if (! (first_cmd && first_entrypoint))
         data->instr_c = 'C';
@@ -433,7 +426,7 @@ static int reflect_lines(refl_data *data, const refl_opts *opt){
                     line = seq;
                 }
                 else if (data->instr_c == 'C'){
-                    line = PTNFOR_CMD_OR_ENTRYPOINT;
+                    line = PATTERN_CMD_OR_ENTRYPOINT;
                     exit_status = delete_from_dockerfile(&line, 1, false, 'Y');
 
                     if (exit_status && (exit_status != UNEXPECTED_ERROR)){
@@ -537,30 +530,30 @@ static const char *check_dockerfile_instr(char *target){
     assert(target);
 
     int instr_id = -1;
-    const char *errdesc = "invalid instruction";
+    const char *msg = "invalid instruction";
 
     if (receive_dockerfile_instr(target, &instr_id)){
         assert((instr_id >= -1) && (instr_id < DOCKER_INSTRS_NUM));
-        errdesc = NULL;
+        msg = NULL;
 
         switch (instr_id){
             case ID_CMD:
                 if (! first_cmd)
-                    errdesc = "duplicated CMD instruction";
+                    msg = "duplicated CMD instruction";
                 first_cmd = false;
                 break;
             case ID_ENTRYPOINT:
                 if (! first_entrypoint)
-                    errdesc = "duplicated ENTRYPOINT instruction";
+                    msg = "duplicated ENTRYPOINT instruction";
                 first_entrypoint = false;
                 break;
             case ID_FROM:
             case ID_MAINTAINER:
-                errdesc = "instruction not allowed";
+                msg = "instruction not allowed";
         }
     }
 
-    return errdesc;
+    return msg;
 }
 
 
@@ -574,24 +567,24 @@ static const char *check_dockerfile_instr(char *target){
  * @attention if the contents of 'p_start' is non-NULL, it should be released by the caller.
  */
 static size_t read_dockerfile_base(char **p_start){
-    assert(p_start);
+    assert(p_start && (! *p_start));
 
     char *line;
     int errid = 0, instr_id;
     size_t lines_num = 0;
 
-    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, p_start, &errid, NULL))){
+    while ((line = xfgets_for_loop(DOCKER_FILE_BASE, p_start, NULL, &errid))){
         instr_id = -1;
 
         if (receive_dockerfile_instr(line, &instr_id) && (lines_num || (instr_id == ID_FROM)))
             lines_num++;
-        else {
+        else
             errid = -1;
-            lines_num = 0;
-        }
     }
 
-    assert(! (errid && lines_num));
+    if (errid)
+        lines_num = 0;
+
     return lines_num;
 }
 

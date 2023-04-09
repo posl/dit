@@ -46,7 +46,7 @@ typedef struct {
     int undoes;          /** how many times to undo the editing of the target files */
     int target_c;        /** character representing the files to be edited ('d', 'h' or 'b') */
     bool history;        /** whether to show the reflection history in the target files */
-    bool ignore_case;    /** whether regular expression pattern string is case sensitive */
+    int ignore_case;     /** whether to ignore case in regex pattern matching (0 or REG_ICASE) */
     int max_count;       /** the maximum number of lines to delete, counting from the most recently added */
     bool reset_flag;     /** whether to reset the log-file (specified by optional arguments) */
     int blank_c;         /** how to handle the empty lines ('p', 's' or 't') */
@@ -92,7 +92,7 @@ static int do_erase(int argc, char **argv, erase_opts *opt, delopt_func markline
 static int construct_erase_data(erase_data *data, int target_id, int provlogs[2], int purpose_c);
 
 static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, erase_data *data);
-static int marklines_containing_pattern(erase_data *data, const char *pattern, bool ignore_case);
+static int marklines_containing_pattern(erase_data *data, const char *pattern, int ignore_case);
 
 static int marklines_with_numbers(erase_data *data, const char *range);
 static void marklines_to_undo(erase_data *data, int undoes);
@@ -212,7 +212,7 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
         opt->undoes = 0;
         opt->target_c = '\0';
         opt->history = false;
-        opt->ignore_case = false;
+        opt->ignore_case = 0;
         opt->max_count = -1;
         opt->reset_flag = false;
         opt->blank_c = 'p';
@@ -258,7 +258,7 @@ static int parse_opts(int argc, char **argv, erase_opts *opt, erase_data *data){
                     opt->history = true;
                     break;
                 case 'i':
-                    opt->ignore_case = true;
+                    opt->ignore_case = REG_ICASE;
                     break;
                 case 'r':
                     opt->reset_flag = true;
@@ -670,7 +670,7 @@ int delete_from_dockerfile(char **patterns, size_t count, bool verbose, int assu
         .has_delopt = true,
         .undoes = 0,
         .target_c = 'd',
-        .ignore_case = true,
+        .ignore_case = REG_ICASE,
         .max_count = -1,
         .reset_flag = false,
         .blank_c = 'p',
@@ -719,12 +719,13 @@ static int construct_erase_data(erase_data *data, int target_id, int provlogs[2]
 
     erase_logs *logs;
     const char *target_file, *log_file;
-    char **p_start = NULL;
+    char **p_start = NULL, *line;
     int concat_flag = true, errid = 0, mode_c = 'w';
 
     logs = data->logs;
 
     data->lines_num = 0;
+    data->blanks_num = 0;
     data->lines = NULL;
     data->list_size = 0;
     data->check_list = NULL;
@@ -744,10 +745,12 @@ static int construct_erase_data(erase_data *data, int target_id, int provlogs[2]
         concat_flag = false;
     }
 
-    while (xfgets_for_loop(target_file, p_start, &errid, NULL))
+    while ((line = xfgets_for_loop(target_file, p_start, NULL, &errid))){
         data->lines_num++;
 
-    // blanks_num
+        if (! *line)
+            data->blanks_num++;
+    }
 
     if (! errid){
         assert(data->lines_num < INT_MAX);
@@ -814,12 +817,12 @@ int update_erase_logs(int reflecteds[2]){
 
 
 /******************************************************************************
-    * Determine by Regular Expression Matching
+    * Determine by Regular Expression Pattern Matching
 ******************************************************************************/
 
 
 /**
- * @brief mark for deletion the lines in Dockerfile containing any of the specified pattern strings.
+ * @brief mark for deletion the lines in Dockerfile matching all of the specified regex pattern strings.
  *
  * @param[in]  size  array size
  * @param[in]  patterns  array of pattern strings to determine which lines to delete
@@ -830,7 +833,7 @@ int update_erase_logs(int reflecteds[2]){
  * @note the argument types match those of 'parse_opts' in order to treat this function in the same way.
  * @note the actual types are 'size_t', 'const char * const *', 'const erase_opts *' and 'erase_data *'.
  *
- * @attention there must be at least one regular expression pattern to determine which lines to delete.
+ * @attention there must be at least one pattern string to determine which lines to delete.
  */
 static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, erase_data *data){
     assert(size > 0);
@@ -852,11 +855,11 @@ static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, e
 
 
 /**
- * @brief mark for deletion the lines containing extended regular expression pattern string.
+ * @brief mark for deletion the lines matching regex pattern string.
  *
  * @param[out] data  variable to store the data commonly used in this command
  * @param[in]  pattern  pattern string to determine which lines to delete
- * @param[in]  ignore_case  whether regular expression pattern string is case sensitive
+ * @param[in]  ignore_case  whether to ignore case in regex pattern matching (0 or REG_ICASE)
  * @return int  0 (success), 1 (argument recognition error) or -1 (unexpected error)
  *
  * @note combine the conditions with a logical OR within this function.
@@ -865,21 +868,20 @@ static int marklines_in_dockerfile(int size, char **patterns, erase_opts *opt, e
  * @attention 'data' must be reliably constructed before calling this function.
  * @attention must not call this function if the target file does not contain any lines that can be deleted.
  */
-static int marklines_containing_pattern(erase_data *data, const char *pattern, bool ignore_case){
+static int marklines_containing_pattern(erase_data *data, const char *pattern, int ignore_case){
     assert(data);
     assert(data->lines_num);
     assert(data->lines);
     assert(data->check_list);
+    assert((! ignore_case) || (ignore_case == REG_ICASE));
 
     int exit_status = POSSIBLE_ERROR;
 
     if (pattern){
-        int cflags, errcode;
+        int errcode;
         regex_t preg;
 
-        cflags = REG_EXTENDED | REG_NOSUB | (ignore_case ? REG_ICASE : 0);
-
-        if (! (errcode = regcomp(&preg, pattern, cflags))){
+        if (! (errcode = regcomp(&preg, pattern, (REG_EXTENDED | REG_NOSUB | ignore_case)))){
             const char *line;
             unsigned int i = 0, idx, mask;
 
@@ -913,30 +915,22 @@ static int marklines_containing_pattern(erase_data *data, const char *pattern, b
             regfree(&preg);
         }
         else {
-            size_t size = 0;
-            char *errmsg = NULL;
+            size_t size;
+            size = regerror(errcode, &preg, NULL, 0);
 
-            do {
-                size = regerror(errcode, &preg, errmsg, size);
+            char msg[size];
+            regerror(errcode, &preg, msg, size);
 
-                if ((! errmsg) && (errmsg = (char *) malloc(sizeof(char) * size)))
-                    continue;
-                break;
-            } while (true);
+            size = (strlen(pattern) * 4 + 1) + 2;
 
-            if (errmsg){
-                size = (strlen(pattern) * 4 + 1) + 2;
+            char buf[size];
+            size = get_sanitized_string((buf + 1), pattern, true);
 
-                char buf[size];
-                size = get_sanitized_string((buf + 1), pattern, true);
+            buf[0] = '\'';
+            buf[++size] = '\'';
+            buf[++size] = '\0';
 
-                buf[0] = '\'';
-                buf[++size] = '\'';
-                buf[++size] = '\0';
-
-                xperror_message(errmsg, buf);
-                free(errmsg);
-            }
+            xperror_message(msg, buf);
         }
 
         data->first_mark = false;
@@ -1438,7 +1432,7 @@ static int handle_empty_lines(erase_data *data, int blank_c){
 /**
  * @brief parse a string representing a range specification.
  *
- * @param[in]  range  string specifying a range of line numbers to delete
+ * @param[out] range  string specifying a range of line numbers to delete
  * @param[in]  stop  stop number in the range specification
  * @param[out] check_list  array of bits representing whether to delete the corresponding lines
  * @return bool  successful or not
@@ -1855,24 +1849,24 @@ static void marklines_containing_pattern_test(void){
     const struct {
         const char * const pattern;
         const int flag;
-        const bool ignore_case;
+        const int ignore_case;
         const unsigned int result;
     }
     // changeable part for updating test cases
     table[] = {
-        { "^[[:space:]]*[^#]",                        true, false, 0x0006def7 },
-        { "\"[[:print:]]+\"",                        false, false, 0x00061c04 },
-        { "^Run[[:space:]]",                         false,  true, 0x00001c00 },
-        { "",                                         true, false, 0x0007ffff },
-        { "^RUN[[:print:]]+([^&]*&{2}|[^|]*\\|{2})", false, false, 0x00008880 },
-        { "0^",                                      false,  true, 0x00000000 },
-        { "*.txt",                                     -1,  false, 0x00000000 },
-        { "((|\\[|\\{)",                               -1,  false, 0x00000000 },
-        { "^run[[:print:]]*\\",                        -1,   true, 0x00000000 },
-        { "[",                                         -1,  false, 0x00000000 },
-        { "\\<[a-Z]+\\>",                              -1,  false, 0x00000000 },
-        { "[[:unknown:]]?",                            -1,   true, 0x00000000 },
-        {  0,                                           0,     0,    0        }
+        { "^[[:space:]]*[^#]",                        true,       0,   0x0006def7 },
+        { "\"[[:print:]]+\"",                        false,       0,   0x00061c04 },
+        { "^Run[[:space:]]",                         false, REG_ICASE, 0x00001c00 },
+        { "",                                         true,       0,   0x0007ffff },
+        { "^RUN[[:print:]]+([^&]*&{2}|[^|]*\\|{2})", false,       0,   0x00008880 },
+        { "0^",                                      false, REG_ICASE, 0x00000000 },
+        { "*.txt",                                     -1,        0,   0x00000000 },
+        { "((|\\[|\\{)",                               -1,        0,   0x00000000 },
+        { "^run[[:print:]]*\\",                        -1,  REG_ICASE, 0x00000000 },
+        { "[",                                         -1,        0,   0x00000000 },
+        { "\\<[a-Z]+\\>",                              -1,        0,   0x00000000 },
+        { "[[:unknown:]]?",                            -1,  REG_ICASE, 0x00000000 },
+        {  0,                                           0,        0,     0        }
     };
 
 
@@ -2272,7 +2266,7 @@ static void manage_erase_logs_test(void){
     };
 
 
-    int i, provlog, tmp;
+    int provlog, i, j;
     erase_logs logs = { .p_provlog = &provlog };
 
     assert((i = open(TMP_FILE1, (O_RDWR | O_CREAT | O_TRUNC))) != -1);
@@ -2288,43 +2282,38 @@ static void manage_erase_logs_test(void){
         logs.total = table[i].total;
         provlog = table[i].provlog;
 
-        tmp = SUCCESS;
-        if (table[i].read_result.reset_flag < 0)
-            tmp = UNEXPECTED_ERROR;
+        j = (table[i].read_result.reset_flag >= 0) ? SUCCESS : UNEXPECTED_ERROR;
+        assert(manage_erase_logs(TMP_FILE1, 'r', &logs, table[i].concat_flag) == j);
 
-        assert(manage_erase_logs(TMP_FILE1, 'r', &logs, table[i].concat_flag) == tmp);
         assert(provlog == table[i].provlog);
         assert(logs.reset_flag == ((bool) table[i].read_result.reset_flag));
 
-        for (tmp = 0; table[i].read_result.array[tmp] >= 0; tmp++){
+        for (j = 0; table[i].read_result.array[j] >= 0; j++){
             assert(logs.array_size--);
-            assert(logs.array[tmp] == table[i].read_result.array[tmp]);
+            assert(logs.array[j] == table[i].read_result.array[j]);
         }
         assert(! logs.array_size);
 
-        for (tmp = 0; table[i].read_result.extra[tmp] >= 0; tmp++){
+        for (j = 0; table[i].read_result.extra[j] >= 0; j++){
             assert(logs.extra_size--);
-            assert(logs.extra[tmp] == table[i].read_result.extra[tmp]);
+            assert(logs.extra[j] == table[i].read_result.extra[j]);
         }
         assert(! logs.extra_size);
 
         logs.reset_flag = table[i].write_input.reset_flag;
 
-        for (tmp = 0; table[i].write_input.array[tmp] >= 0; tmp++){
+        for (j = 0; table[i].write_input.array[j] >= 0; j++){
             logs.array_size++;
-            logs.array[tmp] = table[i].write_input.array[tmp];
+            logs.array[j] = table[i].write_input.array[j];
         }
 
-        for (tmp = 0; table[i].write_input.extra[tmp] >= 0; tmp++){
+        for (j = 0; table[i].write_input.extra[j] >= 0; j++){
             logs.extra_size++;
-            logs.extra[tmp] = table[i].write_input.extra[tmp];
+            logs.extra[j] = table[i].write_input.extra[j];
         }
 
-        tmp = 'w';
-        if (table[i].write_input.reset_flag < 0)
-            tmp = '\0';
-
-        assert(manage_erase_logs(TMP_FILE1, tmp, &logs, table[i].concat_flag) == SUCCESS);
+        j = (table[i].write_input.reset_flag >= 0) ? 0 : 1;
+        assert(manage_erase_logs(TMP_FILE1, "w"[j], &logs, table[i].concat_flag) == SUCCESS);
 
         print_progress_test_loop('\0', -1, i);
         fprintf(stderr, "total:  %3d\n", table[i].total);

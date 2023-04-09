@@ -429,19 +429,19 @@ void xperror_child_process(const char *cmd_name, int status){
  * @brief print the error message about the contents of the specified file to stderr.
  *
  * @param[in]  file_name  file name of NULL to indicate that the source is standard input
- * @param[in]  lineno  the line number
+ * @param[in]  lineno  line number
  * @param[in]  msg  the error message
  *
  * @note line number starts from 1.
  */
-void xperror_file_contents(const char *file_name, int lineno, const char *msg){
-    assert(lineno > 0);
+void xperror_file_contents(const char *file_name, size_t lineno, const char *msg){
+    assert(lineno);
     assert(msg);
 
     if (! file_name)
         file_name = "stdin";
 
-    fprintf(stderr, "%s: %s: line %d: %s\n", program_name, file_name, lineno, msg);
+    fprintf(stderr, "%s: %s: line %zu: %s\n", program_name, file_name, lineno, msg);
 }
 
 
@@ -468,12 +468,13 @@ void xperror_file_contents(const char *file_name, int lineno, const char *msg){
  * @note all lines of the file whose size is larger than 'INT_MAX' cannot be preserved.
  * @note the contents of 'p_len' acts as an offset for concatenating newly read line into preserved lines.
  * @note line concatenation by specifying a valid 'p_len' will occur even between separate series of calls.
+ * @note if you want to prevent the above behavior, you should initialize the contents of 'p_len' to 0.
+ * @note if aborting due to an error, the contents of 'p_errid' will be the positive error number.
  * @note if the contents of 'p_errid' is changed to a non-zero value in the loop, it does finish processing.
- * @note the contents of 'p_errid' will be either the error number or 0 to indicate that no error occurred.
  * @note the trailing newline character of the line that is the return value is stripped.
  *
  * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
- * @attention if you specify a non-NULL value for the argument, its contents should be properly initialized.
+ * @attention if you specify a non-NULL for the argument, its contents should be properly initialized.
  * @attention normally, the address pointed to by 'p_start' should remain constant during a series of calls.
  * @attention if 'p_start' and its contents are non-NULL, its contents should be released by the caller.
  * @attention the return value must not used outside the loop because 'realloc' function may invalidate it.
@@ -1417,12 +1418,11 @@ static void xfgets_for_loop_test(void){
         "The parts where the test case can be updated by changing the code are commented as shown above.",
         "You can try changing the value of the macro 'XFGETS_INITIAL_MAX' before testing.",
         "",
-        NULL
+            NULL
     };
 
     const char * const *p_line;
     FILE *fp;
-    bool isempty;
     char *line;
     int errid = 0;
 
@@ -1433,21 +1433,14 @@ static void xfgets_for_loop_test(void){
         assert(fputs(*p_line, fp) != EOF);
         assert(! fclose(fp));
 
-        isempty = (! **p_line);
-
-        do {
-            line = xfgets_for_loop(TMP_FILE1, NULL, NULL, &errid);
+        if (**p_line){
+            assert((line = xfgets_for_loop(TMP_FILE1, NULL, NULL, &errid)));
+            assert(! strcmp(line, *p_line));
             assert(! errid);
+        }
 
-            if (isempty){
-                assert(! line);
-                break;
-            }
-            else {
-                assert(! strcmp(line, *p_line));
-                isempty = true;
-            }
-        } while (true);
+        assert(! (line = xfgets_for_loop(TMP_FILE1, NULL, NULL, &errid)));
+        assert(! errid);
     }
 
 
@@ -1504,11 +1497,10 @@ static void xfgets_for_loop_test(void){
         ". ,H, .< ,h..J!      .#Nz.?(    _(v    _C.    `                             (<~`",
         "  >+!     .  ` .\"YSa+JMMSaJ....JY-X3..`.. -~Z JJ__J`,   J                       ",
         "      J~.``  j!`.   .C     .._-z   ?M   @ +Hg>?1z-. .~(!_~999  77!`      ",
-        NULL
+            NULL
     };
 
-
-    size_t size, count, len = 0;
+    size_t size, remain, len = 0;
     char *start_for_file = NULL;
 
     size = numof(lines_with_trailing_newline);
@@ -1519,7 +1511,7 @@ static void xfgets_for_loop_test(void){
     assert(size);
 #endif
     size = rand() % size;
-    count = size;
+    remain = size;
 
 
     assert((fp = fopen(TMP_FILE1, "w")));
@@ -1531,7 +1523,7 @@ static void xfgets_for_loop_test(void){
     assert(! fclose(fp));
 
 
-    for (p_line = lines_with_trailing_newline; size--; p_line++){
+    for (p_line = lines_with_trailing_newline; size; p_line++, size--){
         fprintf(stderr, "  Reading '%s' ...\n", *p_line);
 
         assert((line = xfgets_for_loop(TMP_FILE1, &start_for_file, &len, &errid)));
@@ -1560,30 +1552,34 @@ static void xfgets_for_loop_test(void){
 
     char *start_for_stdin = NULL;
 
-    fputs("\nChecking if it works the same as 'cat -' ...\n", stderr);
+    fputs("\nChecking if it works the same as 'cat - -' ...\n", stderr);
 
-    for (size = 0; (line = xfgets_for_loop(NULL, &start_for_stdin, NULL, NULL)); size++)
-        assert(puts(line) != EOF);
+    for (len = 0, size = 2; size; size--)
+        while ((line = xfgets_for_loop(NULL, &start_for_stdin, &len, NULL)))
+            assert(puts(line) != EOF);
 
     do {
         assert(check_if_visually_no_problem());
 
-        if (start_for_stdin){
-            assert(size);
+        if (len){
             fputs("Checking if the output matches the input ...\n", stderr);
 
+            assert(start_for_stdin);
             line = start_for_stdin;
 
             do {
                 assert(puts(line) != EOF);
-                line += strlen(line) + 1;
-            } while (--size);
+
+                size = strlen(line) + 1;
+                line += size;
+                len -= size;
+            } while (len);
 
             free(start_for_stdin);
             start_for_stdin = NULL;
         }
         else {
-            assert(! size);
+            assert(! start_for_stdin);
             break;
         }
     } while (true);
@@ -1593,25 +1589,24 @@ static void xfgets_for_loop_test(void){
 
     errid = -1;
     assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, NULL, &errid));
-    assert(! errid);
+    assert(errid == -1);
 
     if (start_for_file){
-        assert(count);
+        assert(remain);
 
         line = start_for_file;
         p_line = lines_with_trailing_newline;
 
         do {
             len = strlen(*p_line);
-            assert(! memcmp(line, *p_line, len));
+            assert(! memcmp(line, *(p_line++), len));
             line += len;
-            p_line++;
-        } while (--count);
+        } while (--remain);
 
         free(start_for_file);
     }
 
-    assert(! count);
+    assert(! remain);
 
 
     // when specifying a non-existing file

@@ -300,7 +300,7 @@ static int display_version(void){
     const char *line;
     int errid = 0;
 
-    while ((line = xfgets_for_loop(VERSION_FILE, NULL, &errid, NULL)))
+    while ((line = xfgets_for_loop(VERSION_FILE, NULL, NULL, &errid)))
         puts(line);
 
     return errid;
@@ -452,7 +452,7 @@ void erase_manual(void){
         "Delete the lines that match the specified conditions from "DOCKER_OR_HISTORY".\n"
         "\n"
         "Options for Deletion:\n"
-        "  -E, --extended-regexp=PTN     delete the lines containing extended regular expression pattern\n"
+        "  -E, --regexp=PATTERN          delete the lines that matches extended regular expression pattern\n"
         "  -N, --numbers=ARG[,ARG]...    delete the lines with the numbers specified by ARGs:\n"
         "                                  NUM (unique specification), [NUM]-[NUM] (range specification)\n"
         "  -Z, --undoes[=NUM]            delete the lines added within the last NUM (1 by default) times\n"
@@ -463,7 +463,7 @@ void erase_manual(void){
         "      --target=FILE             determine the target file:\n"
         "                                " TARGET_OPTION_ARGS
         "  -H, --history                 show the reflection history in the target files, and exit\n"
-        "  -i, --ignore-case             ignore case distinctions in the PTN arguments and data\n"
+        "  -i, --ignore-case             ignore case distinctions in regular expression pattern matching\n"
         "  -m, --max-count=NUM           delete at most NUM lines, counting from the most recently added\n"
         "  -r, --reset                   reset the internal log-files\n"
         "  -s                            suppress repeated empty lines\n"
