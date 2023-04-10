@@ -125,6 +125,7 @@ static int parse_opts(int argc, char **argv, unsigned int *opt){
     *opt = false;
 
     int c;
+
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0)
         switch (c){
             case 'r':
@@ -163,7 +164,8 @@ static int config_contents(unsigned int code, ...){
     has_arg = code & CONF_ISHASARG;
 
     if ((fp = fopen(CONFIG_FILE, (reset_flag ? "wb" : "rb+")))){
-        unsigned char status = CONF_INITIAL_STAT, modes[2] = { CONF_DEFAULT_MODE, CONF_DEFAULT_MODE };
+        unsigned char status = CONF_INITIAL_STAT;
+        unsigned char modes[2] = { CONF_DEFAULT_MODE, CONF_DEFAULT_MODE };
 
         exit_status = SUCCESS;
 
@@ -171,6 +173,7 @@ static int config_contents(unsigned int code, ...){
             if ((fread(&status, sizeof(status), 1, fp) == 1) && (status < CONF_EXCEED_STAT)){
                 div_t tmp;
                 tmp = div(status, CONF_MODES_NUM);
+
                 modes[1] = tmp.quot;
                 modes[0] = tmp.rem;
             }
@@ -402,10 +405,12 @@ static void receive_mode_test(void){
         {  0,                     0                  }
     };
 
+    unsigned char modes[2];
     int rand2d, rand2h, i, type;
-    unsigned char modes[2] = { CONF_DEFAULT_MODE, CONF_DEFAULT_MODE };
     div_t tmp;
-    char format[] = "%-15s  %d  %d\n";
+
+    modes[1] = CONF_DEFAULT_MODE;
+    modes[0] = CONF_DEFAULT_MODE;
 
     rand2d = CONF_DEFAULT_MODE;
     rand2h = CONF_DEFAULT_MODE;
@@ -426,20 +431,14 @@ static void receive_mode_test(void){
             tmp = div(table[i].result, CONF_MODES_NUM);
             assert(modes[1] == tmp.quot);
             assert(modes[0] == tmp.rem);
-
-            format[5] = ' ';
-            format[6] = ' ';
         }
         else {
             assert(modes[1] == rand2d);
             assert(modes[0] == rand2h);
-
-            format[5] = '\n';
-            format[6] = '\0';
         }
 
         print_progress_test_loop('S', type, i);
-        fprintf(stderr, format, table[i].input, modes[1], modes[0]);
+        fprintf(stderr, "%-15s  %d  %d\n", table[i].input, modes[1], modes[0]);
     }
 }
 
@@ -447,29 +446,29 @@ static void receive_mode_test(void){
 
 
 static void receive_mode_integer_test(void){
-    const int spare = -2;
-
     const struct {
         const int input;
         const int result;
     }
     // changeable part for updating test cases
     table[] = {
-        { '0',   0   },
-        { '2',   2   },
-        { '3',   3   },
-        { '4',   4   },
-        { '_', spare },
-        { '5',  -1   },
-        { '-',  -1   },
-        { 'i',  -1   },
-        { 'o',  -1   },
-        { ' ',  -1   },
-        {  0,    0   }
+        { '0',  0 },
+        { '2',  2 },
+        { '3',  3 },
+        { '4',  4 },
+        { '_', -2 },
+        { '5', -1 },
+        { '-', -1 },
+        { 'i', -1 },
+        { 'o', -1 },
+        { ' ', -1 },
+        {  0,   0 }
     };
 
-    for (int i = 0; table[i].input; i++){
-        assert(receive_mode_integer(table[i].input, spare) == table[i].result);
+    int i;
+
+    for (i = 0; table[i].input; i++){
+        assert(receive_mode_integer(table[i].input, -2) == table[i].result);
 
         print_progress_test_loop('S', ((table[i].result != -1) ? SUCCESS : FAILURE), i);
         fprintf(stderr, "'%c'  % d\n", table[i].input, table[i].result);

@@ -84,7 +84,7 @@ extern const char * const cmd_reprs[CMDS_NUM];
 
 
 /** array of index numbers to rearange the display order of the dit commands */
-static const int cmd_rearange[] = {
+static const int cmd_rearange[CMDS_NUM] = {
     DIT_CONVERT,
     DIT_OPTIMIZE,
     DIT_CONFIG,
@@ -98,8 +98,7 @@ static const int cmd_rearange[] = {
     DIT_REFLECT,
     DIT_ERASE,
     DIT_INSPECT,
-    DIT_HELP,
-        -1
+    DIT_HELP
 };
 
 
@@ -183,10 +182,9 @@ static void (* const dit_helps[HELP_CONTENTS_NUM])(void) = {
 int help(int argc, char **argv){
     int i, exit_status = SUCCESS;
     help_conts code;
+    const char *target;
 
     if (! (i = parse_opts(argc, argv, &code))){
-        const char *target;
-
         if ((argc -= optind) > 0){
             argv += optind;
             target = *argv;
@@ -249,6 +247,7 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
     *opt = manual;
 
     int c;
+
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0)
         switch (c){
             case 'a':
@@ -284,9 +283,11 @@ static int parse_opts(int argc, char **argv, help_conts *opt){
  * @note display the commands in the same order as 'dit help'.
  */
 static void display_cmd_list(void){
-    for (const int *p_id = cmd_rearange; *p_id >= 0; p_id++){
-        assert(*p_id < CMDS_NUM);
-        puts(cmd_reprs[*p_id]);
+    int i;
+
+    for (i = 0; i < CMDS_NUM; i++){
+        assert((cmd_rearange[i] >= 0) && (cmd_rearange[i] < CMDS_NUM));
+        puts(cmd_reprs[cmd_rearange[i]]);
     }
 }
 
@@ -319,18 +320,18 @@ static int display_version(void){
 static bool display_help(help_conts code, const char *target){
     assert((code >= 0) && (code < HELP_CONTENTS_NUM));
 
+    int cmd_id;
     const char *topic;
     void (* help_func)(void);
 
     if (target){
-        int i;
-        if ((i = receive_expected_string(target, cmd_reprs, CMDS_NUM, 2)) >= 0){
-            assert(i < CMDS_NUM);
-            topic = cmd_reprs[i];
-            help_func = cmd_helps[code][i];
+        if ((cmd_id = receive_expected_string(target, cmd_reprs, CMDS_NUM, 2)) >= 0){
+            assert(cmd_id < CMDS_NUM);
+            topic = cmd_reprs[cmd_id];
+            help_func = cmd_helps[code][cmd_id];
         }
         else {
-            xperror_invalid_arg('C', i, "command", target);
+            xperror_invalid_arg('C', cmd_id, "command", target);
             xperror_suggestion(false);
             return false;
         }
@@ -342,8 +343,8 @@ static bool display_help(help_conts code, const char *target){
 
     if (code != manual)
         fprintf(stdout, " < %s >\n", topic);
-    help_func();
 
+    help_func();
     return true;
 }
 
@@ -545,23 +546,23 @@ void ignore_manual(void){
         HELP_USAGES_STR
         "  dit ignore [OPTION]... [NAME]...\n"
         "  dit ignore -A [OPTION]... NAME [SHORT_OPTS [LONG_OPTS]...] [OPTARG]... [FIRST_ARG]...\n"
-        "Edit set of commands that should not be reflected and the conditions for ignoring each element,\n"
-        "used "WHEN_REFLECTING" in "DOCKER_OR_HISTORY", individually.\n"
+        "Edit the conditions for judging that each command should not be reflected, used\n"
+        WHEN_REFLECTING" in "DOCKER_OR_HISTORY", individually.\n"
         "\n"
         "Options for Behavior:\n"
         "  -d                             edit the settings when reflecting in Dockerfile\n"
         "  -h                             edit the settings when reflecting in history-file\n"
         "      --target=FILE              determine the target file:\n"
         "                                 " TARGET_OPTION_ARGS
-        "  -i, --invert                   change to describe about the command that should be reflected\n"
-        "  -n, --unset                    remove the setting for each specified NAME\n"
+        "  -i, --invert                   change to describe about commands that should be reflected\n"
+        "  -n, --unset                    remove the setting corresponding to each specified NAME\n"
         "  -p, --print                    display the current or default settings without any editing\n"
         "  -r, --reset                    reset the settings\n"
         "      --equivalent-to=COMMAND    add NAMEs as commands that have the same setting as COMMAND\n"
         "\n"
-        "Options for Condition Specification:\n"
-        "  -A, --additional-settings      accept the specification of the conditions for ignoring\n"
-        "  -X, --detect-anymatch          change how to use the conditions for ignoring (details below)\n"
+        "Options for Detailed Conditions:\n"
+        "  -A, --additional-settings      accept the detailed conditions for ignoring the specified command\n"
+        "  -X, --detect-anymatch          set a flag to change how to use the conditions (details below)\n"
         "      --max-argc=NUM             set the maximum number of non-optional arguments\n"
         "      --same-as-nothing=TEXT     replace the string meaning no arguments ('NONE' by default)\n"
         "      --help                     " HELP_OPTION_DESC
@@ -581,22 +582,26 @@ void ignore_manual(void){
         "                  - A condition that there are no non-optional arguments can be also specified.\n"
         "\n"
         "Remarks about Behavior:\n"
-        "  - By default, NAME is added as a command that should not be reflected without any conditions.\n"
-        "  - If no NAMEs are specified and '-r' is not given, it behaves as if '-p' is given.\n"
         "  - The argument for '--target' "CAN_BE_TRUNCATED".\n"
-        "  - The target "SPECIFIED_BY_TARGET".\n"
+        "  - If the target file is not specified, it edits a list of arguments that always eliminates\n"
+        "    the need to reflect commands containing any of them, such as '--help' and '--version', and\n"
+        "    by default, it appends each NAME to that list after the confirmation of this behavior.\n"
+        "  - If the target file is specified explicitly, it edits the setting for each specified NAME, and\n"
+        "    by default, it set each NAME as a command that should not be reflected without any conditions.\n"
         "  - When '-i' is given, if '-A' is not given, it has the same meaning as '-n', otherwise it set\n"
-        "    a flag indicating that the conditions for reflection are described as the additional settings.\n"
-        "  - When '-p' is given, '-r' does not reset the ignore-file, it toggles to show the default\n"
+        "    a flag indicating that the conditions for reflecting are described as the additional settings.\n"
+        "  - If no NAMEs are specified and '-r' is not given, it behaves as if '-p' is given.\n"
+        "  - When '-p' is given, '-r' does not reset the settings, it toggles to show the default\n"
         "    settings, and NAMEs narrow down the settings to be displayed to just those specified.\n"
-        "  - If either of '-np' or '--equivalent-to' is given, the additional settings make no sense.\n"
+        "  - If the target file is not specified, nothing but '-inr' makes no sense, otherwise if\n"
+        "    either of '-np' or '--equivalent-to' is given, the additional settings make no sense.\n"
         "  - If given at the same time, '-p' takes precedence over '-n', '-n' over '--equivalent-to'.\n"
         "\n"
-        "Remarks about Condition Specification:\n"
+        "Remarks about Detailed Conditions:\n"
         "  - By default, the conditions are used to determine whether to ignore the executed\n"
         "    command by determining whether it contains elements that any conditions do not\n"
-        "    apply, but when '--detect-anymatch' is given, they are used to determine that\n"
-        "    by determining whether there is a match for any of the conditions.\n"
+        "    apply, but when '--detect-anymatch' is set, they are used to determine that by\n"
+        "    determining whether there is a match for any of the conditions.\n"
         "  - The argument for '--same-as-nothing' can be any string that does not\n"
         "    contain '=', and the string to be specified here is case insensitive.\n"
         "  - When specifying LONG_OPTSs, it must come after specifying one SHORT_OPTS, so even if\n"
@@ -608,12 +613,12 @@ void ignore_manual(void){
         "  - If you want to specify FIRST_ARG without specifying OPTARG, use one '=' instead of OPTARG.\n"
         "\n"
         HELP_REMARKS_STR
-        "  - The settings here are recorded in the ignore-file in json format, and as long as you use this\n"
-        "    command, no invalid, incorrect or meaningless settings will be recorded, but even if you edit\n"
-        "    the file in another way, the contents will be checked so that no problems will occur.\n"
+        "  - The settings here are recorded in the ignore-files, and as long as you use this command,\n"
+        "    no invalid, incorrect or meaningless settings will be recorded, but even if you edit\n"
+        "    the files in another way, the contents will be checked so that no problems will occur.\n"
         "  - Any null-terminated string can be specified for NAME, but at that time, it is necessary to\n"
-        "    consider the specification that the file path specified in the first argument, its base\n"
-        "    name, and the empty string are used in this order to search for commands in the ignore-file.\n"
+        "    consider the specification that the file path specified in the first argument, its base name,\n"
+        "    and the empty string are used in this order to search for the setting corresponding to it.\n"
     , stdout);
 }
 
@@ -756,7 +761,7 @@ static void help_description(void){
 }
 
 static void ignore_description(void){
-    puts("Edit set of commands that should not be reflected in "DOCKER_OR_HISTORY", individually.");
+    puts("Edit the conditions when commands are not reflected in "DOCKER_OR_HISTORY", individually.");
 }
 
 static void inspect_description(void){
