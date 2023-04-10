@@ -83,7 +83,7 @@
 #define strchrcmp(str, c)  (((str)[0] == (c)) && (! (str)[1]))
 #define check_if_stdin(name)  strchrcmp(name, '-')
 
-#define check_if_valid_entry(str)  ((str) && *(str) && (((str)[0] != '.') || (str)[((str)[1] != '.') ? 1 : 2]))
+#define check_if_valid_dirent(name)  (((name)[0] != '.') || (name)[((name)[1] != '.') ? 1 : 2])
 
 
 /******************************************************************************
@@ -98,7 +98,9 @@
 #define xperror_individually(msg)  xperror_message(msg, NULL)
 #define xperror_internal_file()  xperror_individually(NULL)
 
-#define walk(name, callback)  walkat(AT_FDCWD, name, callback)
+#define walk(name, callback)  walkat(AT_FDCWD, name, -1, callback)
+
+#define remove_all(name)  walk(name, removeat)
 
 
 
@@ -258,11 +260,9 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
 
 int execute(const char *cmd_file, char * const argv[], unsigned int mode);
 
-int walkat(int pwdfd, const char *name, int (* callback)(int, const char *, bool));
+bool walkat(int pwdfd, const char *name, int type, int (* callback)(int, const char *, bool));
 
 int removeat(int pwdfd, const char *name, bool isdir);
-bool remove_all(const char *name, bool isdir);
-
 int filter_dirent(const struct dirent *entry);
 
 
