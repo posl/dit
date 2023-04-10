@@ -252,6 +252,7 @@ void xperror_invalid_arg(int code_c, int state, const char *desc, const char *ar
     else
         memcpy(buf, "#NULL", (sizeof(char) * 6));
 
+
     const char *format, *addition = "", *adjective;
 
     switch (code_c){
@@ -770,6 +771,7 @@ int execute(const char *cmd_file, char * const argv[], unsigned int mode){
 
     struct sigaction new_act = {0}, sigint_act, sigquit_act;
     sigset_t old_mask;
+
     pid_t pid, err = -1;
     int tmp = 0, exit_status = -1;
 
@@ -862,14 +864,14 @@ bool walkat(int pwdfd, const char *name, int type, int (* callback)(int, const c
     assert(callback);
 
     bool call_ok;
-    int dirfd;
+    int new_fd;
     DIR *dir;
 
     call_ok = (! type);
 
     if (type){
-        if ((dirfd = openat(pwdfd, name, (O_RDONLY | O_DIRECTORY))) != -1){
-            if ((dir = fdopendir(dirfd))){
+        if ((new_fd = openat(pwdfd, name, (O_RDONLY | O_DIRECTORY))) != -1){
+            if ((dir = fdopendir(new_fd))){
                 struct dirent *entry;
                 const char *child;
                 bool isdir;
@@ -885,12 +887,12 @@ bool walkat(int pwdfd, const char *name, int type, int (* callback)(int, const c
                             isdir = (entry->d_type == DT_DIR);
                         else
 #endif
-                        if (! fstatat(dirfd, child, &file_stat, AT_SYMLINK_NOFOLLOW))
+                        if (! fstatat(new_fd, child, &file_stat, AT_SYMLINK_NOFOLLOW))
                             isdir = S_ISDIR(file_stat.st_mode);
                         else
                             break;
 
-                        if (! walkat(dirfd, child, isdir, callback))
+                        if (! walkat(new_fd, child, isdir, callback))
                             break;
                     }
                 }
@@ -901,7 +903,7 @@ bool walkat(int pwdfd, const char *name, int type, int (* callback)(int, const c
                 call_ok = (! entry);
             }
             else
-                close(dirfd);
+                close(new_fd);
         }
         else if ((type == -1) && (errno == ENOTDIR)){
             type = false;
@@ -1369,7 +1371,7 @@ void print_sanitized_string(const char *target){
 
 // if you want to a normal test for 'fgets_for_loop', comment out the line immediately after
 #ifndef XFGETS_TEST_COMPLETE
-#define XFGETS_TEST_COMPLETE
+// #define XFGETS_TEST_COMPLETE
 #endif
 
 
@@ -1704,7 +1706,7 @@ static void xstrcat_inf_len_test(void){
 
         len += size;
         print_progress_test_loop('\0', -1, i);
-        fprintf(stderr, "total length:  %zu\n", len);
+        fprintf(stderr, "total length:  %4zu\n", len);
     }
 
     assert(i > 0);
@@ -1860,9 +1862,9 @@ static void receive_positive_integer_test(void){
         {  0,              0,    0 }
     };
 
+
     int i, left;
     bool range_flag;
-
 
     for (i = 0; table[i].target; i++){
         range_flag = (table[i].left != -2);
@@ -1946,9 +1948,9 @@ static void receive_expected_string_test(void){
         {  0,            0,  0 }
     };
 
+
     int i, id;
     const char *selected;
-
 
     for (i = 0; table[i].target; i++){
         id = receive_expected_string(table[i].target, candidates, numof(candidates), table[i].mode);
@@ -1999,9 +2001,9 @@ static void receive_dockerfile_instr_test(void){
         {  0,                                          0,              0,            0 }
     };
 
+
     int i, id;
     char *args;
-
 
     for (i = 0; table[i].line; i++){
         id = table[i].expected_id;
@@ -2076,11 +2078,12 @@ static void get_one_liner_test(void){
 
 
 static void get_file_size_test(void){
-    // when specifying a valid file
-
     // changeable part for updating test cases
-    const unsigned int digit = 6;
-    assert(digit && (digit <= 10));
+    const int digit = 6;
+    assert((digit >= 0) && (digit <= 10));
+
+
+    // when specifying a valid file
 
     int i, divisor, fd;
     size_t size;

@@ -115,6 +115,7 @@ static int parse_opts(int argc, char **argv, copy_opts *opt){
     opt->chown_arg = NULL;
 
     int c, i;
+
     while ((c = getopt_long(argc, argv, short_opts, long_opts, &i)) >= 0)
         switch (c){
             case 'v':
