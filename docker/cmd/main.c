@@ -20,11 +20,11 @@
 
 /** Data type for storing the information for one loop for 'xfgets_for_loop' */
 typedef struct {
-    void *src_file;    /** address of the area where the source file name is stored or NULL */
-    FILE *fp;          /** handler for the source file */
-    char *dest;        /** pointer to the beginning of dynamic memory for storing read lines as string */
-    int curr_max;      /** the current maximum length of the string that can be preserved */
-    int curr_len;      /** the total length of the preserved strings including null characters */
+    const void *key;    /** address of the area where the source file name is stored or NULL */
+    FILE *fp;           /** handler for the source file */
+    char *dest;         /** pointer to the beginning of dynamic memory for storing read lines as string */
+    int curr_max;       /** the current maximum length of the string that can be preserved */
+    int curr_len;       /** the total length of the preserved strings including null characters */
 } xfgets_info;
 
 
@@ -250,7 +250,7 @@ void xperror_invalid_arg(int code_c, int state, const char *desc, const char *ar
     if (arg)
         get_sanitized_string(buf, arg, true);
     else
-        memcpy(buf, "#NULL", 6);
+        memcpy(buf, "#NULL", (sizeof(char) * 6));
 
     const char *format, *addition = "", *adjective;
 
@@ -470,15 +470,17 @@ void xperror_file_contents(const char *file_name, size_t lineno, const char *msg
  * @note line concatenation by specifying a valid 'p_len' will occur even between separate series of calls.
  * @note if you want to prevent the above behavior, you should initialize the contents of 'p_len' to 0.
  * @note if aborting due to an error, the contents of 'p_errid' will be the positive error number.
- * @note if the contents of 'p_errid' is changed to a non-zero value in the loop, it does finish processing.
+ * @note if the contents of 'p_errid' is changed to a non-zero value inside the loop, it does end processing.
  * @note the trailing newline character of the line that is the return value is stripped.
  *
  * @attention this function must be called until NULL is returned, since it uses dynamic memory internally.
  * @attention if you specify a non-NULL for the argument, its contents should be properly initialized.
  * @attention normally, the address pointed to by 'p_start' should remain constant during a series of calls.
- * @attention if 'p_start' and its contents are non-NULL, its contents should be released by the caller.
- * @attention the return value must not used outside the loop because 'realloc' function may invalidate it.
+ * @attention if preserving read lines, they should be released by the caller after a series of calls.
+ * @attention the contents of 'p_len' should not be updated except to discard the previously read lines.
+ * @attention the contents of 'p_errid' makes no sense until at least one line is read in a series of calls.
  * @attention except for trivial cases, you should check for errors and abort when an error has occurred.
+ * @attention the return value must not used outside the loop because 'realloc' function may invalidate it.
  */
 char *xfgets_for_loop(const char *src_file, char **p_start, size_t *p_len, int *p_errid){
     assert(XFGETS_NESTINGS_MAX > 0);
@@ -491,11 +493,11 @@ char *xfgets_for_loop(const char *src_file, char **p_start, size_t *p_len, int *
     int used_len = 0, errid = 0;
     unsigned int len;
 
-    if ((info_idx < 0) || (src_file != info_list[info_idx].src_file)){
+    if ((info_idx < 0) || (src_file != info_list[info_idx].key)){
         if (info_idx >= (XFGETS_NESTINGS_MAX - 1))
             return NULL;
 
-        info.src_file = src_file;
+        info.key = src_file;
         info.fp = stdin;
 
         if (src_file && (! (info.fp = fopen(src_file, "r")))){
@@ -507,7 +509,7 @@ char *xfgets_for_loop(const char *src_file, char **p_start, size_t *p_len, int *
         info_idx++;
         assert(info_idx >= 0);
 
-        if (! (p_len && *p_len && (*p_len < info_list[info_idx].curr_max))){
+        if (! (p_len && *p_len && (*p_len <= info_list[info_idx].curr_len))){
             info.dest = NULL;
             info.curr_max = XFGETS_INITIAL_MAX;
             info.curr_len = 0;
@@ -521,7 +523,7 @@ char *xfgets_for_loop(const char *src_file, char **p_start, size_t *p_len, int *
     else {
         memcpy(&info, (info_list + info_idx), sizeof(xfgets_info));
 
-        if (p_len && (*p_len < info.curr_max))
+        if (p_len && (*p_len <= info.curr_len))
             info.curr_len = *p_len;
     }
 
@@ -575,7 +577,7 @@ reading:
 
         start[len] = '\0';
     }
-    else if ((ferror(info.fp) && (errid = errno)) || (used_len == info.curr_len))
+    else if ((ferror(info.fp) && (errid = errno)) || (used_len++ == info.curr_len))
         goto finish;
 
     start = info.dest;
@@ -598,12 +600,12 @@ reading:
 
 
 finish:
-    info_idx--;
+    info_list[info_idx--].curr_len = info.curr_len;
 
     if (p_errid && errid)
         *p_errid = errid;
 
-    assert(src_file == info.src_file);
+    assert(src_file == info.key);
     assert(info.fp);
 
     if (src_file)
@@ -627,7 +629,7 @@ finish:
     if (info.dest)
         free(info.dest);
 
-    info_list[info_idx + 1].curr_max = 0;
+    memset((info_list + info_idx + 1), 0, sizeof(xfgets_info));
     return NULL;
 }
 
@@ -648,6 +650,7 @@ int xstrcmp_upper_case(const char * restrict target, const char * restrict expec
     assert(expected);
 
     int c, d;
+
     do {
         c = (unsigned char) *(target++);
         d = (unsigned char) *(expected++);
@@ -700,41 +703,37 @@ bool xstrcat_inf_len(inf_str *base, size_t base_len, const char *suf, size_t suf
     assert(suf_len == (strlen(suf) + 1));
 
     size_t curr_max;
-    bool allocate_flag = false;
-    void *ptr;
-    char *dest;
+    bool allocate_flag;
+    char *start;
 
-    if (! (curr_max = base->max)){
+    curr_max = base->max;
+    allocate_flag = (! curr_max);
+
+    if (allocate_flag)
         curr_max = XSTRCAT_INITIAL_MAX;
+
+    while ((curr_max - base_len) < suf_len){
+        curr_max++;
+        assert(! (curr_max & (curr_max - 1)));
+
+        if (! (curr_max <<= 1))
+            return false;
+        curr_max--;
         allocate_flag = true;
     }
 
-    do {
-        if ((curr_max - base_len) < suf_len){
-            curr_max++;
-            assert(! (curr_max & (curr_max - 1)));
-
-            if ((curr_max <<= 1)){
-                curr_max--;
-                allocate_flag = true;
-                continue;
-            }
-        }
-        else if (! allocate_flag)
-            break;
-        else if ((ptr = realloc(base->ptr, (sizeof(char) * curr_max)))){
-            base->ptr = (char *) ptr;
-            base->max = curr_max;
-            break;
-        }
-
-        return false;
-    } while (true);
+    if (allocate_flag){
+        if (! (start = (char *) realloc(base->ptr, (sizeof(char) * curr_max))))
+            return false;
+        base->ptr = start;
+        base->max = curr_max;
+    }
 
     assert(base->ptr);
+    assert(base->max);
 
-    dest = base->ptr + base_len;
-    memcpy(dest, suf, (sizeof(char) * suf_len));
+    start = base->ptr + base_len;
+    memcpy(start, suf, (sizeof(char) * suf_len));
 
     return true;
 }
@@ -965,36 +964,41 @@ int filter_dirent(const struct dirent *entry){
  * @note when omitting an integer in the range specification, it is interpreted as specifying 0.
  */
 int receive_positive_integer(const char *target, int *p_left){
-    int curr = -1;
+    int result = -1;
 
     if (target){
-        int c, prev;
+        int c, i;
 
-        curr = 0;
-        c = (unsigned char) *target;
+        result = 0;
 
         do {
-            if (isdigit(c)){
-                if (curr <= (INT_MAX / 10)){
-                    prev = curr * 10;
-                    curr = prev + (c - '0');
+            c = (unsigned char) *target;
+            i = c - '0';
 
-                    if (curr >= prev)
+            if ((i >= 0) && (i < 10)){
+                if (result <= (INT_MAX / 10)){
+                    result *= 10;
+                    result += i;
+
+                    if (result >= i)
                         continue;
                 }
             }
             else if (p_left && (c == '-')){
-                *p_left = curr;
+                *p_left = result;
+
+                result = 0;
                 p_left = NULL;
-                curr = 0;
                 continue;
             }
-            curr = -1;
+
+            result = -1;
             break;
-        } while ((c = (unsigned char) *(++target)));
+
+        } while (*(++target));
     }
 
-    return curr;
+    return result;
 }
 
 
@@ -1033,11 +1037,11 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
         max = size - 1;
         tmp = -max;
 
-    next:
+    bsearch:
         assert(tmp == (min - max));
         assert(tmp <= 0);
 
-        // while statement
+        // while statement (next character)
         if ((c = (unsigned char) *(target++))){
             if (upper_case)
                 c = toupper(c);
@@ -1056,7 +1060,7 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
                     assert(max >= mid);
 
                     tmp = min - max;
-                    goto next;
+                    goto bsearch;
                 }
                 if (tmp > 0)
                     min = mid + 1;
@@ -1074,7 +1078,7 @@ int receive_expected_string(const char *target, const char * const *reprs, size_
 
             if (c == ((unsigned char) *(expecteds[min]++))){
                 if (mode)
-                    goto next;
+                    goto bsearch;
                 if (! strcmp(target, expecteds[min]))
                     return min;
             }
@@ -1107,26 +1111,22 @@ char *receive_dockerfile_instr(char *line, int *p_id){
     assert(line);
     assert(p_id);
 
-    char *tmp = NULL, instr[12];
-    size_t instr_len = 0;
+    size_t len = 0;
+    char instr[12] = {0};
     bool invalid;
 
     do {
         while (isspace((unsigned char) *line))
             line++;
 
-        if (! tmp){
+        if (! len){
             if (*line && (*line != '#')){
-                tmp = line;
-                assert(tmp);
-
                 do
-                    if (! (*(++tmp) && (++instr_len < sizeof(instr))))
+                    if (! (line[++len] && (len < sizeof(instr))))
                         return NULL;
-                while (! isspace((unsigned char) *tmp));
+                while (! isspace((unsigned char) line[len]));
 
-                memcpy(instr, line, (sizeof(char) * instr_len));
-                instr[instr_len] = '\0';
+                memcpy(instr, line, (sizeof(char) * len));
 
                 if (*p_id < 0){
                     *p_id = receive_expected_string(instr, docker_instr_reprs, DOCKER_INSTRS_NUM, 1);
@@ -1138,7 +1138,7 @@ char *receive_dockerfile_instr(char *line, int *p_id){
                 }
 
                 if (! invalid){
-                    line = tmp + 1;
+                    line += len + 1;
                     continue;
                 }
             }
@@ -1149,6 +1149,7 @@ char *receive_dockerfile_instr(char *line, int *p_id){
             break;
 
         return NULL;
+
     } while (true);
 
     return line;
@@ -1169,24 +1170,34 @@ char *receive_dockerfile_instr(char *line, int *p_id){
  * @return char*  the resulting line or NULL
  *
  * @note if the content of the target file spans multiple lines, it is regarded as an error.
+ * @note on success, resize the resulting string to the minimum necessary size if possible.
  *
  * @attention internally, it uses 'xfgets_for_loop' with a depth of 1.
  * @attention if the return value is non-NULL, it should be released by the caller.
  */
 char *get_one_liner(const char *file_name){
-    char *line;
+    char *line = NULL;
+    size_t len = 0;
     int errid = 0;
     bool first_line = true;
+    void *ptr;
 
-    while (xfgets_for_loop(file_name, &line, &errid, NULL)){
+    while (xfgets_for_loop(file_name, &line, &len, &errid)){
         if (! first_line){
-            assert(line);
-            free(line);
-            line = NULL;
+            len = 0;
             errid = -1;
         }
         first_line = false;
     }
+
+    if (line){
+        assert(len);
+        assert(! errid);
+
+        if ((ptr = realloc(line, (sizeof(char) * len))))
+            line = (char *) ptr;
+    }
+
     return line;
 }
 
@@ -1205,16 +1216,16 @@ void get_response(const char *inquiry, const char *format, ...){
     assert(format && strstr(format, "[^\n]"));
 
     va_list sp;
-    int i;
+    int count;
 
     fputs(inquiry, stderr);
     fflush(stderr);
 
     va_start(sp, format);
-    i = vscanf(format, sp);
+    count = vscanf(format, sp);
     va_end(sp);
 
-    if ((i == EOF) || (scanf("%*[^\n]") == EOF) || (getchar() == EOF))
+    if ((count == EOF) || (scanf("%*[^\n]") == EOF) || (getchar() == EOF))
         clearerr(stdin);
 }
 
@@ -1292,15 +1303,14 @@ size_t get_sanitized_string(char *dest, const char *target, bool quoted){
     while ((i = (unsigned char) *(target++))){
         c = '?';
 
-        if (! (i & 0x80)){
+        if (! (i / 128)){
             assert(i < sizeof(escape_char_table));
 
             switch ((c = escape_char_table[i])){
                 case '?':
-                    assert(iscntrl(i));
-                    memcpy(buf, "\\x", 2);
+                    memcpy(buf, "\\x", (sizeof(char) * 2));
                     buf += 2;
-                    memcpy(buf, ((i & 0x60) ? "7F" : &escape_hex_table[i * 2]), 2);
+                    memcpy(buf, ((i / 32) ? "7F" : &(escape_hex_table[i * 2])), (sizeof(char) * 2));
                     buf += 2;
                     continue;
                 case ' ':
@@ -1359,7 +1369,7 @@ void print_sanitized_string(const char *target){
 
 // if you want to a normal test for 'fgets_for_loop', comment out the line immediately after
 #ifndef XFGETS_TEST_COMPLETE
-// #define XFGETS_TEST_COMPLETE
+#define XFGETS_TEST_COMPLETE
 #endif
 
 
@@ -1527,12 +1537,8 @@ static void xfgets_for_loop_test(void){
 
 #ifdef XFGETS_TEST_COMPLETE
     if (start_for_file){
-        assert(len && (! (len % 91)));
-
-        do {
-            start_for_file[len - 1] = '\n';
-            len -= 91;
-        } while (len);
+        for (size = 0; (size += 91) < len;)
+            start_for_file[size - 1] = '\n';
 
         fprintf(stderr, "\n%s\n", start_for_file);
 
@@ -1580,19 +1586,19 @@ static void xfgets_for_loop_test(void){
 
     // when performing terminate processing for the interrupted file reading and confirming its correctness
 
-    errid = -1;
-    assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, NULL, &errid));
-    assert(errid == -1);
-
     if (start_for_file){
         assert(remain);
+
+        errid = -1;
+        assert(! xfgets_for_loop(TMP_FILE1, &start_for_file, NULL, &errid));
+        assert(errid == -1);
 
         line = start_for_file;
         p_line = lines_with_trailing_newline;
 
         do {
             len = strlen(*p_line);
-            assert(! memcmp(line, *(p_line++), len));
+            assert(! memcmp(line, *(p_line++), (sizeof(char) * len)));
             line += len;
         } while (--remain);
 
@@ -1677,9 +1683,11 @@ static void xstrcat_inf_len_test(void){
         fprintf(stderr, "%s\n", table[i].result);
     }
 
+    assert(i > 0);
+
 
     // changeable part for updating test cases
-    const char *repeat = "'a string of arbitrary length'";
+    const char *repeat = " abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 
     size_t size, len = 0;
     int iter = 0;
@@ -1689,16 +1697,18 @@ static void xstrcat_inf_len_test(void){
 
     while ((size * (++iter) + 1) <= XSTRCAT_INITIAL_MAX);
 
-    for (i = 0; i < iter;){
+    for (i = 0; i < iter; i++){
+        assert(start.ptr);
         assert(start.max == XSTRCAT_INITIAL_MAX);
         assert(xstrcat_inf_len(&start, len, repeat, (size + 1)));
-        assert(start.ptr);
 
         len += size;
         print_progress_test_loop('\0', -1, i);
-        fprintf(stderr, "%s * %d\n", repeat, ++i);
+        fprintf(stderr, "total length:  %zu\n", len);
     }
 
+    assert(i > 0);
+    assert(start.ptr);
     assert(start.max > XSTRCAT_INITIAL_MAX);
 
     free(start.ptr);
@@ -1762,7 +1772,7 @@ static int walk_test_stub(int pwdfd, const char *name, bool isdir){
 
 static void walk_test(void){
     // changeable part for updating test cases
-    const char * const root_dirs[] = {
+    const char * const startpoint[] = {
         TMP_FILE1,
         "/tmp",
         "/dit/tmp/..",
@@ -1777,16 +1787,16 @@ static void walk_test(void){
     const char *found, *walked, *tmp;
     size_t name_len;
 
-    for (i = 0; root_dirs[i]; i++){
-        assert(*(root_dirs[i]));
-        fprintf(stderr, "  Walking '%s' ...\n", root_dirs[i]);
+    for (i = 0; startpoint[i]; i++){
+        assert(*(startpoint[i]));
+        fprintf(stderr, "  Walking '%s' ...\n", startpoint[i]);
 
-        size = snprintf(cmdline, sizeof(cmdline), "find %s -depth -print0 > "TMP_FILE1, root_dirs[i]);
+        size = snprintf(cmdline, sizeof(cmdline), "find %s -depth -print0 > "TMP_FILE1, startpoint[i]);
         assert((size >= 0) && (size < sizeof(cmdline)));
         assert(system(NULL) && (! system(cmdline)));
 
         assert(! walked_len);
-        assert(walk(root_dirs[i], walk_test_stub));
+        assert(walk(startpoint[i], walk_test_stub));
 
         assert((size = get_file_size(TMP_FILE1)) >= 0);
         assert((fd = open(TMP_FILE1, O_RDONLY)) != -1);
@@ -1859,6 +1869,7 @@ static void receive_positive_integer_test(void){
         left = -1;
 
         assert(receive_positive_integer(table[i].target, (range_flag ? &left : NULL)) == table[i].right);
+
         if (range_flag)
             assert(left == table[i].left);
 
@@ -1871,67 +1882,89 @@ static void receive_positive_integer_test(void){
 
 
 static void receive_expected_string_test(void){
+    // changeable part for updating test cases
+    const char * const candidates[] = {
+        "",
+        " ",
+        "#TEST",
+        "-",
+        "--help",
+        "--long",
+        "--long-help",
+        "// TEST END",
+        "2023/04/01",
+        "2023/04/10",
+        "@=_AT_",
+        "AAA",
+        "ACK",
+        "SAT",
+        "SYN",
+        "_AT_=@",
+        "~"
+    };
+
+
     const struct {
         const char * const target;
-        const unsigned int mode;
+        const int mode;
         const int result;
     }
     // changeable part for updating test cases
     table[] = {
-        { "COPY",      0, ID_COPY        },
-        { "WORKDIR",   0, ID_WORKDIR     },
-        { "SHELL",     0, ID_SHELL       },
-        { "LABEL",     0, ID_LABEL       },
-        { "Volume",    1, ID_VOLUME      },
-        { "from",      1, ID_FROM        },
-        { "add",       1, ID_ADD         },
-        { "ExPose",    1, ID_EXPOSE      },
-        { "HEA",       2, ID_HEALTHCHECK },
-        { "R",         2, ID_RUN         },
-        { "ENT",       2, ID_ENTRYPOINT  },
-        { "AR",        2, ID_ARG         },
-        { "env",       3, ID_ENV         },
-        { "main",      3, ID_MAINTAINER  },
-        { "sTo",       3, ID_STOPSIGNAL  },
-        { "Cmd",       3, ID_CMD         },
-        { "copy",      0,   -2           },
-        { "WORK DIR",  0,   -2           },
-        { "S",         0,   -1           },
-        { "QWERT",     0,   -2           },
-        { "vol"   ,    1,   -2           },
-        { "Form",      1,   -2           },
-        { "a",         1,   -1           },
-        { "Lap-Top",   1,   -2           },
-        { "health",    2,   -2           },
-        { "Run",       2,   -2           },
-        { "EN",        2,   -1           },
-        { "STRAW",     2,   -2           },
-        { "environ",   3,   -2           },
-        { "Main Tain", 3,   -2           },
-        { "",          3,   -1           },
-        { "2.3],fm';", 3,   -2           },
-        {  0,          0,    0           }
+        { "",            0,  0 },
+        { "--long",      0,  5 },
+        { "2023/04/10",  0,  9 },
+        { "SAT",         0, 13 },
+        { " ",           1,  1 },
+        { "// Test End", 1,  7 },
+        { "aAa",         1, 11 },
+        { "_at_=@",      1, 15 },
+        { "-",           2,  3 },
+        { "--h",         2,  4 },
+        { "2023/04/0",   2,  8 },
+        { "_",           2, 15 },
+        { "#T",          3,  2 },
+        { "@=_",         3, 10 },
+        { "Sy",          3, 14 },
+        { "~",           3, 16 },
+        { "\t",          0, -2 },
+        { "--",          0, -1 },
+        { "2022",        0, -2 },
+        { "FIN",         0, -2 },
+        { "# test",      1, -2 },
+        { "--long-help", 1, -2 },
+        { "aa",          1, -2 },
+        { "_at_",        1, -2 },
+        { "=",           2, -2 },
+        { "/* TEST */",  2, -2 },
+        { "2023/04",     2, -1 },
+        { "syn",         2, -2 },
+        { "a",           3, -1 },
+        { "main()",      3, -2 },
+        { ";",           3, -2 },
+        { "HealthCheck", 3, -2 },
+        {  0,            0,  0 }
     };
 
     int i, id;
-    const char *instr_repr;
+    const char *selected;
 
 
     for (i = 0; table[i].target; i++){
-        id = receive_expected_string(table[i].target, docker_instr_reprs, DOCKER_INSTRS_NUM, table[i].mode);
+        id = receive_expected_string(table[i].target, candidates, numof(candidates), table[i].mode);
         assert(id == table[i].result);
 
         if (id >= 0){
-            instr_repr = docker_instr_reprs[id];
+            selected = candidates[id];
             id = SUCCESS;
         }
         else {
-            instr_repr = " ?";
+            selected = "?";
             id = FAILURE;
         }
 
         print_progress_test_loop('S', id, i);
-        fprintf(stderr, "%-9s  %s\n", table[i].target, instr_repr);
+        fprintf(stderr, "%-11s  '%s'\n", table[i].target, selected);
     }
 }
 
@@ -1966,16 +1999,16 @@ static void receive_dockerfile_instr_test(void){
         {  0,                                          0,              0,            0 }
     };
 
-    int i, id, remain;
-    char *line, *args;
+    int i, id;
+    char *args;
 
 
-    for (i = 0; (line = table[i].line); i++){
+    for (i = 0; table[i].line; i++){
         id = table[i].expected_id;
-        args = receive_dockerfile_instr(line, &id);
+        args = receive_dockerfile_instr(table[i].line, &id);
 
         if (table[i].offset >= 0){
-            assert(args == (line + table[i].offset));
+            assert(args == (table[i].line + table[i].offset));
             assert(id == table[i].actual_id);
             id = SUCCESS;
         }
@@ -1985,15 +2018,7 @@ static void receive_dockerfile_instr_test(void){
         }
 
         print_progress_test_loop('S', id, i);
-        fprintf(stderr, "%-38s", line);
-
-        for (remain = 2; remain--;){
-            id = remain ? table[i].expected_id : table[i].actual_id;
-            fprintf(stderr, "  %-11s", ((id >= 0) ? docker_instr_reprs[id] : " ?"));
-        }
-
-        assert(remain == -1);
-        fputc('\n', stderr);
+        fprintf(stderr, "%-38s  %2d  %2d\n", table[i].line, table[i].expected_id, table[i].actual_id);
     }
 }
 
@@ -2163,7 +2188,7 @@ static void get_sanitized_string_test(void){
         len = get_sanitized_string(buf, table[i].target, table[i].quoted);
         assert(len < 64);
         assert(len == strlen(table[i].result));
-        assert(! memcmp(buf, table[i].result, (len + 1)));
+        assert(! memcmp(buf, table[i].result, (sizeof(char) * (len + 1))));
 
         print_progress_test_loop('\0', -1, i);
         fprintf(stderr, "'%s'\n", table[i].result);

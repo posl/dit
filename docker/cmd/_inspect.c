@@ -256,19 +256,18 @@ static file_node *construct_dir_tree(int pwdfd, const char *name){
     if ((dest = strdup(name))){
         if ((file = new_file(pwdfd, dest))){
             if (S_ISDIR(file->mode)){
-                int new_fd;
-                DIR *dir;
+                if ((pwdfd = openat(pwdfd, dest, (O_RDONLY | O_DIRECTORY))) != -1){
+                    DIR *dir;
+                    struct dirent *entry;
+                    file_node *child;
 
-                if ((new_fd = openat(pwdfd, dest, (O_RDONLY | O_DIRECTORY)))){
-                    if ((dir = fdopendir(new_fd))){
-                        struct dirent *entry;
-                        file_node *child;
-
+                    if ((dir = fdopendir(pwdfd))){
                         while ((entry = readdir(dir))){
                             name = entry->d_name;
+                            assert(name && *name);
 
-                            if (check_if_valid_entry(name)){
-                                if (! (child = construct_dir_tree(new_fd, name)))
+                            if (check_if_valid_dirent(name)){
+                                if (! (child = construct_dir_tree(pwdfd, name)))
                                     break;
                                 if (! append_file(file, child)){
                                     destruct_dir_tree(child, NULL, 0);
@@ -283,7 +282,7 @@ static file_node *construct_dir_tree(int pwdfd, const char *name){
                             qsort(file->children, file->children_num, sizeof(file_node *), qcmp);
                     }
                     else
-                        close(new_fd);
+                        close(pwdfd);
                 }
                 else
                     file->errid = errno;
@@ -372,25 +371,25 @@ static bool append_file(file_node *tree, file_node *file){
     assert(file);
 
     if (tree->children_num == tree->children_max){
-        size_t curr;
+        size_t curr_max;
         void *ptr;
 
-        if ((curr = tree->children_max)){
-            curr++;
-            assert(! (curr & (curr - 1)));
+        if ((curr_max = tree->children_max)){
+            curr_max++;
+            assert(! (curr_max & (curr_max - 1)));
 
-            if (! (curr <<= 1))
+            if (! (curr_max <<= 1))
                 return false;
-            curr--;
+            curr_max--;
         }
         else
-            curr = INSP_INITIAL_DIRS_MAX;
+            curr_max = INSP_INITIAL_DIRS_MAX;
 
-        if (! (ptr = realloc(tree->children, (sizeof(file_node *) * curr))))
+        if (! (ptr = realloc(tree->children, (sizeof(file_node *) * curr_max))))
             return false;
 
         tree->children = (file_node **) ptr;
-        tree->children_max = curr;
+        tree->children_max = curr_max;
     }
 
     assert(tree->children);
@@ -463,6 +462,7 @@ static int fcmp_name(const void *a, const void *b, int (* fcmp)(const file_node 
 
     file1 = *((file_node **) a);
     file2 = *((file_node **) b);
+
     assert(file1);
     assert(file2);
 
@@ -538,6 +538,7 @@ static void destruct_dir_tree(file_node *file, const insp_opts *opt, size_t dept
     assert(file->name);
 
     size_t size;
+    file_node * const *p_file;
 
     if (opt){
         if (! file->noinfo){
@@ -571,10 +572,9 @@ static void destruct_dir_tree(file_node *file, const insp_opts *opt, size_t dept
         free(file->link_path);
 
     if (file->children){
-        size = file->children_num;
         depth++;
 
-        for (file_node * const *p_file = file->children; size--; p_file++)
+        for (size = file->children_num, p_file = file->children; size; size--, p_file++)
             destruct_dir_tree(*p_file, opt, depth);
 
         free(file->children);
@@ -666,37 +666,63 @@ static void print_file_owner(const file_node *file, bool numeric_id){
     assert((file->uid >= 0) && (file->uid <= UINT_MAX));
     assert((file->gid >= 0) && (file->gid <= UINT_MAX));
 
-    const char *name;
-    int i = 1;
-    unsigned int id;
+    unsigned int ids[2];
+    const char *names[2] = {0};
+
     struct passwd *passwd;
     struct group *group;
 
-    do {
-        name = NULL;
+    char buf[11];
+    int i, remain;
+    char *output;
 
-        if (i){
-            id = file->uid;
-            if ((! numeric_id) && (passwd = getpwuid(id)))
-                name = passwd->pw_name;
+    size_t size;
+    div_t tmp;
+
+
+    ids[0] = file->uid;
+    ids[1] = file->gid;
+
+    if (! numeric_id){
+        if ((passwd = getpwuid(file->uid)))
+            names[0] = passwd->pw_name;
+
+        if ((group = getgrgid(file->gid)))
+            names[1] = group->gr_name;
+    }
+
+    memcpy((buf + 8), "  ", (sizeof(char) * 3));
+
+
+    for (i = 0; i < 2; i++){
+        remain = 0;
+        output = buf;
+
+        if (names[i] && *(names[i]) && ((size = strlen(names[i])) <= 8)){
+            remain = 8 - size;
+            memcpy((buf + remain), names[i], (sizeof(char) * size));
         }
-        else {
-            id = file->gid;
-            if ((! numeric_id) && (group = getgrgid(id)))
-                name = group->gr_name;
+        else if (ids[i] < 100000000){
+            tmp.quot = ids[i];
+            remain = 8;
+
+            do {
+                tmp = div(tmp.quot, 10);
+                buf[--remain] = tmp.rem + '0';
+            } while (tmp.quot);
+        }
+        else
+            output = " #EXCESS  ";
+
+        if (remain){
+            assert((remain > 0) && (remain < 8));
+            assert(buf == output);
+            memcpy(buf, "       ", (sizeof(char) * remain));
         }
 
-        if (! (name && (strlen(name) <= 8))){
-            if (id < 100000000){
-                fprintf(stdout, "%8u  ", id);
-                continue;
-            }
-            name = " #EXCESS";
-        }
-        fprintf(stdout, "%8s  ", name);
-    } while (i--);
-
-    assert(i == -1);
+        assert(strlen(output) == 10);
+        fputs(output, stdout);
+    }
 }
 
 
@@ -712,10 +738,9 @@ static void print_file_owner(const file_node *file, bool numeric_id){
 static void print_file_size(off_t size){
     assert(size >= 0);
 
-    unsigned int i = 0;
+    int i = 0, rem = 0, unit = '\0';
     lldiv_t tmp = {0};
-    const char *format = " #EXCESS    ";
-    int rem = 0, unit = '\0';
+    const char *format;
 
     while (size >= 1000){
         i++;
@@ -726,16 +751,18 @@ static void print_file_size(off_t size){
     }
 
     if (i < 8){
-        format = "%6u B    ";
-
-        if (i){
-            format = "%3u.%1d %cB    ";
+        if (! i)
+            format = "%6d B    ";
+        else {
+            format = "%3d.%1d %cB    ";
             rem = tmp.rem / 100;
             unit = " kMGTPEZ"[i];
         }
     }
+    else
+        format = " #EXCESS    ";
 
-    fprintf(stdout, format, ((unsigned int) size), rem, unit);
+    fprintf(stdout, format, ((int) size), rem, unit);
 }
 
 
@@ -775,93 +802,89 @@ static void print_file_name(const file_node *file, const insp_opts *opt, bool li
     size = get_sanitized_string(output, tmp, false);
 
     if (opt->color){
-        memcpy((output + size), "\e[0m", 5);
+        memcpy((output + size), "\e[0m", (sizeof(char) * 5));
 
         if (! file->link_invalid)
             switch ((mode & S_IFMT)){
                 case S_IFREG:
                     tmp =
-                        (mode & S_ISUID) ? "37;41" :
-                        (mode & S_ISGID) ? "30;43" :
-                        (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) ? "1;32" :
-                            "0";
+                        (mode & S_ISUID) ? "\e[37;41m" :
+                        (mode & S_ISGID) ? "\e[30;43m" :
+                        (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) ? "\e[1;32m" :
+                            "\e[0m";
                     break;
                 case S_IFDIR:
                     switch ((mode & (S_ISVTX | S_IWOTH))){
                         case 0:
-                            tmp = "1;34";
+                            tmp = "\e[1;34m";
                             break;
                         case S_ISVTX:
-                            tmp = "37;44";
+                            tmp = "\e[37;44m";
                             break;
                         case S_IWOTH:
-                            tmp = "34;42";
+                            tmp = "\e[34;42m";
                             break;
                         default:
-                            tmp = "30;42";
+                            tmp = "\e[30;42m";
                     }
                     break;
                 case S_IFCHR:
                 case S_IFBLK:
-                    tmp = "1;33";
+                    tmp = "\e[1;33m";
                     break;
                 case S_IFIFO:
-                    tmp = "33";
+                    tmp = "\e[33m";
                     break;
                 case S_IFLNK:
-                    tmp = "1;36";
+                    tmp = "\e[1;36m";
                     break;
                 case S_IFSOCK:
-                    tmp = "1;35";
+                    tmp = "\e[1;35m";
                     break;
                 default:
-                    tmp = "0";
+                    tmp = "\e[0m";
             }
         else
-            tmp = "31";
-
-        *(--output) = 'm';
+            tmp = "\e[31m";
 
         size = strlen(tmp);
-        assert(size <= 5);
-        output -= size;
-        memcpy(output, tmp, size);
+        assert(size >= 4);
 
-        output -= 2;
-        memcpy(output, "\e[", 2);
+        output -= size;
+        memcpy(output, tmp, (sizeof(char) * size));
     }
 
     if (link_flag){
         output -= 4;
-        memcpy(output, " -> ", 4);
+        memcpy(output, " -> ", (sizeof(char) * 4));
     }
 
     fputs(output, stdout);
 
 
-    int i;
+    int c;
 
     if (opt->classify){
         switch ((mode & S_IFMT)){
             case S_IFREG:
                 if (! (mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
                     return;
-                i = '*';
+                c = '*';
                 break;
             case S_IFDIR:
-                i = '/';
+                c = '/';
                 break;
             case S_IFIFO:
-                i = '|';
+                c = '|';
                 break;
             case S_IFSOCK:
-                i = '=';
+                c = '=';
                 break;
             default:
                 return;
         }
-        assert(i);
-        fputc(i, stdout);
+        assert(c);
+        fputc(c, stdout);
     }
 }
 
@@ -1032,18 +1055,13 @@ static void append_file_test(void){
         assert(node.children);
         assert(node.children[i++] == file);
         assert(node.children_num == i);
+        assert(node.children_max >= INSP_INITIAL_DIRS_MAX);
 
         free(file);
 
-        if (i <= INSP_INITIAL_DIRS_MAX)
-            assert(node.children_max == INSP_INITIAL_DIRS_MAX);
-        else {
-            assert(node.children_max > INSP_INITIAL_DIRS_MAX);
-            break;
-        }
-    } while (true);
+    } while (i <= INSP_INITIAL_DIRS_MAX);
 
-    assert(i == (INSP_INITIAL_DIRS_MAX + 1));
+    assert(node.children_max > INSP_INITIAL_DIRS_MAX);
 
     free(node.children);
 }

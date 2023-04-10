@@ -358,6 +358,7 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
                     }
                     first_blank = true;
                 }
+
                 lineno++;
                 data->lines_num++;
             }
@@ -367,6 +368,7 @@ static int construct_refl_data(refl_data *data, int argc, char **argv, int blank
                     msg = "read size overflow detected";
                 if (msg)
                     xperror_file_contents(src_file, lineno, msg);
+
                 exit_status = POSSIBLE_ERROR;
                 break;
             }
@@ -485,8 +487,9 @@ static int reflect_lines(refl_data *data, const refl_opts *opt){
                                 continue;
                             }
                         }
-                        xperror_message("write size overflow detected", dest_file);
+
                         assert(! data->lines_num);
+                        xperror_message("write size overflow detected", dest_file);
                         break;
                     } while (--remain);
 
@@ -621,6 +624,7 @@ static int record_reflected_lines(void){
 
     if ((fp = fopen(REFLECT_FILE_R, "w"))){
         code = 31;  // red
+
         if (! get_last_exit_status())
             code++;  // grean
 
@@ -683,16 +687,14 @@ static int manage_provisional_report(int reflecteds[2], const char *mode){
         if (fp){
             if (mode_c == 'r'){
                 if (fread(array_for_read, sizeof(int), 2, fp) == 2){
-                    i = 1;
-
-                    do {
+                    for (i = 0; i < 2; i++){
                         j = reflecteds[i] + array_for_read[i];
 
                         if (reflecteds[i] <= j)
                             reflecteds[i] = j;
                         else
                             exit_status = UNEXPECTED_ERROR;
-                    } while (i--);
+                    }
                 }
                 else
                     exit_status = UNEXPECTED_ERROR;
@@ -710,15 +712,14 @@ static int manage_provisional_report(int reflecteds[2], const char *mode){
         else
             exit_status = UNEXPECTED_ERROR;
 
-        if (*mode){
-            if (! keep_c){
-                array_for_read[1] = 0;
-                array_for_read[0] = 0;
-                array_for_write = array_for_read;
-            }
-        }
-        else
+        if (! *mode)
             return exit_status;
+
+        if (! keep_c){
+            array_for_read[1] = 0;
+            array_for_read[0] = 0;
+            array_for_write = array_for_read;
+        }
     } while (true);
 }
 
